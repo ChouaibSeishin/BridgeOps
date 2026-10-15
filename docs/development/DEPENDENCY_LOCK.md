@@ -34,3 +34,5 @@ Selected tag aliases: eclipse-temurin:21-jdk-jammy, eclipse-temurin:21-jre-jammy
 GitHub action releases were queried from their official repositories and resolved to commit SHAs. ci.yml pins checkout v7.0.1, setup-java v6.1.0 and setup-node v7.1.0; the [foundation workflow](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38776342374) passed on commit b1517ec. Later commits require their own verified CI result. CI Java setup follows the maintained Java 21 line; exact observed runtime must be recorded by each CI run.
 
 No release candidate is selected. TypeScript 5.9.3 intentionally satisfies typescript-eslint's <6.1 peer range. No force/legacy-peer-deps install was used. Later feature SDKs are not yet dependencies. Future upgrades update this evidence and rerun relevant checks. A lock does not establish absence of vulnerabilities.
+
+Phase 1B.2 adds spring-security-oauth2-jose without an explicit version: the unchanged Spring Boot 4.1.1 BOM manages Spring Security and Nimbus. RSA signing/verification uses those maintained APIs rather than a separate JWT library/version override.

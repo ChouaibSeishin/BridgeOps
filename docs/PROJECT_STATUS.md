@@ -1,6 +1,6 @@
 # Project status
 
-Updated: 2026-10-15 UTC. Current increment: **Phase 1B.1 — internal identity and refresh-session core**. Phase 1A is preserved and verified. Full Phase 1B HTTP authentication and Phase 1C bootstrap/tenant onboarding are **not complete**.
+Updated: 2026-10-15 UTC. Current increment: **Phase 1B.2 — access-token component; HTTP boundary pending**. Phase 1A is preserved and verified. Full Phase 1B HTTP authentication and Phase 1C bootstrap/tenant onboarding are **not complete**.
 
 ## GitHub and completed baseline
 
@@ -60,3 +60,9 @@ No production security, WCAG/assistive-technology conformance, cloud deployment/
 ## Next increment
 
 Phase 1B.2: signed access tokens bound to live families, complete HTTP DTO/controller/application integration, same-origin/CSRF protection, correct local/production cookie flags, bounded login throttling, safe errors and negative HTTP security tests. Then Phase 1C implements offline one-shot initial-account provisioning and tenant onboarding. Commit and push each completed verified increment separately.
+
+## Phase 1B.2 access-token checkpoint
+
+AccessTokens now implements identity-only RS256 JWT signing and strict verification, a ten-minute maximum capped by family expiry, explicit local key IDs and bounded previous-key overlap. The five focused security tests passed in this session. See [the HTTP authentication guide](development/PHASE_1B_HTTP_AUTH.md). HTTP remains denied until the complete cookie/CSRF/Origin/throttle boundary is verified.
+
+Fresh Phase 1B.2 verification: Maven verify passed on 2026-10-15 with 11 unit/MVC tests and 13 PostgreSQL integration tests (24 total, zero failures/errors/skips). Documentation checker passed 41 Markdown files and 72 local links. Frontend and containers were not rerun for this isolated component; their earlier results remain historical.
