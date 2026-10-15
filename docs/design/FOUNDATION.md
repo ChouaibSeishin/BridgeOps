@@ -1,0 +1,17 @@
+# Design foundation
+
+Status: tokens and layout direction retained after review. Phase 1A implements an inspectable shell; rendered results and verification limits are recorded in PROJECT_STATUS.md. [Token source](../../frontend/src/styles/tokens.css) remains framework-independent and is imported alongside Tailwind.
+
+Use a restrained operations workspace: warm neutral light surfaces, graphite dark surfaces, indigo actions, clear table hierarchy, monospaced identifiers and readable status text. Use system sans-serif initially to avoid font licensing/network dependencies. Typography targets: 14px body, 12px metadata, 24px page title; 1.5 body line height. Use a 4px spacing scale, 6–12px radii and modest shadows. Tokens govern colors, spacing, typography, borders, focus and states.
+
+Desktop shell: 240px navigation rail, compact top bar, content width up to 1440px. Final sidebar groups operations (overview/workflows/executions/integrations/approvals), intelligence (AI/analytics) and governance (audit/settings). Top bar contains organization selector, breadcrumbs, theme and user controls as those features exist; search and notifications appear only when functional. Phase 1A exposes Overview and Runtime only, with compact wrapping mobile navigation. A future drawer must preserve focus and keyboard access. Tables allow deliberate horizontal scrolling; key actions remain accessible.
+
+Show page title, precise supporting text and one primary action. Prefer compact metric strips, tables and timelines over a grid of unrelated cards. Use outlined surfaces for configuration and inspection, not every content item. Status always includes text/icon, not color alone. Definition versions and operation IDs use monospace.
+
+Workflow canvas: left categorized palette; central graph with visible trigger/action/condition/approval distinctions; right configuration inspector. Keep zoom/fit controls, keyboard alternatives to dragging, unsaved-change text, version badge and node-specific validation list. Errors link to the affected node. Publish shows the exact draft revision. Test-run uses the label **Run test — real effects**, lists configured integrations and requires a confirmation dialog explaining possible real requests and changes. The request carries effectsAcknowledged=true. A true dry-run is a separate deferred feature.
+
+Execution view prioritizes state and timestamps, then graph/timeline, attempts and sanitized item results. Approval view shows exact changes, requester, expiry, policy and consequences before decision. AI view labels MOCK or provider identity and differentiates proposal, approval request and completed action.
+
+Focus rings must be visible against both surface themes, pointer targets at least 40px (44px mobile), labels programmatically associated, and reduced-motion preference respected. Target WCAG 2.2 AA; no conformance claim before keyboard, contrast and assistive-technology checks. Minimum body text contrast is 4.5:1 and control boundaries/focus 3:1 where applicable. Tokens and component states require rendered validation.
+
+Loading, empty, failure and success are separate states. Empty workflow list offers create only to authorized builders. Unavailable API displays retry and a correlation ID; no fabricated metrics. Disabled unavailable features explain the milestone dependency or are omitted. No inert primary navigation/action is shipped to imply functionality.

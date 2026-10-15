@@ -1,0 +1,6 @@
+* text=auto
+*.sh text eol=lf
+mvnw text eol=lf
+*.cmd text eol=crlf
+# Markdown permits intentional hard-break spaces.
+*.md whitespace=-blank-at-eol

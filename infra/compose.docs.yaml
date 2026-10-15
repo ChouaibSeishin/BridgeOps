@@ -1,0 +1,7 @@
+# Explicit local-only documentation/development opt-in. Never use this override in production.
+services:
+  backend:
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      API_DOCS_ENABLED: "true"

@@ -1,0 +1,45 @@
+# Local secrets and machine settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Build and test output
+**/target/
+**/node_modules/
+**/dist/
+**/coverage/
+**/playwright-report/
+**/test-results/
+*.log
+.tmp/
+
+# Project-local toolchains and caches
+.tools/
+.cache/
+
+
+# Local archives, credentials and database exports
+*.7z
+*.zip
+*.tar
+*.tar.gz
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.backup
+.npmrc
+.mvn/settings.xml
+**/settings-security.xml

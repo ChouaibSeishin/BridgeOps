@@ -1,0 +1,12 @@
+.git
+.tools
+.cache
+.tmp
+.env
+.env.*
+**/node_modules
+**/target
+**/dist
+**/coverage
+**/test-results
+**/.gitkeep
