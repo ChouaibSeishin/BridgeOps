@@ -1,6 +1,6 @@
 # Proposed API contract outline
 
-Status: planned routes and DTO shapes. **Only the Phase 1A info/health routes are implemented. All other routes below are planned.** Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths.
+Status: planned routes and DTO shapes. **Info/health and the six Phase 1B.2 auth routes are implemented. All remaining routes below are planned.** Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths.
 
 ## Shared conventions
 
@@ -68,6 +68,6 @@ Mock AI responses identify `providerMode=MOCK`. Provider output is schema-valida
 
 There is no bootstrap or public registration HTTP route. The offline command provisions one verified account, not a tenant, and consumes a singleton installation marker. POST /organizations checks the account-level organization.create grant, creates the tenant and its Owner membership in one transaction, then returns 201. Invitation acceptance requires the intended recipient and grants only checked tenant roles. Normal startup cannot provision accounts. See ADR 0014.
 
-## Phase 1B.1 transport status
+## Implemented Phase 1B.2 transport
 
-Internal password/session persistence and rotation now exist, but no auth route in this outline has been enabled. The external implemented API remains system info and health only. The next transport increment must add signed access validation, exact Origin/CSRF, secure cookie settings and throttling together; it must map internal rejections to non-enumerating HTTP responses. Never return the internal Granted object directly as JSON.
+With authentication explicitly enabled and signing material configured, GET /api/v1/auth/csrf and /me, and POST /api/v1/auth/login, /refresh, /logout and /logout-all are implemented. The rest of the target route table remains planned. See [the HTTP guide](../development/PHASE_1B_HTTP_AUTH.md) for exact DTOs, required headers, cookie settings, errors and configuration. Never serialize internal Granted objects. Unrelated business routes remain denied even with a valid bearer credential.

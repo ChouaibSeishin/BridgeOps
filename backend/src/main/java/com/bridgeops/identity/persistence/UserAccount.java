@@ -20,6 +20,8 @@ public class UserAccount {
 
     protected UserAccount() { }
     public UUID getId() { return id; }
+    public String getEmail() { return email; }
+    public String getDisplayName() { return displayName; }
     public String getPasswordHash() { return passwordHash; }
     public boolean isActive() { return "ACTIVE".equals(accountStatus); }
 }

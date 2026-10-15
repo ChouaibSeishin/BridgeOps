@@ -1,6 +1,6 @@
 # Phase 1 verification
 
-Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The complete HTTP authentication/onboarding/tenant gates remain planned; Phase 1B.1 internal session behavior is implemented; do not mark the full phase complete from foundation checks.
+Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The HTTP authentication adapter and its security tests are implemented; onboarding/tenant/browser gates remain planned; do not mark the full phase complete from foundation checks.
 
 ## Exact foundation commands
 
@@ -15,6 +15,7 @@ npm.cmd --prefix frontend test
 npm.cmd --prefix frontend run build
 node scripts/verify-docs.mjs
 ./scripts/setup-local.ps1
+./scripts/setup-auth.ps1
 docker compose --env-file .env -f infra/compose.yaml config --quiet
 docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
 Invoke-RestMethod http://localhost:8088/api/v1/system/info
@@ -24,7 +25,7 @@ Invoke-RestMethod http://localhost:8088/health/readiness
 
 Run setup only when .env is absent. It intentionally refuses overwrite. POSIX backend equivalent: `cd backend` then `./mvnw -B -ntp verify`. Local sandbox permissions may require approved execution outside the sandbox; this is not evidence of an unavailable Docker daemon. Host runtime versions and container runtimes are reported separately.
 
-Backend verify now runs four MVC boundary tests, two password/token unit tests and thirteen required PostgreSQL integration tests (three foundation plus ten identity/session cases). Check reports for actual counts/failures/skips; missing Docker is a failure, not an accepted skip. Tests cover public info/correlation, denied unknown APIs, mutation denial, private docs by default, empty migration and minimal probes plus opt-in OpenAPI. Future authentication tests are not implied by these denials.
+Backend verify now runs fourteen unit/MVC tests (four foundation, two password/token, five JWT and three browser controls) and thirty-one required PostgreSQL integration tests (three foundation, ten session core and eighteen HTTP cases). Check reports for actual counts/failures/skips; missing Docker is a failure, not an accepted skip. Tests cover public info/correlation, denied unknown APIs, mutation denial, private docs by default, empty migration and minimal probes plus opt-in OpenAPI. HTTP tests additionally cover exact Origin/CSRF, signed session binding, production cookie attributes, live JWT revocation, bounded/concurrent throttling, replay/expiry, generic errors and dependency failure. See [the HTTP guide](PHASE_1B_HTTP_AUTH.md).
 
 Frontend tests cover actual info/readiness requests, loading, recoverable outage, theme and routing. Typecheck and lint are separate gates. A production build is not a browser test; inspect desktop/mobile and both themes before describing visual quality.
 

@@ -28,6 +28,16 @@ services:
       SPRING_FLYWAY_USER: bridgeops_migrator
       SPRING_FLYWAY_PASSWORD: ${MIGRATION_PASSWORD:?Required migration password}
       API_DOCS_ENABLED: "false"
+      BRIDGEOPS_AUTH_ENABLED: "true"
+      BRIDGEOPS_AUTH_ORIGIN: ${AUTH_ORIGIN:-http://localhost:${BRIDGEOPS_PORT:-8088}}
+      BRIDGEOPS_AUTH_LOCAL_HTTP: "true"
+      BRIDGEOPS_AUTH_ISSUER: bridgeops-local
+      BRIDGEOPS_AUTH_KEY_ID: local-v1
+      BRIDGEOPS_AUTH_PRIVATE_KEY: /run/bridgeops-auth/access-private.pem
+      BRIDGEOPS_AUTH_PUBLIC_KEY: /run/bridgeops-auth/access-public.pem
+      BRIDGEOPS_AUTH_CSRF_KEY: /run/bridgeops-auth/csrf.key
+    volumes:
+      - ../secrets/auth:/run/bridgeops-auth:ro
     depends_on:
       postgres:
         condition: service_healthy

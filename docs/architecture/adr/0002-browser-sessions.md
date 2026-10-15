@@ -1,6 +1,6 @@
 # ADR-0002-browser-sessions: Browser sessions and revocation
 
-Status: Proposed. Date: 2026-10-15.
+Status: Accepted. Date: 2026-10-15.
 
 ## Context
 
@@ -17,3 +17,5 @@ Short-lived in-memory access JWT and rotating opaque HttpOnly refresh cookie, CS
 ## Consequences
 
 Immediate revocation costs a database lookup; strict refresh races may require login. Signing-key rotation and cookie tests are required.
+
+Implementation: the session core and Phase 1B.2 HTTP boundary use RS256 with explicit key IDs, live database checks, signed refresh-bound CSRF cookies and exact Origin enforcement. The browser sign-in/client coordination work remains pending. See [the HTTP guide](../../development/PHASE_1B_HTTP_AUTH.md) for tested boundaries and signing-key cutover constraints.

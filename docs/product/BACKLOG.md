@@ -23,4 +23,4 @@ Every increment includes validation, backend authorization, migrations, safe err
 
 ## Current verified checkpoint
 
-Phase 1A is committed and published as b1517ec with a passing hosted workflow. Phase 1B.1 internal identity/opaque-session behavior is implemented with 19 backend tests passing; the next increment is the complete HTTP/JWT/CSRF/Origin/cookie/throttle boundary in 1B.2. The overall Phase 1B row remains incomplete until those controls are implemented and tested. See PROJECT_STATUS.md for exact evidence and Git outcomes.
+Phase 1A and Phase 1B.1 are preserved. JWT component f00a1e0 is published with passing CI. Phase 1B.2 now implements HTTP authentication, cookie/CSRF/Origin protection, bounded shared throttling and negative security tests. Check PROJECT_STATUS.md for the final verification, publication and CI evidence. Next is Phase 1C offline bootstrap/organization onboarding, followed by Phase 1D browser login and session coordination. Password recovery/setup and tenant authorization are not implied by the HTTP checkpoint.

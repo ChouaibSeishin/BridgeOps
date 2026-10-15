@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfiguration {
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="bridgeops.auth.enabled", havingValue="false", matchIfMissing=true)
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             @Value("${bridgeops.api-docs.enabled:false}") boolean docsEnabled) throws Exception {
         http.authorizeHttpRequests(authorize -> {

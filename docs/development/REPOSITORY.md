@@ -30,7 +30,7 @@ docs/{product,architecture,api,security,development,design}/
 README.md, SECURITY.md
 ```
 
-Implemented addition in Phase 1B.1: identity/application (password/token/session services), identity/domain (typed/redacted outcomes), identity/persistence (entities and repositories), ClockConfiguration, V2__identity_sessions.sql, PasswordPolicyTest and PasswordSessionIT. No HTTP authentication transport or account-provisioning command exists yet.
+Implemented addition in Phase 1B.1: identity/application (password/token/session services), identity/domain (typed/redacted outcomes), identity/persistence (entities and repositories), ClockConfiguration, V2__identity_sessions.sql, PasswordPolicyTest and PasswordSessionIT. Phase 1B.2 adds identity/web (HTTP DTOs/controller, security configuration/filters, signed CSRF and cookies), AccessTokens, IdentityQueries, AuthenticationThrottle, V3__authentication_throttles.sql, AccessTokensTest, BrowserSecurityTest, AuthenticationHttpIT and scripts/setup-auth.ps1. An account-provisioning command does not exist yet.
 
 Planned modules: organizations, integrations, workflows, executions, approvals, ai, mcp, audit and notifications. Each module exposes `api` contracts and owns application/domain/persistence/web code when useful; no unused package skeletons or interface-per-class requirement. REST DTOs do not expose JPA entities. Cross-module entities/repositories are forbidden; use public application services.
 

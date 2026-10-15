@@ -10,3 +10,7 @@
 **/coverage
 **/test-results
 **/.gitkeep
+
+secrets
+**/*.pem
+**/*.key

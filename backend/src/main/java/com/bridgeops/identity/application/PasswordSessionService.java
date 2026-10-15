@@ -20,7 +20,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Internal boundary only. HTTP adapters must add CSRF/Origin, throttling and access-token checks. */
+/** Application session boundary; HTTP controls are supplied by the identity web adapter. */
 @Service
 public class PasswordSessionService {
     private static final Duration FAMILY_LIFETIME = Duration.ofDays(7);
@@ -113,6 +113,12 @@ public class PasswordSessionService {
                 && !family.isExpired(clock.instant()) && users.findById(userId).map(UserAccount::isActive).orElse(false);
     }
 
+    /** Cookie-authorized logout; revocation never creates a successor or grants access. */
+    @Transactional(timeout = 10)
+    public void revokePresented(String raw) {
+        if (!tokens.isWellFormed(raw)) return;
+        credentials.locate(tokens.hash(raw)).ifPresent(ref -> revokeFamily(ref.getUserId(),ref.getFamilyId()));
+    }
     private Granted issue(SessionFamily family, UUID parent, Instant now) {
         String raw = tokens.generate();
         credentials.save(new RefreshSession(family.getId(), parent, tokens.hash(raw), now, family.getExpiresAt()));

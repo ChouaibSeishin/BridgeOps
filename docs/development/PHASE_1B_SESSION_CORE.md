@@ -1,3 +1,5 @@
+Historical checkpoint: this report describes commit ffa151d. The current HTTP adapter is documented in [Phase 1B.2](PHASE_1B_HTTP_AUTH.md); its implementation supersedes the pending-transport statements below.
+
 # Phase 1B.1 — identity and opaque-session core
 
 Scope: internal application services and PostgreSQL persistence only. This increment does not expose login/refresh/logout HTTP routes, issue access JWTs, provide cookies/CSRF, throttle callers, create an initial account or add a sign-in UI. Those remain explicit next increments. The existing deny-by-default HTTP security chain is unchanged.
