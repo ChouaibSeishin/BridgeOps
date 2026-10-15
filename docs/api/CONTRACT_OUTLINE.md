@@ -67,3 +67,7 @@ Mock AI responses identify `providerMode=MOCK`. Provider output is schema-valida
 ## Initial account lifecycle
 
 There is no bootstrap or public registration HTTP route. The offline command provisions one verified account, not a tenant, and consumes a singleton installation marker. POST /organizations checks the account-level organization.create grant, creates the tenant and its Owner membership in one transaction, then returns 201. Invitation acceptance requires the intended recipient and grants only checked tenant roles. Normal startup cannot provision accounts. See ADR 0014.
+
+## Phase 1B.1 transport status
+
+Internal password/session persistence and rotation now exist, but no auth route in this outline has been enabled. The external implemented API remains system info and health only. The next transport increment must add signed access validation, exact Origin/CSRF, secure cookie settings and throttling together; it must map internal rejections to non-enumerating HTTP responses. Never return the internal Granted object directly as JSON.

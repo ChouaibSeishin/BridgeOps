@@ -66,3 +66,9 @@ Residual risks: single-database application tenancy depends on complete query di
 ## Reference guidance
 
 Controls are design decisions informed by [OWASP multi-tenant security](https://cheatsheetseries.owasp.org/cheatsheets/Multi_Tenant_Security_Cheat_Sheet.html), [SSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) and [CSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html). These references do not establish that BridgeOps implements their guidance.
+
+## Phase 1B.1 implementation boundary
+
+BCrypt and the hashed opaque-refresh lifecycle are now implemented as internal services with transaction/concurrency tests. No login HTTP route, JWT, cookie, CSRF/Origin adapter, throttle or browser sign-in is exposed yet; all such planned controls above retain their future status. Refresh replay commits family revocation and a safe event even when the result is rejected. Email identifiers are ASCII with trim/ROOT-lower normalization matched by PostgreSQL C-collation checks. Runtime event rows are insert/read only. These checks do not establish tenant isolation or complete authentication security. Details and limitations are in [the session-core report](../development/PHASE_1B_SESSION_CORE.md).
+
+Local migration credential limit: the current Compose backend also receives Flyway credentials for startup migrations. Database-role privilege checks do not isolate those credentials from a compromised backend process. A production deployment must run migrations with a separate operator/job and omit migration credentials from the long-lived runtime. This is a documented development limitation, not production containment.

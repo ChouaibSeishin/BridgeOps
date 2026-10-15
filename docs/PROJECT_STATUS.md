@@ -1,69 +1,62 @@
 # Project status
 
-Updated: 2026-10-15 UTC. Current increment: **Phase 1A — runnable technical foundation**. The documentation review is resolved and implementation is authorized; no additional Phase 0 approval is pending. Full Phase 1 (authentication, bootstrap and tenant onboarding) is **not complete**.
+Updated: 2026-10-15 UTC. Current increment: **Phase 1B.1 — internal identity and refresh-session core**. Phase 1A is preserved and verified. Full Phase 1B HTTP authentication and Phase 1C bootstrap/tenant onboarding are **not complete**.
 
-## Implemented
+## GitHub and completed baseline
 
-- Java 21/Spring Boot 4.1.1 backend, Maven Wrapper 3.9.16 with verified distribution checksum, DTO-based safe system info and server-generated correlation IDs.
-- Default-denied business routes, no generated account/password, minimal separate liveness/readiness, opt-in OpenAPI and structured logs. This is not implemented user authentication.
-- PostgreSQL 18.6 and Flyway V1 technical platform_metadata migration; distinct migration/runtime database roles in Compose. Business schema remains planned.
-- Strict React/TypeScript/Vite frontend with TanStack Query, Overview and Runtime routes, actual info/readiness requests, loading/error/retry states, theme switching and responsive navigation. No fabricated tenant/workflow statistics or login controls.
-- Digest-pinned multi-stage Docker builds, non-root app containers, same-origin nginx routing, named PostgreSQL volume, unique generated local credentials, ignored .env and localhost-only frontend binding.
-- Four backend MVC boundary tests, three required PostgreSQL/OpenAPI integration tests, four frontend behavior tests, lockfile and pinned GitHub Actions workflow.
-- Conflicts A–G documented, revised seven-phase roadmap, explicit stack and bootstrap ADRs, accurate reporting-channel policy, real-effects test-run confirmation contract and inclusive deadline semantics.
+Public repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Local branch remains master and tracks origin/master. Initial inspection found no local commits/remotes/tracked files and no GitHub refs; existing work was preserved, secret-checked and committed.
 
-## Verification evidence
+Foundation commit: `b1517ec` — `chore: establish verified BridgeOps foundation`. Push succeeded; GitHub's master ref matched the commit hash. The [foundation GitHub Actions run](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38776342374) completed successfully. Git Credential Manager worked; GitHub CLI/connector installation was unnecessary. Do not infer the outcome for later commits from that baseline run.
 
-| Category | Command/check actually executed | Result |
-| --- | --- | --- |
-| Documentation | project-local Node scripts/verify-docs.mjs | Passed: 35 Markdown files, 60 local links, 6 Mermaid blocks, 14 ADRs |
-| Backend build/tests | backend/mvnw.cmd -f backend/pom.xml -B -ntp with project-local Maven cache, verify | BUILD SUCCESS; 4 MVC tests + 3 required PostgreSQL IT tests, zero failures/errors/skips |
-| Database integration | Testcontainers PostgreSQL 18.6, Flyway empty-schema migration | V1 applied; metadata and schema history assertions passed |
-| OpenAPI | Integration test with explicit docs-enabled property | Implemented info route present; imaginary login route absent; private-by-default MVC test passed |
-| Frontend | pinned npm install; typecheck; lint; test; build | Passed; 4 behavior tests; production Vite build completed |
-| Production dependency audit | npm --prefix frontend audit --omit=dev --audit-level=high | Passed, reported zero vulnerabilities at check time; not a comprehensive backend/dev-dependency security audit |
-| Compose | config --quiet; images built; startup on port 8088 | Three services healthy; final documented up --build -d --wait command passed on port 8088 |
-| API/probes | GET info, liveness, readiness via http://localhost:8088 | 200; identity matches DTO; both probes UP with minimal output |
-| Denied API | GET /api/v1/organizations | 401 safe denial; no fabricated organization endpoint |
-| Database privilege check | pg_roles + has_schema_privilege + has_table_privilege | Runtime role: not superuser, cannot CREATE in public, cannot INSERT platform_metadata |
-| Outage/recovery | Stop only BridgeOps PostgreSQL, check probes, restart in finally | Liveness 200; readiness 503 during outage; readiness 200 after restart; technical data persisted |
-| Actual browser | In-app browser desktop light/dark, 390x844 mobile, theme control and Runtime navigation | Inspected; mobile document width 390 equals viewport 390; captured console warnings/errors empty |
-| Screenshots | Captured from actual running local browser | docs/screenshots/foundation-desktop.jpg and foundation-mobile-dark.jpg; no mock screenshots |
-| Limited secret leakage | Generated local database passwords checked against Git-visible source and captured backend/PostgreSQL logs, values never printed | Passed; this is not a comprehensive secret scanner |
-| Git hygiene | git diff --check | Exited successfully; files remain untracked in this initially empty repository, so this alone does not check new-file whitespace |
+## Implemented now
 
-Initial verification failures were corrected: PowerShell Maven argument splitting; missing checksum endpoint (used official SHA-512 plus derived SHA-256); MVC slice missing explicit web security; Testcontainers digest compatibility; builder missing unzip causing archive-format checksum mismatch. Windows rejected port 8080; the project default and current .env now use localhost:8088. No unrelated running service was stopped. A documentation replacement bug damaged four texts; the link checker exposed it, originals were restored, and explicit corrections/checks passed.
+- Phase 1A Spring Boot/React/PostgreSQL foundation, info/health endpoints, default-denied business routes, real status shell, same-origin proxy, non-root app containers, pinned dependency builds and CI.
+- V2 users/session_families/refresh_sessions/identity_security_events migration, JPA ownership and constraints, current-user/family binding and safe internal security events. No user is seeded.
+- BCrypt cost 12 with minimum 12 Unicode code points and maximum 72 UTF-8 bytes; dummy verification for unknown accounts.
+- 256-bit opaque refresh credentials stored only as SHA-256 hashes; seven-day absolute family expiry; single-use rotation, strict replay revocation, individual/all-family revocation, disabled-account checks and safe redacted outcomes.
+- Account-before-family transaction locks, scalar lookup before locking to avoid stale managed state, and a typed rejection so replay revocation/audit commits rather than rolls back.
+- Git workflow/assessment, secure archive/key/export ignores, a canonical dependency-lock pointer and a data-preserving local database password-rotation guide.
 
-## Runtime and dependency observations
+Internal session services confer no organization/platform permissions and have no HTTP mapping. The existing deny-by-default SecurityFilterChain remains unchanged. There is no working login UI, access JWT, refresh cookie, public registration, bootstrap HTTP endpoint or initial-owner command yet.
 
-Observed again in this session: host Java 21.0.4/Maven 3.9.9/Node 20.17.0. Approved execution outside the sandbox reached Docker Engine 28.3.2 and Compose 2.39.1; the earlier denied daemon observation was sandbox-specific, not an unavailable engine. Project commands use checksum-verified local Node 24.22.0/npm 11.19.1. The pinned runtime image reports Temurin 21.0.12.1+1-LTS; nginx reports 1.30.6. Exact image digests/checksums and dependency versions are in [dependency evidence](development/DEPENDENCY_LOCK.md).
+## Verification executed in this session
 
-## Current source/module structure
+| Check | Actual result |
+| --- | --- |
+| Baseline backend verify | 4 MVC + 3 required PostgreSQL tests passed before the foundation commit |
+| Frontend typecheck, lint, test, build | Passed; 4 behavior tests. Frontend source is unchanged by the session-core increment |
+| Narrow password/token tests | 2 passed before full verification |
+| Final backend verify | BUILD SUCCESS; 6 unit/MVC + 13 required PostgreSQL integration tests, zero failures/errors/skips |
+| Session core cases | Bad/unknown/disabled credentials; rotation; fixed expiry; persisted replay revocation; exact expiry; owned/global revocation; account suspension; malformed tokens; concurrent duplicate refresh; email constraints |
+| Compose build/start | Final up --build -d --wait passed; all three services healthy on localhost:8088 |
+| Existing-volume upgrade | V1 and V2 present; users count 0; no fixture or default account seeded |
+| Runtime privileges | Can INSERT/UPDATE refresh_sessions and INSERT security events; cannot UPDATE/DELETE identity_security_events |
+| Unexposed auth API | GET /api/v1/auth/me returns 401; no partial transport exposed |
+| Gitleaks 8.30.1 | Official checksum-verified binary; publication candidates/staged baseline/history and new backend source scans reported no leaks; final staged gate is required before each commit |
+| Ignored credentials | .env never staged/tracked; initial history was empty; local tools/caches/archives/keys/exports excluded |
 
-Only shared technical backend configuration/web code and the frontend foundation exist. Planned domain modules remain identity, organizations, integrations, workflows, executions, approvals, ai, mcp, audit and notifications. See [repository structure](development/REPOSITORY.md). No TODO controllers or fake module implementations stand in for these features.
+Documentation links and actual staged diff/whitespace are checked by the final commit gate. The precise second commit/push and its CI result must be verified from Git/GitHub, not guessed inside a document prepared before commit creation. See [the session-core scope and commands](development/PHASE_1B_SESSION_CORE.md), [Git workflow](development/GIT_WORKFLOW.md) and [repository assessment](reviews/2026-10-15_REPOSITORY_ASSESSMENT.md).
 
-## Commands and local review
+Prior Phase 1A evidence remains valid as historical verification: desktop/mobile light/dark inspection, zero captured console warnings/errors, no 390px overflow, minimal probes, database outage liveness 200/readiness 503/recovery 200, persistent technical data and safe connection errors. Screenshots are actual foundation captures; no new UI behavior is claimed for this backend increment.
+
+## Current configuration and source
+
+Java 21 compile target; Boot 4.1.1; Maven Wrapper 3.9.16; managed Jupiter 6.0.3; PostgreSQL 18.6; project-local Node 24.22.0. Host Java remains 21.0.4, while the pinned container reports maintained Temurin 21.0.12.1. No framework versions were upgraded. [Dependency evidence](development/DEPENDENCY_LOCK.md) and [repository structure](development/REPOSITORY.md) remain authoritative.
+
+Domain code now includes identity/application, identity/domain and identity/persistence plus a shared Clock bean. Other business modules remain planned. All build output, local tools and .env remain ignored. Local credentials were not automatically rotated; the [operator guide](security/LOCAL_CREDENTIAL_ROTATION.md) explains actual role-password rotation without deleting data. Treat archive values as potentially disclosed if shared.
 
 ```powershell
 docker compose --env-file .env -f infra/compose.yaml ps
-Invoke-RestMethod http://localhost:8088/api/v1/system/info
 Invoke-RestMethod http://localhost:8088/health/readiness
+./backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
 ```
 
-The existing workspace .env was generated with unique local-only secrets; do not rerun setup to overwrite it. A clean checkout uses scripts/setup-local.ps1 first. Build/test/start/stop/reset/docs instructions are in [README](../README.md) and the [Phase 1 verification plan](development/PHASE_1_VERIFICATION.md).
+## Not implemented or not verified
 
-## Not yet implemented or verified
+HTTP login/refresh/logout, signed access validation, cookies, exact Origin/CSRF enforcement, throttling and browser session coordination remain Phase 1B.2. The current strict replay policy requires eventual cross-tab/client serialization of refresh. Bootstrap/organizations/invitations/permission delegation/tenant isolation are Phase 1C. Workflows/approvals, integrations/webhooks, AI/MCP and delivery follow the established roadmap.
 
-Authentication/session rotation/reuse/revocation, one-shot bootstrap, organization creation/membership/invites and tenant authorization are planned Phase 1B/C. No owner account or working login exists. Workflow definitions/execution/approvals are Phases 2–4; full integrations/webhooks Phase 5; AI/MCP Phase 6; polish/delivery Phase 7. Full business vertical slice is not complete.
-
-Mermaid was not parsed/rendered; link/fence checks establish only document structure. No WCAG conformance, assistive-technology audit, full secret scanner, backend vulnerability scan, hosted GitHub Actions result, cloud deployment, production TLS, backup/restore or production security claim. The optional docs-port override is configured; exact-pair OpenAPI is integration-tested, not a complete Swagger browser walkthrough.
+No production security, WCAG/assistive-technology conformance, cloud deployment/TLS, backend vulnerability scan or backup/restore claim. Mermaid source was not parsed/rendered. A regex secret scanner is not proof that all possible secrets are absent. No license or verified private vulnerability-reporting channel has been configured. Local Compose supplies migration credentials to the backend; production must separate migration execution and omit those credentials from runtime. No database volume or unrelated service was deleted/stopped.
 
 ## Next increment
 
-Phase 1B: identity/session migrations and business services, BCrypt, validated signed access tokens, rotating hashed refresh tokens, family revocation/reuse, exact Origin/CSRF protection, bounded login throttling and security tests. Then Phase 1C implements the documented offline initial-account lifecycle and tenant onboarding. Preserve all reviewed boundaries; do not call Phase 1 complete until these acceptance gates pass.
-
-## GitHub development checkpoint — 2026-10-15
-
-The user confirmed https://github.com/ChouaibSeishin/BridgeOps as the public development repository. Initial inspection found local master with no commits/remotes/tracked files and an empty GitHub repository. Foundation checks were repeated successfully (7 backend tests, 4 frontend tests, typecheck/lint/build); Gitleaks 8.30.1 found no leaks in the isolated 81-file publication candidate snapshot. Exact commit and push outcomes are verified separately, never inferred from the URL. The configured branch and Git identity are preserved. See the Git workflow and assessment in docs/reviews.
-
-Phase 1B is split into verifiable increments: first internal identity/refresh-session persistence and replay/concurrency tests, then signed access tokens and HTTP/CSRF/Origin/rate-limit behavior. Browser login and bootstrap remain unavailable until their complete security boundary exists.
+Phase 1B.2: signed access tokens bound to live families, complete HTTP DTO/controller/application integration, same-origin/CSRF protection, correct local/production cookie flags, bounded login throttling, safe errors and negative HTTP security tests. Then Phase 1C implements offline one-shot initial-account provisioning and tenant onboarding. Commit and push each completed verified increment separately.

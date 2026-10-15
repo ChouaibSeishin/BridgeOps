@@ -159,3 +159,7 @@ Flyway owns schema; JPA uses ddl-auto=validate. Test migration from empty and pr
 Phase 1 introduces a singleton installation_state record with bootstrap_consumed_at and initial_user_id, plus account-level user_grants for organization.create. Offline bootstrap locks the singleton row and atomically creates exactly one verified account and consumes the marker. It creates no organization. Organization creation is an authenticated transaction that checks the account grant and creates Owner membership. Invite acceptance creates no installation-wide grants. This remains planned until Phase 1B/C verification passes.
 
 Approval uniqueness means one decision-maker per request, distinct from the requester; it does not mean two approvers.
+
+## Implemented identity subset — Phase 1B.1
+
+V2 now implements users, session_families, refresh_sessions and identity_security_events for the internal session core. users currently includes ID, stored/normalized ASCII email, BCrypt hash, display name, active/disabled status and creation time; verification/reset/invitation/account-grant fields remain future migrations. The identity_security_events name distinguishes minimal identity security history from the future organization audit module. Parent uniqueness, parent/family binding and fixed-expiry foreign keys are database-enforced. No user is seeded. Installation bootstrap/membership remains Phase 1C. See [session core](../development/PHASE_1B_SESSION_CORE.md).

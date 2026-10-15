@@ -23,3 +23,7 @@ Before staging, scan Git-visible publication candidates without exposing ignored
 ## Next smallest useful increment
 
 First create and publish the verified foundation commit with secure ignore rules and this workflow. Then Phase 1B.1 implements identity persistence and the opaque refresh-session lifecycle as internal application services, with expiry/reuse/revocation/concurrency tests against PostgreSQL. Keep HTTP authentication unavailable until signed access tokens, CSRF/Origin checks, throttling and transport tests exist. No public registration, default account, skipped bootstrap or pretend login.
+
+## Verified publication outcome
+
+Foundation commit b1517ec was created and pushed to origin/master, and git ls-remote matched its full hash. Git Credential Manager authentication worked; no connector installation was needed. The foundation GitHub Actions run 38776342374 completed with conclusion success. This outcome is newer than the initial pending-publication assessment above.

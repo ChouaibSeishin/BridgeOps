@@ -20,3 +20,7 @@ Mapping: original Phase 1 and 2 -> revised Phase 1; original 4 -> revised 2; ori
 P0 means first operational MVP, not optional security. AI/MCP remain required portfolio increments. RabbitMQ requires measured need plus outbox/dedup/outage tests. Redis requires a defined distributed rate-limit/coordination responsibility. Neither is required in the foundation.
 
 Every increment includes validation, backend authorization, migrations, safe errors, meaningful tests, frontend states and synchronized docs. Source generation, skipped tests or a Compose file alone do not meet acceptance. Use the [Phase 1 sequence](../development/PHASE_1_IMPLEMENTATION.md) and [verification plan](../development/PHASE_1_VERIFICATION.md).
+
+## Current verified checkpoint
+
+Phase 1A is committed and published as b1517ec with a passing hosted workflow. Phase 1B.1 internal identity/opaque-session behavior is implemented with 19 backend tests passing; the next increment is the complete HTTP/JWT/CSRF/Origin/cookie/throttle boundary in 1B.2. The overall Phase 1B row remains incomplete until those controls are implemented and tested. See PROJECT_STATUS.md for exact evidence and Git outcomes.

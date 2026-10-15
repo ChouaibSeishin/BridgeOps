@@ -2,7 +2,7 @@
 
 A modular Java/Spring Boot and React operations platform for governed workflow automation.
 
-**Current increment: Phase 1A technical foundation.** Backend, frontend, PostgreSQL migration, health/info API, live status shell and container setup are implemented. Authentication, first-account provisioning, tenant membership, workflows, approvals, integrations, AI and MCP are subsequent increments; they are not represented by fake controls or statistics. See [current verification evidence](docs/PROJECT_STATUS.md).
+**Current increment: Phase 1B.1 internal identity/session core.** Backend, frontend, PostgreSQL migration, health/info API, live status shell and container setup are implemented. The internal BCrypt/opaque-refresh service and V2 identity migration are implemented; browser authentication, first-account provisioning, tenant membership, workflows, approvals, integrations, AI and MCP are subsequent increments; they are not represented by fake controls or statistics. See [current verification evidence](docs/PROJECT_STATUS.md).
 
 The [conflict-resolution report](docs/CONFLICT_RESOLUTION.md) records the reviewed decisions. The [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md), [technology lock](docs/development/TECHNOLOGY.md) and [backlog](docs/product/BACKLOG.md) govern the next work. The [master specification](docs/product/MASTER_PROJECT_PROMPT.md) is retained with explicit amendments.
 
@@ -20,7 +20,7 @@ Open [the local workspace](http://localhost:8088). Setup generates unique local 
 
 Port 8088 is the default because this Windows host rejected binding to 8080. No existing service was stopped to claim that port.
 
-The first PostgreSQL startup creates distinct migration/runtime roles. Flyway applies V1__platform_foundation.sql using the migration role; the runtime role has read-only access to foundation tables. Future business migrations grant only required DML. Existing database volumes retain their role passwords: changing .env does not rotate existing database roles.
+The first PostgreSQL startup creates distinct migration/runtime roles. Flyway applies V1 technical metadata and V2 identity/session schema using the migration role. The runtime role remains read-only for technical metadata; V2 grants the specific session/account DML needed by the internal service and insert/read-only security events. Existing database volumes retain their role passwords: changing .env does not rotate existing database roles.
 
 ## Verify and operate
 
@@ -78,7 +78,7 @@ Open [Swagger UI](http://localhost:8081/swagger-ui.html) or [OpenAPI JSON](http:
 
 ## Bootstrap and security boundary
 
-The chosen design provisions one initial account through an explicit offline, one-shot command. That account logs in and creates its organization/Owner membership transactionally; subsequent users join by invitation. **This command and login are not implemented in Phase 1A.** There are no seed credentials, privileged HTTP bootstrap endpoint, production default account or working sign-in controls. Phase 1B/C implements and tests the [bootstrap lifecycle](docs/architecture/adr/0014-offline-bootstrap.md) and [session strategy](docs/architecture/adr/0002-browser-sessions.md).
+The chosen design provisions one initial account through an explicit offline, one-shot command. That account logs in and creates its organization/Owner membership transactionally; subsequent users join by invitation. **The bootstrap command and browser login are not implemented yet.** Internal identity/session services now exist; their HTTP security adapter is the next increment. There are no seed credentials, privileged HTTP bootstrap endpoint, production default account or working sign-in controls. Phase 1B/C implements and tests the [bootstrap lifecycle](docs/architecture/adr/0014-offline-bootstrap.md) and [session strategy](docs/architecture/adr/0002-browser-sessions.md).
 
 No private security-reporting method currently exists; [SECURITY.md](SECURITY.md) describes the public-release gate. No WCAG, production security, hosted deployment or workflow correctness claim is made for this foundation.
 
@@ -94,7 +94,7 @@ No private security-reporting method currently exists; [SECURITY.md](SECURITY.md
 - [ADRs](docs/architecture/adr/README.md)
 - [Repository structure](docs/development/REPOSITORY.md)
 
-Next: Phase 1B identity/session behavior, then Phase 1C bootstrap/organizations and tenant isolation. The first workflow/approval business demonstration follows Phases 2–4; full integrations/webhooks, AI/MCP and delivery polish remain in the revised roadmap.
+Next: Phase 1B.2 signed access tokens and complete HTTP/cookie/CSRF/Origin/throttle behavior, then Phase 1C bootstrap/organizations and tenant isolation. The first workflow/approval business demonstration follows Phases 2–4; full integrations/webhooks, AI/MCP and delivery polish remain in the revised roadmap.
 
 ## Actual foundation preview
 
@@ -105,3 +105,5 @@ Captured from the running local application, not a mockup. [Mobile dark-theme ca
 ## Incremental GitHub development
 
 The public development repository is [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Publication status is recorded in PROJECT_STATUS.md; a URL alone does not prove a push succeeded. Follow the [Git workflow](docs/development/GIT_WORKFLOW.md) and [local credential rotation guide](docs/security/LOCAL_CREDENTIAL_ROTATION.md). No license has been selected yet.
+
+The [Phase 1B.1 session-core report](docs/development/PHASE_1B_SESSION_CORE.md) explains replay transactions, concurrency guarantees and the intentionally unexposed transport boundary.

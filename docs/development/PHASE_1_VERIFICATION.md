@@ -1,6 +1,6 @@
 # Phase 1 verification
 
-Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). Phase 1B–D authentication/onboarding/tenant gates remain planned; do not mark the full phase complete from foundation checks.
+Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The complete HTTP authentication/onboarding/tenant gates remain planned; Phase 1B.1 internal session behavior is implemented; do not mark the full phase complete from foundation checks.
 
 ## Exact foundation commands
 
@@ -24,7 +24,7 @@ Invoke-RestMethod http://localhost:8088/health/readiness
 
 Run setup only when .env is absent. It intentionally refuses overwrite. POSIX backend equivalent: `cd backend` then `./mvnw -B -ntp verify`. Local sandbox permissions may require approved execution outside the sandbox; this is not evidence of an unavailable Docker daemon. Host runtime versions and container runtimes are reported separately.
 
-Backend verify runs four MVC boundary tests and three required PostgreSQL integration tests. Check reports for actual counts/failures/skips; missing Docker is a failure, not an accepted skip. Tests cover public info/correlation, denied unknown APIs, mutation denial, private docs by default, empty migration and minimal probes plus opt-in OpenAPI. Future authentication tests are not implied by these denials.
+Backend verify now runs four MVC boundary tests, two password/token unit tests and thirteen required PostgreSQL integration tests (three foundation plus ten identity/session cases). Check reports for actual counts/failures/skips; missing Docker is a failure, not an accepted skip. Tests cover public info/correlation, denied unknown APIs, mutation denial, private docs by default, empty migration and minimal probes plus opt-in OpenAPI. Future authentication tests are not implied by these denials.
 
 Frontend tests cover actual info/readiness requests, loading, recoverable outage, theme and routing. Typecheck and lint are separate gates. A production build is not a browser test; inspect desktop/mobile and both themes before describing visual quality.
 

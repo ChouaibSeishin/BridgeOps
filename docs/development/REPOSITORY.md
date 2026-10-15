@@ -30,7 +30,9 @@ docs/{product,architecture,api,security,development,design}/
 README.md, SECURITY.md
 ```
 
-Planned modules: identity, organizations, integrations, workflows, executions, approvals, ai, mcp, audit and notifications. Each module exposes `api` contracts and owns application/domain/persistence/web code when useful; no unused package skeletons or interface-per-class requirement. REST DTOs do not expose JPA entities. Cross-module entities/repositories are forbidden; use public application services.
+Implemented addition in Phase 1B.1: identity/application (password/token/session services), identity/domain (typed/redacted outcomes), identity/persistence (entities and repositories), ClockConfiguration, V2__identity_sessions.sql, PasswordPolicyTest and PasswordSessionIT. No HTTP authentication transport or account-provisioning command exists yet.
+
+Planned modules: organizations, integrations, workflows, executions, approvals, ai, mcp, audit and notifications. Each module exposes `api` contracts and owns application/domain/persistence/web code when useful; no unused package skeletons or interface-per-class requirement. REST DTOs do not expose JPA entities. Cross-module entities/repositories are forbidden; use public application services.
 
 Flyway versions are globally ordered with owning-module descriptions. Tests mirror business packages; `*Test` runs in the unit/MVC phase, `*IT` in required Maven failsafe verify. Frontend feature tests are colocated; the full browser journey arrives with identity/workflow behavior. Source imports semantic tokens rather than inventing per-page colors.
 

@@ -46,3 +46,7 @@ scripts/{verify-docs.mjs,setup-local.ps1}
 ```
 
 Phase 1B/C add only actual module files, not empty placeholder controllers. Each increment reports exact commands and results in PROJECT_STATUS.md.
+
+## Phase 1B subdivision
+
+1B.1 is the internal identity and refresh-session core (V2 migration, BCrypt, hashed opaque tokens, live checks, revocation/replay/concurrency). 1B.2 adds access JWTs and a complete HTTP/CSRF/Origin/cookie/throttle adapter with negative security tests. Keep business HTTP denied until that boundary is complete; no public registration is introduced. See [session-core scope](PHASE_1B_SESSION_CORE.md).

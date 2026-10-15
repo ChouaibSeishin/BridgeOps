@@ -28,3 +28,14 @@ The GitHub plugin is available but was not confirmed connected during initial in
 ## Repository presentation and release gates
 
 Do not claim CI passing until GitHub Actions has actually completed successfully. Do not add a license until the user deliberately chooses one. Before a public release, configure and test a real private vulnerability-reporting channel and document its instructions. Public development source is explicitly a pre-release work in progress, not a production release or security certification.
+
+## Redacting scanner commands
+
+This session used official Gitleaks 8.30.1, downloaded to ignored .tools and verified against the release SHA-256 manifest. With that version available on PATH, run:
+
+```powershell
+gitleaks git --staged --redact --no-banner
+gitleaks git --redact --no-banner
+```
+
+The first command checks the staged snapshot; the second checks committed history. Neither proves every possible secret is absent. Do not add broad scanner exemptions to make a real credential pass.
