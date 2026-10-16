@@ -1,6 +1,6 @@
 # API contract outline
 
-Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes are implemented. Phase 2 workflow routes are being implemented against [the precise draft/version contract](../development/PHASE_2_WORKFLOWS.md); they remain unavailable until their adapter increment.** Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
+Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, plus Phase 2 workflow draft/validate/publish/duplicate/archive/version routes are implemented.** [Exact workflow DTOs and semantics](../development/PHASE_2_WORKFLOWS.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
 
 ## Shared conventions
 

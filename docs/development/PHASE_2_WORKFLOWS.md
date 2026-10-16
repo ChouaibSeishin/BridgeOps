@@ -1,6 +1,6 @@
 # Phase 2 — workflow definitions
 
-Status: registry/validator/canonicalizer and transactional persistence services implemented; HTTP/UI increments in progress. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
+Status: registry/validator/canonicalizer, persistence and HTTP lifecycle implemented; browser UI/release gates in progress. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
 
 ## Graph v1 and registry
 
@@ -50,7 +50,11 @@ Let `W=/api/v1/organizations/{organizationId}/workflows`.
 
 UI uses existing session client/TanStack Query and design tokens: tenant list, metadata/node/connection forms, saved/unsaved revision, explicit persisted validation, revision-confirmed publication, history/exact snapshot, duplication and archive confirmation. No active execution controls. Permission hints come from current O/access, never infer authority from role names.
 
+Implemented DTOs: Detail is `{workflow,definition,currentPublishedVersion}`. Workflow summary is `{id,name,description,status,revision,currentPublishedVersionId,updatedAt}`. Snapshot is `{version,definition}`. Version summary is `{id,workflowId,versionNumber,sourceRevision,schemaVersion,canonicalizationVersion,name,description,definitionHash,publishedBy,publishedAt}`. Collections contain summaries only, never full graphs. Required create/save description may be an empty string. Unknown DTO fields are 400; graph semantic errors may remain in bounded drafts. Invalid publication returns safe error code INVALID_WORKFLOW with `details:{valid:false,errors:[...]}`. GET detail/exact version returns historical metadata alongside the appropriate graph, never persistence entities. HTTP body filtering after authentication bounds direct/chunked bodies to 256 KiB and parser depth 32/string length 4096/number length 20 with duplicate-key rejection. Draft bounds additionally enforce depth 16, 4096 JSON values, 2000-character strings, 128 KiB, 50 nodes and 100 edges.
+
 ## Verification and progress
+
+HTTP increment: all ten restricted-runtime transport cases and 29 selected validator/boundary unit cases passed. They cover lifecycle shapes, persisted validation/422 details, safe errors, stale revisions, duplicate/archive/history, live authentication/permissions, exact Origin/CSRF, every tenant resource family, direct request/parser bounds, audit rollback, implemented OpenAPI and denied execution/test-run/approval routes. The architecture test checks workflow source imports use only its own module, shared primitives and public identity/organization/audit application APIs. Persistence increment 891cf82 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38946336182). No full Phase 2 UI/browser/release completion is claimed.
 
 Persistence increment: V9 and public application lifecycle implemented. Twelve focused restricted-runtime cases passed (10 lifecycle + 2 migration): fresh schema, V8 upgrade preserving existing user/tenant/marker/grants, revision save/reload, invalid publication, immutable metadata/graph/hash, independent copy/archive, live reader/editor/publisher separation, direct service tenant concealment, two publication races, required audit rollback, database mutation denial and composite pointer/child constraints. Runtime remains bridgeops_app; migration/operator fixtures are separate and disposable. No workflow HTTP endpoint is enabled yet. No local Compose migration/account mutation has been performed by these tests.
 
