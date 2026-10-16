@@ -80,3 +80,5 @@ Phase 1C.3 enables PATCH/DELETE O/members/{membershipId} with live tenant permis
 Phase 1C.4 implements POST O/invitations, DELETE O/invitations/{id}, authenticated POST /api/v1/invitations/accept, and invitation-only POST /api/v1/invitations/enroll. The enrollment extension is required for first-time invitees; a raw recipient-bound emailed token is mandatory, roles/grants are never body authority, and existing accounts require authenticated accept. It is not general registration. [Exact DTOs, statuses, SMTP and proof rules](../development/PHASE_1C_ONBOARDING.md). HTTP bootstrap, /auth/register and all unrelated business routes remain denied.
 
 Phase 1D.1 integrates the existing authentication contract into the browser without adding backend routes. [Session client behavior](../development/PHASE_1D_BROWSER.md).
+
+Phase 1D.2 adds UserSummary.canCreateOrganizations, GET O/access and bounded GET O/invitations; O/roles adds a live assignable hint. Existing mutating contracts are unchanged and remain authoritative. [Browser/API details](../development/PHASE_1D_BROWSER.md).

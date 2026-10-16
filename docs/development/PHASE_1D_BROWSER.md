@@ -13,3 +13,13 @@ Focused frontend verification covers initialization, expired access, concurrent 
 ## Operator prerequisites
 
 Normal startup still provisions no account. Follow the [offline bootstrap guide](PHASE_1C_ONBOARDING.md), then open the same-origin frontend and sign in. Authentication must be enabled with signing material and the exact browser Origin; see [HTTP configuration](PHASE_1B_HTTP_AUTH.md). No persistent local account or real-recipient email is created by implementation verification. External SMTP remains disabled until configured.
+
+## 1D.2 organization browser experience
+
+The signed-in landing page lists real organizations and the API's pagination totals. The create form is shown from UserSummary.canCreateOrganizations, derived from current account grants on /me/login/refresh, never inferred from a tenant role. The backend still rechecks that grant at creation. Organization details expose current members, tenant-local roles, revision-checked changes/removal, invitation issuance/listing/revocation and safe errors. Client hints do not override server authorization. React Query state is memory-only, scoped by user and cleared when signed out.
+
+New bounded reads: GET O/access returns {membershipId,permissions} for the caller's ACTIVE membership only; GET O/invitations?page=0&size=25 requires membership.invite and returns safe paginated {id,email,expiresAt,status,roleIds}, never tokens/hashes. Status is PENDING, EXPIRED, REVOKED or ACCEPTED. This listing is necessary so an invitation remains manageable after navigation/reload. Foreign/missing tenants remain uniformly 404. GET O/roles adds assignable, calculated from current permission subset and privileged-role rules. No migration or runtime privilege expansion is needed.
+
+Existing recipients sign in, open Accept an invitation, and paste the emailed token. New recipients use Join with an invitation from sign-in, fill the invitation-only enrollment form and explicitly sign in afterward; enrollment creates no session. No proof is read from a URL. Unusable invitations retain a generic rejection because the anonymous API deliberately conceals exact failure reasons. SMTP-disabled/failure responses are shown as unavailable, never successful delivery.
+
+Membership removal asks for confirmation and sends the current quoted revision in If-Match. Editing sends expectedRevision, status and tenant-local role IDs. A conflict requires reloading; last-active-Owner and delegation constraints remain enforced by the existing backend. There is no role-definition editor or fabricated workflow data.

@@ -30,5 +30,7 @@ public class InvitationStore {
     if(jdbc.update("UPDATE invitations SET accepted_at=? WHERE organization_id=? AND id=? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>?",java.sql.Timestamp.from(now),org,invitation,java.sql.Timestamp.from(now))!=1)throw rejected();
  }
  public void revoke(UUID org,UUID invitation,Instant now){jdbc.update("UPDATE invitations SET revoked_at=? WHERE organization_id=? AND id=? AND accepted_at IS NULL AND revoked_at IS NULL",java.sql.Timestamp.from(now),org,invitation);}
+ public List<Invitation> list(UUID org,int page,int size){return rows("organization_id=? ORDER BY created_at DESC,id LIMIT ? OFFSET ?",org,size,(long)page*size);}
+ public long count(UUID org){return jdbc.queryForObject("SELECT count(*) FROM invitations WHERE organization_id=?",Long.class,org);}
  public static DomainFailure rejected(){return new DomainFailure(400,"INVITATION_REJECTED");}
 }

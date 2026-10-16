@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrganizationService {
     public record Page<T>(List<T> items,int page,int size,long totalElements,long totalPages){}
+    public record Access(UUID membershipId,Set<String> permissions){}
+    public record RoleSummary(UUID id,String name,boolean assignable){}
     public record MemberSummary(UUID id,UUID userId,String status,long revision,List<Role> roles){}
     private final AccountAuthority identities;private final OrganizationStore store;private final Clock clock;
     public OrganizationService(AccountAuthority identities,OrganizationStore store,Clock clock){this.identities=identities;this.store=store;this.clock=clock;}
@@ -33,7 +35,8 @@ public class OrganizationService {
         return page(rows,page,size,store.memberCount(org));
     }
     @Transactional(readOnly=true,timeout=5)
-    public List<Role> roles(UUID user,UUID family,UUID org){identities.requireLive(user,family);var member=store.member(org,user);store.require(org,member.id(),"membership.read");store.organization(org,false);return store.catalog(org);}
+    public List<RoleSummary> roles(UUID user,UUID family,UUID org){identities.requireLive(user,family);var member=store.member(org,user);store.require(org,member.id(),"membership.read");store.organization(org,false);var permissions=store.permissions(org,member.id());return store.catalog(org).stream().map(role->new RoleSummary(role.id(),role.name(),permissions.containsAll(store.rolePermissions(org,role.id())) && (!Set.of("OWNER","ADMIN").contains(role.name()) || permissions.contains("membership.grant_privileged")))).toList();}
+    @Transactional(readOnly=true,timeout=5) public Access access(UUID user,UUID family,UUID org){identities.requireLive(user,family);var member=store.member(org,user);store.organization(org,false);return new Access(member.id(),store.permissions(org,member.id()));}
     private void bounds(int page,int size){if(page<0 || size<1 || size>100)throw new DomainFailure(400,"INVALID_REQUEST");}
     private <T> Page<T> page(List<T> items,int page,int size,long total){return new Page<>(items,page,size,total,(total+size-1)/size);}
 }

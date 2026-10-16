@@ -56,3 +56,7 @@ No production security/load/TLS/HA, WCAG, backend vulnerability scan, backup/res
 ## Phase 1D progress (2026-10-16 UTC)
 
 1D.1 implements the real sign-in/protected shell and session coordinator. Fresh frontend typecheck, lint, 11 tests and production build passed. Origin-wide Web Locks serialize CSRF/cookie-sensitive sequences; no credential persistence/broadcast. Backend code is unchanged in this increment. Commit/push/hosted results are verified after the commit gate. Organization UI, recovery and browser end-to-end gates remain incomplete; Phase 1 is not complete. [Browser guide](development/PHASE_1D_BROWSER.md).
+
+1D.1 published as 54a8c1f; push/ref verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38907270990). 1D.2 adds the real organization/member/invitation UI and narrow capability/list reads; tests and publication are checked at its gate. Recovery and browser release checks remain pending.
+
+1D.2 local verification: all 37 restricted-runtime organization integration cases passed (zero failures/errors/skips), including new live-capability and invitation-list tests. Frontend 14 tests, typecheck/lint and production build passed. No schema or runtime grant was expanded. Browser end-to-end verification remains a separate gate.

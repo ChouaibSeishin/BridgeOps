@@ -25,6 +25,7 @@ public class OrganizationController {
     }
     @GetMapping public OrganizationService.Page<Organization> list(@AuthenticationPrincipal Identity actor,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size){return organizations.list(actor.userId(),actor.familyId(),page,size);}
     @GetMapping("/{id}") public Organization detail(@AuthenticationPrincipal Identity actor,@PathVariable UUID id){return organizations.detail(actor.userId(),actor.familyId(),id);}
-    @GetMapping("/{id}/roles") public java.util.List<com.bridgeops.organizations.persistence.OrganizationStore.Role> roles(@AuthenticationPrincipal Identity actor,@PathVariable UUID id){return organizations.roles(actor.userId(),actor.familyId(),id);}
+    @GetMapping("/{id}/access") public OrganizationService.Access access(@AuthenticationPrincipal Identity actor,@PathVariable UUID id){return organizations.access(actor.userId(),actor.familyId(),id);}
+    @GetMapping("/{id}/roles") public java.util.List<OrganizationService.RoleSummary> roles(@AuthenticationPrincipal Identity actor,@PathVariable UUID id){return organizations.roles(actor.userId(),actor.familyId(),id);}
     @GetMapping("/{id}/members") public OrganizationService.Page<OrganizationService.MemberSummary> members(@AuthenticationPrincipal Identity actor,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size){return organizations.members(actor.userId(),actor.familyId(),id,page,size);}
 }

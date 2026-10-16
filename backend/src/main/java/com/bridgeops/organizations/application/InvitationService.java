@@ -12,11 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class InvitationService {
  public record Summary(UUID id,UUID organizationId,String email,Instant expiresAt){}
+ public record Listed(UUID id,String email,Instant expiresAt,String status,List<UUID> roleIds){}
  public record Accepted(UUID userId,UUID organizationId,UUID membershipId){}
  private final AccountAuthority identities;private final InvitationAccounts accounts;private final OrganizationStore organizations;
  private final InvitationStore invitations;private final RoleDelegation delegation;private final RefreshTokens tokens;private final InvitationDelivery delivery;private final Clock clock;
  public InvitationService(AccountAuthority identities,InvitationAccounts accounts,OrganizationStore organizations,InvitationStore invitations,RoleDelegation delegation,RefreshTokens tokens,InvitationDelivery delivery,Clock clock){
     this.identities=identities;this.accounts=accounts;this.organizations=organizations;this.invitations=invitations;this.delegation=delegation;this.tokens=tokens;this.delivery=delivery;this.clock=clock;
+ }
+ @Transactional(readOnly=true,timeout=5) public OrganizationService.Page<Listed> list(UUID user,UUID family,UUID org,int page,int size){
+    identities.requireLive(user,family);if(page<0 || size<1 || size>100)throw new DomainFailure(400,"INVALID_REQUEST");var member=organizations.member(org,user);organizations.organization(org,false);organizations.require(org,member.id(),"membership.invite");
+    var rows=invitations.list(org,page,size).stream().map(i->new Listed(i.id(),i.email(),i.expiresAt(),i.acceptedAt()!=null?"ACCEPTED":i.revokedAt()!=null?"REVOKED":!clock.instant().isBefore(i.expiresAt())?"EXPIRED":"PENDING",invitations.roles(org,i.id()))).toList();long total=invitations.count(org);return new OrganizationService.Page<>(rows,page,size,total,(total+size-1)/size);
  }
  @Transactional(timeout=20)
  public Summary issue(UUID user,UUID family,UUID org,String email,List<UUID> roles){

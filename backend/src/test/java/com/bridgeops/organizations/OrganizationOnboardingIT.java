@@ -20,6 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.ObjectMapper;
 import static org.assertj.core.api.Assertions.*;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -69,6 +70,26 @@ class OrganizationOnboardingIT {
             userId,"owner@example.invalid","owner@example.invalid",passwordHash,"Synthetic Owner",java.sql.Timestamp.from(NOW));
         jdbc.update("UPDATE users SET email_verified_at=? WHERE id=?",java.sql.Timestamp.from(NOW),userId);
         jdbc.update("INSERT INTO user_grants VALUES(?,\'organization.create\',?)",userId,java.sql.Timestamp.from(NOW));
+    }
+    @Test void browserCapabilityAndTenantContextReflectCurrentAuthority() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"browser-context");
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.user.canCreateOrganizations").value(true));
+        jdbc.update("DELETE FROM user_grants WHERE user_id=?",userId);
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.user.canCreateOrganizations").value(false));
+        mvc.perform(get("/api/v1/organizations/"+org+"/access").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.membershipId").value(memberId(org,userId).toString())).andExpect(jsonPath("$.permissions").isArray());
+        var other=other();for(String suffix:List.of("access","invitations"))mvc.perform(get("/api/v1/organizations/"+org+"/"+suffix).header("Authorization","Bearer "+other.access())).andExpect(status().isNotFound());
+        jdbc.update("DELETE FROM role_permissions WHERE organization_id=? AND permission_code='membership.grant_privileged'",org);
+        mvc.perform(get("/api/v1/organizations/"+org+"/roles").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$[4].name").value("OWNER")).andExpect(jsonPath("$[4].assignable").value(false));
+    }
+    @Test void invitationListingIsBoundedTenantAuthorizedAndNeverReturnsProof() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"browser-invitations");UUID id=invite(owner,org,"listed@example.invalid","VIEWER");
+        var result=mvc.perform(get("/api/v1/organizations/"+org+"/invitations?size=1").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].status").value("PENDING")).andReturn();
+        assertThat(result.getResponse().getContentAsString()).doesNotContain(inbox.messages.getLast().token(),"token_hash","tokenHash");
+        mvc.perform(delete("/api/v1/organizations/"+org+"/invitations/"+id).header("Authorization","Bearer "+owner.access()).header("Origin",ORIGIN).cookie(owner.csrf(),owner.refresh()).header("X-CSRF-TOKEN",owner.csrf().getValue())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/organizations/"+org+"/invitations").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].status").value("REVOKED"));
+        for(String query:List.of("?page=-1","?size=101"))mvc.perform(get("/api/v1/organizations/"+org+"/invitations"+query).header("Authorization","Bearer "+owner.access())).andExpect(status().isBadRequest());
+        jdbc.update("DELETE FROM role_permissions WHERE organization_id=? AND permission_code='membership.invite'",org);
+        mvc.perform(get("/api/v1/organizations/"+org+"/invitations").header("Authorization","Bearer "+owner.access())).andExpect(status().isForbidden());
     }
     @Test void createIsAtomicAndListIncludesOnlyOwnMemberships() throws Exception {
         Browser owner=login(bootstrap(null));UUID org=create(owner,"alpha-tenant");

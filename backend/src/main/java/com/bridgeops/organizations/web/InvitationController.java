@@ -22,6 +22,8 @@ public class InvitationController {
  public record Enroll(@NotBlank @Size(min=43,max=43) String token,@NotBlank @Size(max=254) String email,@NotBlank @Size(max=120) String displayName,@NotBlank @Size(max=256) String password){@Override public String toString(){return "Enroll[REDACTED]";}}
  private final InvitationService invitations;private final AuthenticationThrottle throttle;
  public InvitationController(InvitationService invitations,AuthenticationThrottle throttle){this.invitations=invitations;this.throttle=throttle;}
+ @GetMapping("/api/v1/organizations/{org}/invitations")
+ public com.bridgeops.organizations.application.OrganizationService.Page<InvitationService.Listed> list(@AuthenticationPrincipal Identity actor,@PathVariable UUID org,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="25") int size){return invitations.list(actor.userId(),actor.familyId(),org,page,size);}
  @PostMapping("/api/v1/organizations/{org}/invitations")
  public ResponseEntity<InvitationService.Summary> issue(@AuthenticationPrincipal Identity actor,@PathVariable UUID org,@Valid @RequestBody Issue body,HttpServletRequest request,HttpServletResponse response)throws IOException{
     if(!allow("invite",body.email(),request,response))return null;
