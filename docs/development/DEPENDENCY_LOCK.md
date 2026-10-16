@@ -38,3 +38,5 @@ No release candidate is selected. TypeScript 5.9.3 intentionally satisfies types
 Phase 1B.2 adds spring-security-oauth2-jose without an explicit version: the unchanged Spring Boot 4.1.1 BOM manages Spring Security and Nimbus. RSA signing/verification uses those maintained APIs rather than a separate JWT library/version override.
 
 Phase 1C adds spring-boot-starter-mail under the unchanged Boot 4.1.1 BOM for the user-selected external SMTP requirement. No explicit mail-library version override, framework/toolchain upgrade or additional infrastructure service is introduced.
+
+Phase 1D adds @playwright/test 1.64.1 as a pinned development-only browser verification tool, resolved through the frontend lockfile. CI installs its matching Chromium and OS dependencies before Maven verify. No browser/runtime mail sink is shipped in production images; the final frontend image contains only built assets.

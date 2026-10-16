@@ -26,9 +26,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Documentation structure
         run: node scripts/verify-docs.mjs
-      - name: Backend unit and required PostgreSQL integration tests
-        working-directory: backend
-        run: chmod +x mvnw && ./mvnw -B -ntp verify
       - name: Frontend checks
         working-directory: frontend
         run: |
@@ -37,6 +34,12 @@ jobs:
           npm run lint
           npm test
           npm run build
+      - name: Install Chromium for required browser journey
+        working-directory: frontend
+        run: npm exec -- playwright install --with-deps chromium
+      - name: Backend unit and required PostgreSQL integration tests
+        working-directory: backend
+        run: chmod +x mvnw && ./mvnw -B -ntp verify
       - name: Generate ephemeral local environment
         shell: pwsh
         run: |

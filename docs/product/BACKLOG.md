@@ -21,10 +21,6 @@ P0 means first operational MVP, not optional security. AI/MCP remain required po
 
 Every increment includes validation, backend authorization, migrations, safe errors, meaningful tests, frontend states and synchronized docs. Source generation, skipped tests or a Compose file alone do not meet acceptance. Use the [Phase 1 sequence](../development/PHASE_1_IMPLEMENTATION.md) and [verification plan](../development/PHASE_1_VERIFICATION.md).
 
-## Current verified checkpoint
+## Current checkpoint
 
-Phase 1C backend implementation now includes offline verified-account bootstrap, explicit atomic organization/Owner creation, tenant-qualified permissions and memberships, last-active-Owner/revision protection, and recipient-bound one-use invitations with external SMTP plus a test sink. Fresh full verify passed 93 backend tests; hosted publication/CI evidence is checked per increment in PROJECT_STATUS.md and the task report. No default user/tenant or real-recipient mail was created by tests. Next is Phase 1D browser onboarding, client/session coordination and recovery; all later workflow/integration/AI/MCP work remains pending.
-
-Phase 1D in progress: browser authentication/session coordinator implemented in 1D.1; organization UI, password recovery and real browser release gates remain pending. Do not infer full Phase 1 completion.
-
-Phase 1D.3 password change and recovery are implemented; the final real-browser journey, visual verification, full suite and container/CI release gates remain pending.
+Phase 1D implements the real browser session, organization/member/invitation and password-management/recovery experience. Focused security/frontend tests and the real disposable browser journey passed. Final full-suite/container/publication gates and exact CI evidence are recorded in [project status](../PROJECT_STATUS.md). SMTP remains disabled/unverified externally; no persistent local identity was created. Once those final gates pass, the next incomplete roadmap task is Phase 2 workflow draft persistence/validation/publication. No workflow execution/integration/AI/MCP work was started.

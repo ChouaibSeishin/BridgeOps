@@ -14,6 +14,7 @@ interface Role {
   assignable: boolean;
 }
 interface Member {
+  account: { displayName: string; email: string };
   id: string;
   userId: string;
   status: string;
@@ -571,7 +572,8 @@ function MemberRow({
   return (
     <article className="member-row">
       <div>
-        <strong className="mono">{member.userId}</strong>
+        <strong>{member.account.displayName}</strong>
+        <small className="member-email">{member.account.email}</small>
         <p>
           {member.roles.map((role) => role.name).join(", ")} · {member.status} ·
           Revision {member.revision}

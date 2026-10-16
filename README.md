@@ -1,14 +1,12 @@
 # BridgeOps
 
-A modular Java/Spring Boot and React operations platform for governed workflow automation.
+A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Current checkpoint: Phase 1C backend onboarding.** Offline one-shot bootstrap, organization/Owner creation, tenant-bound membership permissions, last-Owner protection and recipient-bound SMTP invitations are implemented. The frontend remains the foundation status shell. Browser sign-in/onboarding, recovery, workflows, integrations, AI and MCP remain planned. See [current verification evidence](docs/PROJECT_STATUS.md).
+**Current work: Phase 1D browser onboarding and recovery.** Real sign-in, organization creation/selection, member management, invitations, session controls and password change/recovery are implemented. Full local verification passed 110 backend/integration/browser cases and 17 frontend tests, plus container startup and security smoke; hosted publication is checked separately. Workflows, integrations, approvals, AI and MCP remain future roadmap phases. See [current evidence](docs/PROJECT_STATUS.md).
 
-The [conflict-resolution report](docs/CONFLICT_RESOLUTION.md) records the reviewed decisions. The [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md), [technology lock](docs/development/TECHNOLOGY.md) and [backlog](docs/product/BACKLOG.md) govern the next work. The [master specification](docs/product/MASTER_PROJECT_PROMPT.md) is retained with explicit amendments.
+## Start from a clean checkout
 
-## Start locally
-
-Prerequisites: Docker Engine/Desktop with Compose 2.24+ and PowerShell 7. Host Java/Node are unnecessary for the full container startup. Commands below run from the repository root.
+Prerequisites: Docker Engine/Desktop with Compose 2.24+ and PowerShell 7. Host Java/Node are unnecessary for the container startup. Run from repository root:
 
 ```powershell
 ./scripts/setup-local.ps1
@@ -17,38 +15,33 @@ docker compose --env-file .env -f infra/compose.yaml config --quiet
 docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
 ```
 
-Open [the local workspace](http://localhost:8088). Setup generates unique local database secrets in ignored .env and refuses to overwrite an existing file. .env.example contains empty placeholders only. Auth setup generates separate ignored local RSA/CSRF key files and refuses to replace existing material. For an existing checkout with .env, run only setup-auth.ps1 once. Change BRIDGEOPS_PORT in .env if 8088 is occupied; adjust URLs accordingly. Bindings are localhost-only; only the frontend is published. No paid AI key is required.
+Open [BridgeOps](http://localhost:8088). Setup creates unique ignored .env database credentials and ignored signing material; it refuses to overwrite existing files. For an existing workspace, retain .env, keys and volumes; run setup-auth only if authentication material has never been configured. Setup/startup creates no account or tenant. Never commit credentials or keys. Port 8088 is localhost-only; BRIDGEOPS_PORT can be set in .env. The browser uses relative URLs through the same-origin proxy.
 
-Port 8088 is the default because this Windows host rejected binding to 8080. No existing service was stopped to claim that port.
+### Provision the first account explicitly
 
-The first PostgreSQL startup creates distinct migration/runtime roles. Flyway applies V1 technical metadata, V2 identity/session schema and V3 bounded authentication throttles using the migration role. The runtime role remains read-only for technical metadata; V2 grants the specific session/account DML needed by the internal service and insert/read-only security events. Existing database volumes retain their role passwords: changing .env does not rotate existing database roles.
-
-## Verify and operate
+After services/migrations are ready, an operator runs:
 
 ```powershell
-Invoke-RestMethod http://localhost:8088/api/v1/system/info
-Invoke-RestMethod http://localhost:8088/health/liveness
-Invoke-RestMethod http://localhost:8088/health/readiness
-docker compose --env-file .env -f infra/compose.yaml ps
-docker compose --env-file .env -f infra/compose.yaml logs --tail 100 backend
-docker compose --env-file .env -f infra/compose.yaml down
+docker compose --env-file .env -f infra/compose.yaml run --rm -e BOOTSTRAP_ENABLED=true -e BOOTSTRAP_EMAIL=your-email@example.com -e BOOTSTRAP_DISPLAY_NAME=YourName bootstrap
 ```
 
-Liveness checks the application process; readiness includes PostgreSQL. Public probe output is minimal. `/api/v1/system/info` returns `{name,apiVersion}`. The implemented /api/v1/auth routes are described in [the HTTP guide](docs/development/PHASE_1B_HTTP_AUTH.md); every other business route remains denied. The browser uses relative URLs through a same-origin proxy; it never receives internal container hostnames or secrets. Named database volumes survive `down`. Rebuild using `up --build -d --wait` after source changes.
+Replace the nonsensitive metadata; enter your own password through the no-echo console. Never pass a password argument or literal secret in shell history. Protected automated stdin, exit codes and operator-credential requirements are documented in the [bootstrap guide](docs/development/PHASE_1C_ONBOARDING.md). Bootstrap is disabled by default, one-shot and transactionally locked. It creates one verified account with an account-level organization.create grant, no tenant. Normal startup never provisions an identity. Do not reset the consumed marker to bypass this policy.
 
-To reset **disposable development data only**, stop services and explicitly run `docker compose --env-file .env -f infra/compose.yaml down --volumes`. This deletes this Compose project's database volume; never use it for data you need to keep. Normal verification does not delete existing volumes.
+Sign in at [the browser sign-in page](http://localhost:8088/sign-in), create an organization and open its members/roles/invitations. Only current permitted actions appear; the backend rechecks authorization, delegation, revisions and last-active-Owner protection. Organization membership does not grant the account-level ability to create other organizations.
 
-## Builds and tests
+Current secure-context browsers with Web Locks are required (HTTPS or loopback development). Access credentials stay in memory, refresh credentials stay in HttpOnly cookies, cookie-sensitive sequences are serialized across tabs, and broadcasts contain no credentials. Account & sessions offers password change, this-browser sign-out and logout-all; no individual remote-session list is claimed.
 
-Use Java 21 and Maven Wrapper for backend commands. Integration tests require a working Docker daemon; they fail rather than silently skip when it is missing.
+### Invitations and recovery email
 
-```powershell
-./backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
-```
+SMTP is disabled unless explicitly configured. Add external INVITATION_SMTP_ENABLED/HOST/PORT/USERNAME/PASSWORD/FROM/SSL settings to the ignored environment; blank examples and required TLS behavior are in the [configuration guide](docs/development/PHASE_1C_ONBOARDING.md). These compatibility settings now configure the shared transport used by invitations and identity recovery. Recreate the backend after configuration. No real SMTP credentials/connectivity or real-recipient delivery was used for implementation verification.
 
-On Linux/macOS install unzip and a SHA-256 tool, then use `cd backend` and `./mvnw -B -ntp verify`. The wrapper checksum targets the ZIP; without unzip this wrapper switches archive formats. `test` runs unit/MVC security tests; `verify` also runs PostgreSQL/Flyway/OpenAPI integration tests. Container builds skip tests because CI runs them separately; an image build alone is not test evidence.
+Existing recipients sign in and choose Accept an invitation. First-time recipients choose Join with an invitation, paste the emailed proof into the form, enroll and then explicitly sign in. Tokens never belong in URLs. Invitation issue reports unavailable delivery as an error.
 
-Frontend requires Node **24.22.0** (global 20.17.0 is incompatible). With that runtime on PATH:
+Forgot your password opens recovery request; I have a recovery token opens manual reset. Recovery requires an ACTIVE verified account and working external delivery. Public responses are generic and never confirm that an email was sent. The bounded volatile dispatcher may lose/drop work on failure, saturation or shutdown; there is no durable outbox or automatic retry. If no message arrives, retry within quotas or contact the operator. Recovery proofs expire in 15 minutes and are consumed once. Successful password change/reset revokes all sessions and outstanding proofs. [Exact contracts, tests and limitations](docs/development/PHASE_1D_BROWSER.md).
+
+## Build and verify
+
+Host verification needs Java 21, Node **24.22.0**, a working Docker daemon and Chromium. Missing browser/database prerequisites fail rather than silently skip. Build frontend assets before the Maven verify lifecycle:
 
 ```powershell
 npm.cmd --prefix frontend ci --no-audit --no-fund
@@ -56,61 +49,48 @@ npm.cmd --prefix frontend run typecheck
 npm.cmd --prefix frontend run lint
 npm.cmd --prefix frontend test
 npm.cmd --prefix frontend run build
+npm.cmd --prefix frontend exec -- playwright install chromium
+./backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
 node scripts/verify-docs.mjs
 ```
 
-The current workspace also has a checksum-verified untracked runtime in `.tools/node-v24.22.0-win-x64`; it is not part of a clean checkout. To use it in this workspace:
+On Linux/macOS use npm and ./backend/mvnw; install unzip and a SHA-256 tool. Chromium may require OS packages: npm exec -- playwright install --with-deps chromium from frontend. CI installs these prerequisites and runs the browser journey as part of Maven verification.
+
+The browser test explicitly bootstraps an isolated Testcontainers database, uses the real API and built frontend, and captures mail only through a secret-protected loopback test gateway in test sources. It creates no persistent local account, contacts no external SMTP provider and never installs a production fake-mailbox route. Generated diagnostics/screenshots remain under ignored backend/target/browser-checks. It does not establish WCAG conformance or a production security audit.
+
+This workspace has an ignored checksum-verified Node runtime under .tools/node-v24.22.0-win-x64. Add it to PATH for frontend commands. When the host's default Node differs, set BRIDGEOPS_TEST_NODE to the absolute pinned node executable before Maven verify. A clean checkout uses an official Node 24.22.0 installation. Windows test sockets use a canonical ignored target directory to avoid JDK short-TEMP-path selector failures; no OS networking setting is changed.
+
+## Operate the development stack
 
 ```powershell
-$env:PATH = (Join-Path $PWD '.tools/node-v24.22.0-win-x64') + ';' + $env:PATH
+Invoke-RestMethod http://localhost:8088/api/v1/system/info
+Invoke-RestMethod http://localhost:8088/health/liveness
+Invoke-RestMethod http://localhost:8088/health/readiness
+docker compose --env-file .env -f infra/compose.yaml ps
+docker compose --env-file .env -f infra/compose.yaml down
 ```
 
-A fresh checkout may instead use the official Node 24.22.0 installer or the pinned Node build image. Lockfiles and wrapper distribution/checksum make dependency resolution reproducible. The [verification plan](docs/development/PHASE_1_VERIFICATION.md) lists failure and security checks. CI configuration is committed; a hosted CI run is not implied.
+Named database volumes survive down. Rebuild with up --build -d --wait after source changes. Changing .env does not rotate existing database-role passwords. Never delete volumes/reset accounts to make verification pass.
 
-## API documentation and frontend development
+Liveness is independent of PostgreSQL; readiness includes it. Public probe output is minimal. Management/OpenAPI paths are hidden by default. For explicit local documentation access use infra/compose.docs.yaml in addition to the main Compose file; Swagger/API docs appear on localhost:8081. Vite development proxies to that backend; set the ignored AUTH_ORIGIN to the exact Vite origin and recreate the backend. Only one browser origin is trusted at a time.
 
-Public Compose routing hides management and OpenAPI paths by default. To opt in locally:
+The local Compose backend receives startup migration credentials. Production must separate migrations/operator execution, inject secrets safely and use HTTPS/Secure cookies. Runtime database grants remain restricted; they do not contain a compromised process holding migration credentials. No license, verified private reporting channel, production deployment, SSO/MFA, backup/restore, load/HA, accessibility conformance or complete security certification is claimed.
 
-```powershell
-docker compose --env-file .env -f infra/compose.yaml -f infra/compose.docs.yaml up -d --wait
-```
+## Architecture and delivery
 
-Open [Swagger UI](http://localhost:8081/swagger-ui.html) or [OpenAPI JSON](http://localhost:8081/v3/api-docs). The override exposes the backend only on localhost:8081 and enables docs; omit it for ordinary startup. Documentation describes implemented routes only. `npm.cmd --prefix frontend run dev` serves the development client, proxying API/health requests to that backend on 8081. Keep the core Compose services running. No production TLS deployment is performed by this setup.
+- [Current project status and verified publication](docs/PROJECT_STATUS.md)
+- [Browser/session/recovery guide](docs/development/PHASE_1D_BROWSER.md)
+- [HTTP authentication and keys](docs/development/PHASE_1B_HTTP_AUTH.md)
+- [Offline bootstrap and invitation configuration](docs/development/PHASE_1C_ONBOARDING.md)
+- [Implemented and planned API contracts](docs/api/CONTRACT_OUTLINE.md)
+- [System architecture](docs/architecture/SYSTEM.md), [database](docs/architecture/DATABASE.md) and [threat model](docs/security/THREAT_MODEL.md)
+- [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
+- [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-## Bootstrap and security boundary
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 2 draft workflow persistence/validation/publication, after Phase 1D verification is complete; execution, integration adapters and AI remain later.
 
-The chosen design provisions one initial account through an explicit offline, one-shot command. That account logs in and creates its organization/Owner membership transactionally; subsequent users join by invitation. **The offline bootstrap command is implemented; the sign-in UI remains Phase 1D.** Compose enables authentication, but normal startup seeds no account or tenant. Use [the Phase 1C operator/API guide](docs/development/PHASE_1C_ONBOARDING.md) for explicit provisioning and SMTP configuration. There are no seed credentials, privileged HTTP bootstrap endpoint, production default account or working sign-in controls. Phase 1B/C implements and tests the [bootstrap lifecycle](docs/architecture/adr/0014-offline-bootstrap.md) and [session strategy](docs/architecture/adr/0002-browser-sessions.md).
+## Browser preview
 
-No private security-reporting method currently exists; [SECURITY.md](SECURITY.md) describes the public-release gate. No WCAG, production security, hosted deployment or workflow correctness claim is made for this foundation.
+Actual application/API with disposable test accounts, captured during the browser journey. These are not seeded local accounts or fabricated dashboard data. [Mobile](docs/screenshots/phase1d-organizations-mobile.png) and [dark theme](docs/screenshots/phase1d-organizations-dark.png).
 
-## Architecture and product documents
-
-- [Requirements and scope](docs/product/REQUIREMENTS.md)
-- [System/module architecture and component diagram](docs/architecture/SYSTEM.md)
-- [Execution/state/approval sequence](docs/architecture/EXECUTION.md)
-- [Database relationships](docs/architecture/DATABASE.md)
-- [Threat model and permissions](docs/security/THREAT_MODEL.md)
-- [Implemented versus planned API contract](docs/api/CONTRACT_OUTLINE.md)
-- [Design tokens and layout direction](docs/design/FOUNDATION.md)
-- [ADRs](docs/architecture/adr/README.md)
-- [Repository structure](docs/development/REPOSITORY.md)
-
-Next: Phase 1D real browser sign-in/onboarding, session coordination and recovery. The first workflow/approval business demonstration follows Phases 2–4; full integrations/webhooks, AI/MCP and delivery polish remain in the revised roadmap.
-
-## Actual foundation preview
-
-Captured from the running local application, not a mockup. [Mobile dark-theme capture](docs/screenshots/foundation-mobile-dark.jpg). These captures do not establish accessibility conformance.
-
-![Running Phase 1A workspace](docs/screenshots/foundation-desktop.jpg)
-
-## Incremental GitHub development
-
-The public development repository is [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Publication status is recorded in PROJECT_STATUS.md; a URL alone does not prove a push succeeded. Follow the [Git workflow](docs/development/GIT_WORKFLOW.md) and [local credential rotation guide](docs/security/LOCAL_CREDENTIAL_ROTATION.md). No license has been selected yet.
-
-The [Phase 1B.1 session-core report](docs/development/PHASE_1B_SESSION_CORE.md) explains replay transactions, concurrency guarantees and the historical internal boundary. The [Phase 1B.2 HTTP guide](docs/development/PHASE_1B_HTTP_AUTH.md) documents the current enabled transport and key configuration.
-
-The [Phase 1C guide](docs/development/PHASE_1C_ONBOARDING.md) documents explicit offline initial-account provisioning. It is disabled by default and creates no tenant; normal startup never provisions an account.
-
-Phase 1D.1 adds real browser sign-in, protected navigation, memory-only access, cross-tab Web Lock coordination and sign-out/logout-all. Organization onboarding and recovery UI follow. See [browser guide](docs/development/PHASE_1D_BROWSER.md). Earlier foundation screenshots are historical.
-
-Phase 1D.3 adds browser password change and recovery. Recovery requests acknowledge only a request; delivery requires configured external SMTP and remains best-effort. Reset tokens are pasted into the form, never URLs. [Exact prerequisites and limits](docs/development/PHASE_1D_BROWSER.md).
+![Phase 1D organization workspace](docs/screenshots/phase1d-organizations-desktop.png)

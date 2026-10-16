@@ -99,7 +99,7 @@ class OrganizationOnboardingIT {
         assertThat(count("roles")).isEqualTo(6);assertThat(count("organization_memberships")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT r.name FROM membership_roles m JOIN roles r ON r.organization_id=m.organization_id AND r.id=m.role_id",String.class)).isEqualTo("OWNER");
         mvc.perform(get("/api/v1/organizations/"+org+"/members").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk())
-            .andExpect(jsonPath("$.items[0].userId").value(userId.toString())).andExpect(jsonPath("$.items[0].roles[0].name").value("OWNER"));
+            .andExpect(jsonPath("$.items[0].account.displayName").value("Synthetic Owner")).andExpect(jsonPath("$.items[0].userId").value(userId.toString())).andExpect(jsonPath("$.items[0].roles[0].name").value("OWNER"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='ORGANIZATION_CREATED'",Integer.class)).isEqualTo(1);
     }
     @Test void creationRequiresCurrentAccountGrantAndUnrelatedRoutesStayDenied() throws Exception {

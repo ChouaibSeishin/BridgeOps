@@ -54,3 +54,5 @@ Phase 1B/C add only actual module files, not empty placeholder controllers. Each
 Phase 1D subdivision: 1D.1 browser session lifecycle; 1D.2 organizations/members/invitations; 1D.3 password change and recovery with shared outbound email; 1D.4 truthful dashboard, disposable browser journey and release checks. [Current browser implementation](PHASE_1D_BROWSER.md).
 
 1D.3 password management/recovery is implemented with hash-only V8 proofs, all-session revocation and a shared outbound mail port. Final Phase 1 completion still requires the disposable real-browser journey and full verification gates.
+
+Phase 1D.4 implements the required real-browser gate/CI prerequisites, responsive operational workspace and safe member display labels. Focused browser journey passed; final full-suite/container/publication evidence is recorded in PROJECT_STATUS.md. No fake workflow metrics or default identity is introduced.
