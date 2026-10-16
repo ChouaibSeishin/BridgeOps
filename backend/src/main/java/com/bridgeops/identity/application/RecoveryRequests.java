@@ -2,7 +2,7 @@ package com.bridgeops.identity.application;
 import jakarta.annotation.PreDestroy;
 import java.util.concurrent.*;
 import org.springframework.stereotype.Component;
-/** Generic acknowledgement precedes lookup/delivery; bounded volatile work, no durable queue or retries. */
+/** Acknowledgement does not wait for lookup/delivery; bounded volatile work, no durable queue or retries. */
 @Component
 public class RecoveryRequests {
  private final PasswordRecoveryService recovery;

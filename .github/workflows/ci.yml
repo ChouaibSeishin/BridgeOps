@@ -58,4 +58,4 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Stop test services
         if: always()
-        run: docker compose --env-file .env -f infra/compose.yaml down
+        run: if test -f .env; then docker compose --env-file .env -f infra/compose.yaml down; fi

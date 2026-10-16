@@ -13,7 +13,7 @@ Initial inspection found clean local master exactly matching fetched origin/mast
 | 1D.2 organizations, members and invitation browser journeys / safe read contracts | 078c3e2; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38909776173) |
 | 1D.3 password change/recovery, V8 and neutral shared mail port | 594e0d3; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38911492628) |
 
-The final increment's hash/remote/CI result is recorded only after actual publication.
+6416a5c was pushed/ref-verified. Its [first hosted browser run failed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38914798975) while the other 88 integration cases passed. Local full verification passed; Linux browser diagnostics and final touch/keyboard refinements are being verified. No hosted completion is claimed until the retry succeeds.
 
 ## Implemented behavior
 

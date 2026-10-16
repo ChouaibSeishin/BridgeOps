@@ -460,7 +460,12 @@ export function OrganizationDetail({ user }: { user: User }) {
               {invitations.data.items.length === 0 && (
                 <p>No invitations have been issued.</p>
               )}
-              <div className="table-scroll">
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Invitation history"
+              >
                 <table>
                   <thead>
                     <tr>

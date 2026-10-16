@@ -55,22 +55,26 @@ try {
   });
   page = await context.newPage();
   const urls = [];
+  page.on("response",response=>console.log("HTTP: "+response.request().method()+" "+new URL(response.url()).pathname+" "+response.status()));
   page.on("request", (request) => urls.push(request.url()));
-  step = "invalid credentials"; console.log("STEP: " + step);
+  step = "invalid credentials";
+  console.log("STEP: " + step);
   await page.goto("/sign-in");
   await page.getByLabel("Email", { exact: true }).fill("owner@example.invalid");
   await page.getByLabel("Password", { exact: true }).fill("incorrect-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
-  step = "provisioned account sign-in"; console.log("STEP: " + step);
+  step = "provisioned account sign-in";
+  console.log("STEP: " + step);
   const ownerAccess = await signIn(
     page,
     "owner@example.invalid",
     ownerPassword,
   );
   await expect(page.getByText("Your workspace starts here")).toBeVisible();
-  step = "organization creation"; console.log("STEP: " + step);
+  step = "organization creation";
+  console.log("STEP: " + step);
   await page.getByLabel("Organization name").fill("Dispatch Operations");
   await page.getByLabel("Organization slug").fill("browser-dispatch");
   await page.getByRole("button", { name: "Create organization" }).click();
@@ -84,7 +88,8 @@ try {
   await expect(
     page.getByRole("heading", { name: "Members", exact: true }),
   ).toBeVisible();
-  step = "concurrent tab session restoration"; console.log("STEP: " + step);
+  step = "concurrent tab session restoration";
+  console.log("STEP: " + step);
   const tab = await context.newPage();
   await Promise.all([page.reload(), tab.goto(organizationUrl)]);
   await expect(
@@ -94,7 +99,8 @@ try {
     tab.getByRole("heading", { name: "Dispatch Operations", exact: true }),
   ).toBeVisible();
   await tab.close();
-  step = "cookie and memory storage boundary"; console.log("STEP: " + step);
+  step = "cookie and memory storage boundary";
+  console.log("STEP: " + step);
   expect(
     await page.evaluate(() => localStorage.length + sessionStorage.length),
   ).toBe(0);
@@ -108,7 +114,8 @@ try {
   );
   expect(refreshCookie?.httpOnly).toBe(true);
   expect(refreshCookie?.sameSite).toBe("Lax");
-  step = "invitation issue and revoke"; console.log("STEP: " + step);
+  step = "invitation issue and revoke";
+  console.log("STEP: " + step);
   await page.getByLabel("Recipient email").fill("revoked@example.invalid");
   await page.getByRole("checkbox", { name: "VIEWER", exact: true }).check();
   let issued = page.waitForResponse(
@@ -124,7 +131,8 @@ try {
   await expect(
     revoked.getByRole("cell", { name: "REVOKED", exact: true }),
   ).toBeVisible();
-  step = "new recipient invitation"; console.log("STEP: " + step);
+  step = "new recipient invitation";
+  console.log("STEP: " + step);
   await page.getByLabel("Recipient email").fill("jordan@example.invalid");
   issued = page.waitForResponse(
     (r) => r.url().endsWith("/invitations") && r.request().method() === "POST",
@@ -135,7 +143,8 @@ try {
     "jordan@example.invalid",
     "BridgeOps invitation",
   );
-  step = "invitation-only enrollment without auto-login"; console.log("STEP: " + step);
+  step = "invitation-only enrollment without auto-login";
+  console.log("STEP: " + step);
   const guestContext = await browser.newContext({ baseURL: origin });
   const guest = await guestContext.newPage();
   await guest.goto("/invitations/enroll");
@@ -152,7 +161,8 @@ try {
   expect((await guestContext.request.get("/api/v1/auth/me")).status()).toBe(
     401,
   );
-  step = "invited account membership and denied creation"; console.log("STEP: " + step);
+  step = "invited account membership and denied creation";
+  console.log("STEP: " + step);
   await signIn(guest, "jordan@example.invalid", invitedPassword);
   await expect(
     guest.getByRole("button", { name: "Create organization" }),
@@ -195,7 +205,8 @@ try {
     }),
   );
   expect(denied).toBe(403);
-  step = "foreign tenant concealment"; console.log("STEP: " + step);
+  step = "foreign tenant concealment";
+  console.log("STEP: " + step);
   await guest.goto("/organizations/" + process.env.BRIDGEOPS_TEST_FOREIGN_ORG);
   await expect(guest.getByRole("alert")).toContainText(
     "unavailable to your account",
@@ -203,7 +214,8 @@ try {
   await expect(
     guest.getByRole("heading", { name: "Outside tenant" }),
   ).toHaveCount(0);
-  step = "revision-checked member management"; console.log("STEP: " + step);
+  step = "revision-checked member management";
+  console.log("STEP: " + step);
   await page.getByRole("button", { name: "Reload access & data" }).click();
   const member = page
     .locator("article.member-row")
@@ -215,8 +227,9 @@ try {
   await member.getByRole("button", { name: "Save membership" }).click();
   await expect(member).toContainText("OPERATOR");
   await expect(member).toContainText("Revision 1");
-  step = "desktop mobile and dark render captures"; console.log("STEP: " + step);
-  await page.evaluate(()=>window.scrollTo(0,0));
+  step = "desktop mobile and dark render captures";
+  console.log("STEP: " + step);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await mkdir(resolve("backend/target/browser-checks"), { recursive: true });
   await page.screenshot({
     path: resolve("backend/target/browser-checks/organizations-desktop.png"),
@@ -235,12 +248,36 @@ try {
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  expect(
+    await page
+      .locator(".button,.icon-button,.check-label")
+      .evaluateAll((elements) =>
+        elements.every(
+          (element) => element.getBoundingClientRect().height >= 44,
+        ),
+      ),
+  ).toBe(true);
+  const history = page.getByRole("region", {
+    name: "Invitation history",
+    exact: true,
+  });
+  await history.focus();
+  await expect(history).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => history.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  await history.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: resolve("backend/target/browser-checks/organizations-mobile.png"),
     fullPage: true,
     mask: [page.locator('input[type="password"],input[name="token"]')],
   });
-  step = "sign-out and denied protected navigation"; console.log("STEP: " + step);
+  step = "sign-out and denied protected navigation";
+  console.log("STEP: " + step);
   await guest.getByRole("link", { name: "Organizations", exact: true }).click();
   await guest.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(
@@ -250,7 +287,8 @@ try {
   await expect(
     guest.getByRole("heading", { name: "Sign in to your workspace" }),
   ).toBeVisible();
-  step = "recovery invalidates an independent live session"; console.log("STEP: " + step);
+  step = "recovery invalidates an independent live session";
+  console.log("STEP: " + step);
   const otherContext = await browser.newContext({ baseURL: origin });
   const other = await otherContext.newPage();
   const otherAccess = await signIn(
@@ -289,7 +327,8 @@ try {
   await expect(
     other.getByRole("heading", { name: "Sign in to your workspace" }),
   ).toBeVisible();
-  step = "authenticated password change"; console.log("STEP: " + step);
+  step = "authenticated password change";
+  console.log("STEP: " + step);
   const beforeChange = await signIn(
     guest,
     "jordan@example.invalid",
@@ -312,7 +351,8 @@ try {
       })
     ).status(),
   ).toBe(401);
-  step = "logout-all and original owner sign-out"; console.log("STEP: " + step);
+  step = "logout-all and original owner sign-out";
+  console.log("STEP: " + step);
   const beforeLogout = await signIn(
     guest,
     "jordan@example.invalid",
@@ -341,7 +381,8 @@ try {
       })
     ).status(),
   ).toBe(401);
-  step = "URL and persistent-cache exclusion"; console.log("STEP: " + step);
+  step = "URL and persistent-cache exclusion";
+  console.log("STEP: " + step);
   expect(
     urls.some((url) => /[?#].*(token|password|accessToken)=/i.test(url)),
   ).toBe(false);
@@ -353,6 +394,7 @@ try {
   );
 } catch {
   console.error("FAIL: browser journey at step: " + step);
+  if(page)console.error("LAYOUT: "+JSON.stringify(await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(e=>({tag:e.tagName,css:e.className,right:e.getBoundingClientRect().right}))})).catch(()=>({}))));
   if (page)
     console.error(
       (

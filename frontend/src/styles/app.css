@@ -1062,11 +1062,49 @@ th {
     min-width: 0;
   }
 }
-@media(max-width:600px) {
- .sidebar { flex-direction:column; align-items:stretch; }
- .sidebar .brand { width:fit-content; }
- .sidebar nav { margin-left:0; flex-wrap:wrap; gap:6px; }
- .sidebar nav a { flex:1; justify-content:center; }
- .page-heading { min-width:0; }
- .page-heading > div { min-width:0; max-width:100%; }
+@media (max-width: 600px) {
+  .sidebar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sidebar .brand {
+    width: fit-content;
+  }
+  .sidebar nav {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .sidebar nav a {
+    flex: 1;
+    justify-content: center;
+  }
+  .page-heading {
+    min-width: 0;
+  }
+  .page-heading > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+/* Design-foundation pointer targets; labels are the complete checkbox hit area. */
+.button,
+.icon-button {
+  min-height: 40px;
+  min-width: 40px;
+}
+.check-label {
+  min-height: 40px;
+}
+.table-scroll:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .button,
+  .icon-button,
+  .check-label {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
