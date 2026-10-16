@@ -1,6 +1,6 @@
 # Phase 2 — workflow definitions
 
-Status: accepted design; implementation and verification are in progress. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
+Status: accepted design; graph registry/validator/canonicalizer implemented, persistence and HTTP/UI increments in progress. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
 
 ## Graph v1 and registry
 
@@ -52,4 +52,4 @@ UI uses existing session client/TanStack Query and design tokens: tenant list, m
 
 ## Verification and progress
 
-First increment reconciles stale Git/Phase 1/current-task documentation and accepts this contract. Implementation follows with validator unit tests, V8 upgrade/empty-schema restricted-runtime integration tests, HTTP tenant/permission/concurrency/audit/immutable-row tests, frontend tests and the required real Chromium journey. Missing infrastructure fails, not skips. Final gates remain README frontend checks + Maven verify + docs/secret scans + Compose build/start + API smoke + inspected hosted CI. No Phase 2 verification is claimed yet. Local pre-migration inspection: schema V8, one user, zero organizations, consumed bootstrap marker; preserve the existing account, keys, environment and volume.
+First increment 4875c64 reconciled stale Git/Phase 1/current-task documentation and accepted this contract; [its hosted workflow passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38943543050). GraphDefinition now implements the bounded registry, deterministic graph validation and canonical hash. The final focused 28-case unit run passed, including save bounds and integer-overflow version rejection. Remaining gates: V8 upgrade/empty-schema restricted-runtime integration tests, HTTP tenant/permission/concurrency/audit/immutable-row tests, frontend tests and required real Chromium. Missing infrastructure fails, not skips. Final gates remain README frontend checks + Maven verify + docs/secret scans + Compose build/start + API smoke + inspected hosted CI. No full Phase 2 completion is claimed. Local pre-migration inspection: schema V8, one user, zero organizations, consumed bootstrap marker; preserve the existing account, keys, environment and volume.
