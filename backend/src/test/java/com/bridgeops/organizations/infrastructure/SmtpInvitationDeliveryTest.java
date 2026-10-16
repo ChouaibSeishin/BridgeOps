@@ -29,9 +29,9 @@ class SmtpInvitationDeliveryTest {
     assertThatThrownBy(()->delivery.deliver("victim@example.invalid\r\nBcc:extra@example.invalid","synthetic",Instant.now())).isInstanceOf(IllegalArgumentException.class);assertThat(sender.captured).isNull();
  }
  @Test void disabledAndIncompleteConfigurationFailClosedWithoutMail(){
-    var config=new InvitationDeliveryConfiguration();var disabled=config.invitationDelivery(false,"",587,"","","",false);
-    assertThatThrownBy(()->disabled.deliver("recipient@example.invalid","synthetic",Instant.now())).isInstanceOf(DomainFailure.class).hasMessage("Operation was not accepted.");
-    assertThatThrownBy(()->config.invitationDelivery(true,"",587,"","","",false)).isInstanceOf(IllegalStateException.class).hasMessage("SMTP configuration is incomplete.");
+    var config=new com.bridgeops.shared.mail.OutboundEmailConfiguration();var disabled=config.outboundEmail(false,"",587,"","","",false);
+    assertThatThrownBy(()->disabled.send("recipient@example.invalid","Synthetic subject","Synthetic body")).isInstanceOf(DomainFailure.class).hasMessage("Operation was not accepted.");
+    assertThatThrownBy(()->config.outboundEmail(true,"",587,"","","",false)).isInstanceOf(IllegalStateException.class).hasMessage("SMTP configuration is incomplete.");
  }
  @Test void providerFailureIsRedactedAndNotChainedIntoHttpErrors(){
     var sender=sender();sender.fail=true;var delivery=new SmtpInvitationDelivery(sender,"sender@example.invalid",false);

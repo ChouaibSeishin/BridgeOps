@@ -18,6 +18,9 @@ public class UserAccount {
     @Column(nullable = false, length = 16) private String accountStatus;
     @Column(nullable = false) private Instant createdAt;
 
+    private Instant emailVerifiedAt;
+    public boolean isVerified(){return emailVerifiedAt!=null;}
+    public void changePasswordHash(String value){passwordHash=value;}
     protected UserAccount() { }
     public UUID getId() { return id; }
     public String getEmail() { return email; }

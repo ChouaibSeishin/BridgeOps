@@ -9,6 +9,7 @@ export interface SessionState {
   user?: User;
   error?: string;
 }
+export class InputFailure extends Error {}
 export class HttpFailure extends Error {
   constructor(
     public status: number,
@@ -20,6 +21,7 @@ export class HttpFailure extends Error {
   }
 }
 export function failureMessage(error: unknown): string {
+  if (error instanceof InputFailure) return error.message;
   if (!(error instanceof HttpFailure))
     return "The connection was interrupted. Check your connection before trying again.";
   const messages: Record<number, string> = {
@@ -238,6 +240,10 @@ export class SessionClient {
       });
       return (response.status === 204 ? undefined : await response.json()) as T;
     });
+  invalidate = () => {
+    this.clear();
+    this.notify();
+  };
   logout = async (all = false) => {
     try {
       if (all)

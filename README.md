@@ -112,3 +112,5 @@ The [Phase 1B.1 session-core report](docs/development/PHASE_1B_SESSION_CORE.md) 
 The [Phase 1C guide](docs/development/PHASE_1C_ONBOARDING.md) documents explicit offline initial-account provisioning. It is disabled by default and creates no tenant; normal startup never provisions an account.
 
 Phase 1D.1 adds real browser sign-in, protected navigation, memory-only access, cross-tab Web Lock coordination and sign-out/logout-all. Organization onboarding and recovery UI follow. See [browser guide](docs/development/PHASE_1D_BROWSER.md). Earlier foundation screenshots are historical.
+
+Phase 1D.3 adds browser password change and recovery. Recovery requests acknowledge only a request; delivery requires configured external SMTP and remains best-effort. Reset tokens are pasted into the form, never URLs. [Exact prerequisites and limits](docs/development/PHASE_1D_BROWSER.md).

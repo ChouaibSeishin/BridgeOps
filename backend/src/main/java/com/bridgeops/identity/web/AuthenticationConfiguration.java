@@ -49,9 +49,9 @@ public class AuthenticationConfiguration {
             PasswordSessionService sessions, SignedCsrfTokens csrf, @Value("${bridgeops.api-docs.enabled:false}") boolean docsEnabled) throws Exception {
         http.authorizeHttpRequests(authorize -> {
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/system/info","/actuator/health/liveness","/actuator/health/readiness","/api/v1/auth/csrf").permitAll();
-            authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/refresh","/api/v1/auth/logout").permitAll();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/refresh","/api/v1/auth/logout","/api/v1/auth/forgot","/api/v1/auth/reset").permitAll();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/auth/me").authenticated();
-            authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/logout-all").authenticated();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/logout-all","/api/v1/auth/password/change").authenticated();
             if (docsEnabled) authorize.requestMatchers(HttpMethod.GET,"/v3/api-docs","/v3/api-docs/**","/swagger-ui.html","/swagger-ui/**").permitAll();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations","/api/v1/organizations/*","/api/v1/organizations/*/members","/api/v1/organizations/*/roles","/api/v1/organizations/*/access","/api/v1/organizations/*/invitations").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations").authenticated();

@@ -4,7 +4,14 @@ import {
   useSyncExternalStore,
   type FormEvent,
 } from "react";
-import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -23,7 +30,9 @@ import {
   OrganizationDetail,
   InvitationJourney,
 } from "./Organizations";
+import { Recovery, PasswordSettings } from "./Recovery";
 export function App() {
+  const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
   const [dark, setDark] = useState(
     () => document.documentElement.dataset.theme === "dark",
@@ -36,6 +45,11 @@ export function App() {
   useEffect(() => {
     void session.initialize();
   }, []);
+  function passwordFinished() {
+    setNotice("Password updated. Sign in again to continue.");
+    session.invalidate();
+    navigate("/sign-in", { replace: true });
+  }
   function theme() {
     document.documentElement.dataset.theme = dark ? "light" : "dark";
     setDark(!dark);
@@ -75,6 +89,14 @@ export function App() {
     return (
       <main className="auth-layout">
         <Routes>
+          <Route
+            path="/forgot"
+            element={<Recovery onReset={passwordFinished} />}
+          />
+          <Route
+            path="/reset"
+            element={<Recovery reset onReset={passwordFinished} />}
+          />
           <Route path="/sign-in" element={<SignIn notice={notice} />} />
           <Route
             path="/invitations/enroll"
@@ -143,6 +165,14 @@ export function App() {
         </header>
         <main id="main" tabIndex={-1}>
           <Routes>
+            <Route
+              path="/forgot"
+              element={<Recovery onReset={passwordFinished} />}
+            />
+            <Route
+              path="/reset"
+              element={<Recovery reset onReset={passwordFinished} />}
+            />
             <Route path="/" element={<Organizations user={state.user!} />} />
             <Route
               path="/organizations/:id"
@@ -163,6 +193,7 @@ export function App() {
                       <p>Your current identity and sign-out controls.</p>
                     </div>
                   </div>
+                  <PasswordSettings onChanged={passwordFinished} />
                   <section className="auth-card">
                     <h2>{state.user?.displayName}</h2>
                     <p>{state.user?.email}</p>
@@ -270,6 +301,11 @@ function SignIn({ notice }: { notice: string }) {
       <p>
         <Link className="text-link" to="/invitations/enroll">
           Join with an invitation
+        </Link>
+      </p>
+      <p>
+        <Link className="text-link" to="/forgot">
+          Forgot your password?
         </Link>
       </p>
       <p className="muted small">

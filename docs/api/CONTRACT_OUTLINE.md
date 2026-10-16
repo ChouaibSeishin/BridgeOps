@@ -82,3 +82,5 @@ Phase 1C.4 implements POST O/invitations, DELETE O/invitations/{id}, authenticat
 Phase 1D.1 integrates the existing authentication contract into the browser without adding backend routes. [Session client behavior](../development/PHASE_1D_BROWSER.md).
 
 Phase 1D.2 adds UserSummary.canCreateOrganizations, GET O/access and bounded GET O/invitations; O/roles adds a live assignable hint. Existing mutating contracts are unchanged and remain authoritative. [Browser/API details](../development/PHASE_1D_BROWSER.md).
+
+Phase 1D.3 implements POST /auth/password/change, /auth/forgot and /auth/reset with the exact shapes, generic acknowledgement and invalidation semantics in [the browser/recovery guide](../development/PHASE_1D_BROWSER.md). Forgot returns 202 without a delivery claim; change/reset success returns 204 and clears cookies. V8 reset state and shared outbound transport retain invitation SMTP configuration compatibility.

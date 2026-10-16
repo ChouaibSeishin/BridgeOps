@@ -23,7 +23,7 @@ public class AuthenticationThrottle {
         List<Bucket> buckets = new ArrayList<>();
         buckets.add(new Bucket("global",300,60));
         buckets.add(new Bucket("peer:" + peer,120,60));
-        if (Set.of("login","invite","enroll").contains(operation)) {
+        if (Set.of("login","invite","enroll","forgot","reset","password-change").contains(operation)) {
             buckets.add(new Bucket(operation + "-peer:" + peer,20,900));
             buckets.add(new Bucket(operation + "-account:" + email.trim().toLowerCase(Locale.ROOT),10,900));
         }
