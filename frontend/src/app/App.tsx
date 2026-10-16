@@ -31,6 +31,11 @@ import {
   InvitationJourney,
 } from "./Organizations";
 import { Recovery, PasswordSettings } from "./Recovery";
+import { WorkflowHome, WorkflowList } from "../features/workflows/WorkflowList";
+import {
+  WorkflowEditor,
+  PublishedVersion,
+} from "../features/workflows/WorkflowEditor";
 export function App() {
   const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
@@ -136,6 +141,7 @@ export function App() {
             Runtime
           </NavLink>
           <NavLink to="/account">Account & sessions</NavLink>
+          <NavLink to="/workflows">Workflows</NavLink>
         </nav>
         <div className="sidebar-bottom">
           <p className="muted small">
@@ -174,6 +180,22 @@ export function App() {
               element={<Recovery reset onReset={passwordFinished} />}
             />
             <Route path="/" element={<Organizations user={state.user!} />} />
+            <Route
+              path="/workflows"
+              element={<WorkflowHome user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/workflows"
+              element={<WorkflowList user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/workflows/:workflowId"
+              element={<WorkflowEditor user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/workflows/:workflowId/versions/:versionId"
+              element={<PublishedVersion user={state.user!} />}
+            />
             <Route
               path="/organizations/:id"
               element={<OrganizationDetail user={state.user!} />}

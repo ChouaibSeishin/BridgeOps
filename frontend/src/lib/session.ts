@@ -16,6 +16,7 @@ export class HttpFailure extends Error {
     public code: string,
     public reference?: string,
     public retryAfter?: string,
+    public details?: unknown,
   ) {
     super(code);
   }
@@ -30,6 +31,8 @@ export function failureMessage(error: unknown): string {
     403: "This operation is not permitted. Your permissions or browser security state may have changed.",
     404: "This resource is unavailable to your account.",
     409: "The record changed or conflicts with existing data. Reload before trying again.",
+    413: "The definition or request exceeds the supported limits.",
+    422: "Correct the saved workflow definition before publishing.",
     429: "Too many requests. Wait before trying again.",
     503: "The service or email delivery is unavailable. Try again later.",
   };
@@ -87,9 +90,14 @@ export class SessionClient {
     });
     if (!response.ok) {
       let code = "REQUEST_FAILED";
+      let details: unknown;
       try {
-        const body = (await response.json()) as { code?: string };
+        const body = (await response.json()) as {
+          code?: string;
+          details?: unknown;
+        };
         code = body.code ?? code;
+        details = body.details;
       } catch {
         /* Fixed safe errors only. */
       }
@@ -98,6 +106,7 @@ export class SessionClient {
         code,
         response.headers.get("X-Correlation-ID") ?? undefined,
         response.headers.get("Retry-After") ?? undefined,
+        details,
       );
     }
     return response;

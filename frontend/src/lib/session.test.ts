@@ -10,6 +10,34 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+it("retains safe semantic validation details without refreshing or clearing a live session", async () => {
+  const f = fixture();
+  await f.client.initialize();
+  const before = f.refreshes();
+  const details = {
+    valid: false,
+    errors: [
+      {
+        nodeId: "node",
+        path: "$.nodes[1].config.message",
+        code: "INVALID_TEXT",
+        message: "Provide a message.",
+      },
+    ],
+  };
+  f.transport
+    .mockResolvedValueOnce(
+      json({ headerName: "X-CSRF-TOKEN", token: "test-proof" }),
+    )
+    .mockResolvedValueOnce(json({ code: "INVALID_WORKFLOW", details }, 422));
+  await expect(
+    f.client.request("/api/v1/organizations/org/workflows/workflow/publish", {
+      method: "POST",
+    }),
+  ).rejects.toMatchObject({ status: 422, details });
+  expect(f.refreshes()).toBe(before);
+  expect(f.client.snapshot().status).toBe("authenticated");
+});
 function fixture() {
   let refreshes = 0;
   let expiry = Date.now() + 600000;

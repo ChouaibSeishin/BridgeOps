@@ -6,6 +6,8 @@ Phase 2 inspection: clean master and GitHub both at 11aec6e9e2e9d2e0ea0aaedde2e2
 
 ## Continuity and publication evidence
 
+Phase 2 UI progress: source implements the real workflow list/editor/validation/publication/history/copy/archive browser experience using existing session/query/design primitives. The frontend's 35 tests, typecheck, lint and production build passed; real-browser/release gates remain pending. HTTP 77411d1 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38947425562). No Phase 2 completion or execution claim is made yet.
+
 Phase 2 HTTP progress: workflow list/create/detail/save/validate/publish/duplicate/archive/history/exact-version endpoints are implemented, with current tenant capability checks, exact Origin/CSRF, safe semantic 422 details, revision conflicts and bounded parsing. Ten restricted-runtime HTTP cases plus 29 selected validator/boundary unit cases passed. Persistence 891cf82 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38946336182). UI/browser/release verification remains in progress; execution stays unavailable.
 
 Phase 2 persistence progress: V9, public TenantAuthorization, narrow WorkflowAudit and workflow application/persistence services are implemented. All 12 focused disposable PostgreSQL lifecycle/migration tests passed, including V8 preservation, races, immutable rows and audit rollback. HTTP/UI are still unavailable pending their increments. Local data remains preserved. Validator increment 11555f5 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38944732833).

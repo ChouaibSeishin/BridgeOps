@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Completed: Phase 1D browser onboarding and recovery.** Real sign-in, organization creation/selection, member management, invitations, session controls and password change/recovery are implemented. Local and [hosted verification](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931044047) passed 110 backend/integration/browser cases and 17 frontend tests, plus container startup and security smoke. Workflows, integrations, approvals, AI and MCP remain future roadmap phases. See [current evidence](docs/PROJECT_STATUS.md).
+**Current work: Phase 2 workflow drafts, validation and immutable publication.** Phase 1D onboarding/sessions/recovery is complete. Workflow backend and form editor are implemented, with required real-browser/container/release verification in progress. Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Execution, integrations, approval processing, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the workflow guide](docs/development/PHASE_2_WORKFLOWS.md).
 
 ## Start from a clean checkout
 
@@ -79,6 +79,7 @@ The local Compose backend receives startup migration credentials. Production mus
 ## Architecture and delivery
 
 - [Current project status and verified publication](docs/PROJECT_STATUS.md)
+- [Workflow definition schema, revisions and immutable publication](docs/development/PHASE_2_WORKFLOWS.md)
 - [Browser/session/recovery guide](docs/development/PHASE_1D_BROWSER.md)
 - [HTTP authentication and keys](docs/development/PHASE_1B_HTTP_AUTH.md)
 - [Offline bootstrap and invitation configuration](docs/development/PHASE_1C_ONBOARDING.md)

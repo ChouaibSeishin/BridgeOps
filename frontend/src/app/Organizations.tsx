@@ -362,6 +362,16 @@ export function OrganizationDetail({ user }: { user: User }) {
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
+      {permissions.includes("workflow.read") && (
+        <p>
+          <Link
+            className="button primary"
+            to={`/organizations/${id}/workflows`}
+          >
+            Open workflows
+          </Link>
+        </p>
+      )}
       {error && (
         <p role="alert" className="form-error">
           {error}
