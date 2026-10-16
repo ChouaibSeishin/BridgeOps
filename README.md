@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Current work: Phase 2 workflow drafts, validation and immutable publication.** Phase 1D onboarding/sessions/recovery is complete. Workflow backend and form editor are implemented, with required real-browser/container/release verification in progress. Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Execution, integrations, approval processing, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the workflow guide](docs/development/PHASE_2_WORKFLOWS.md).
+**Phase 2 complete: workflow drafts, validation and immutable publication.** Phase 1D onboarding/sessions/recovery and Phase 2 backend/browser authoring are verified. Final local gates passed 162 backend/integration/browser tests and 37 frontend tests, and [implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38955049541). Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Execution, integrations, approval processing, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the workflow guide](docs/development/PHASE_2_WORKFLOWS.md).
 
 ## Start from a clean checkout
 
@@ -30,6 +30,8 @@ docker compose --env-file .env -f infra/compose.yaml run --rm -e BOOTSTRAP_ENABL
 Replace the nonsensitive metadata; enter your own password through the no-echo console. Never pass a password argument or literal secret in shell history. Protected automated stdin, exit codes and operator-credential requirements are documented in the [bootstrap guide](docs/development/PHASE_1C_ONBOARDING.md). Bootstrap is disabled by default, one-shot and transactionally locked. It creates one verified account with an account-level organization.create grant, no tenant. Normal startup never provisions an identity. Do not reset the consumed marker to bypass this policy.
 
 Sign in at [the browser sign-in page](http://localhost:8088/sign-in), create an organization and open its members/roles/invitations. Only current permitted actions appear; the backend rechecks authorization, delegation, revisions and last-active-Owner protection. Organization membership does not grant the account-level ability to create other organizations.
+
+For workflow authoring, select an organization and open Workflows. Create a draft, edit its metadata, node configuration and Next node connections, then save and validate it. Publish the saved valid revision and inspect its immutable version in history. Later draft edits, duplication and archive preserve published history. Publishing stores a definition only; it performs no workflow execution or approval decision.
 
 Current secure-context browsers with Web Locks are required (HTTPS or loopback development). Access credentials stay in memory, refresh credentials stay in HttpOnly cookies, cookie-sensitive sequences are serialized across tabs, and broadcasts contain no credentials. Account & sessions offers password change, this-browser sign-out and logout-all; no individual remote-session list is claimed.
 
@@ -90,7 +92,7 @@ The local Compose backend receives startup migration credentials. Production mus
 - [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
 - [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 2 draft workflow persistence/validation/publication; execution, integration adapters and AI remain later.
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 3 durable sequential execution with synthetic capabilities; approval processing, integration adapters and AI remain later.
 
 ## Browser preview
 

@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 2 workflow definitions are implemented; full local release verification passed; final hosted publication is pending.** Publication stores an immutable definition; it does not execute it. Execution, approval processing, integrations, webhooks, AI and MCP remain later phases.
+Updated 2026-10-16 UTC. **Phase 2 workflow definitions are complete: full local release verification and the corresponding hosted implementation CI passed.** Publication stores an immutable definition; it does not execute it. Execution, approval processing, integrations, webhooks, AI and MCP remain later phases.
 
 ## Starting point and preserved environment
 
@@ -17,8 +17,9 @@ Normal commits/pushes and exact remote refs were verified; no reset, force push 
 | 891cf82 | V9 drafts/immutable versions, public tenant/audit boundary, atomic publication | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38946336182) |
 | 77411d1 | Workflow HTTP lifecycle, strict tenant/revision/security contracts | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38947425562) |
 | ee7c98b | Browser authoring, validation, publication/history, duplication/archive | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38949564604) |
+| c5e588e | Strict draft inputs, full browser lifecycle and final release verification | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38955049541) |
 
-The final browser/input refinement increment passed full local verification and is being published. Final hosted completion is not inferred from earlier commits.
+Final implementation commit: c5e588e5f929f7bac782196b481597b44cdb34ad. Its corresponding hosted run completed successfully, including frontend, required backend/PostgreSQL/Chromium verification, container build/start, same-origin smoke and production dependency audit. Final hosted completion was observed directly.
 
 ## Implemented Phase 2 behavior
 
@@ -57,4 +58,4 @@ Use [README](../README.md) and the [Phase 2 contract/commands](development/PHASE
 
 Current definition semantics are linear only; branches/joins, runtime work, TEST snapshots and approval decisions are deferred. Unsaved editor state lives only in the current page. Hashes identify content, not authorship/tamper-proof storage. Publication does not run anything. No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment is claimed. Local Compose still supplies startup migration credentials; production must separate migration/operator execution. No license or verified private reporting channel is configured. SMTP dispatcher/outbox limitations from Phase 1 remain unchanged.
 
-After the pending Phase 2 release gates pass, the next task is Phase 3 durable sequential execution with deterministic synthetic capabilities, state/attempt history, idempotency, retries/delay/deadline/cancel and fencing. Approval processing begins in Phase 4; integration/webhook and AI/MCP phases follow. No later-phase implementation was started.
+Phase 2 release gates passed. The next task is Phase 3 durable sequential execution with deterministic synthetic capabilities, state/attempt history, idempotency, retries/delay/deadline/cancel and fencing. Approval processing begins in Phase 4; integration/webhook and AI/MCP phases follow. No later-phase implementation was started.
