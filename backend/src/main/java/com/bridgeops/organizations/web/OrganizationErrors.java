@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestControllerAdvice(basePackages="com.bridgeops.organizations.web")
 public class OrganizationErrors {
  @ExceptionHandler(DomainFailure.class) public void domain(DomainFailure failure,HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,failure.status(),failure.code(),failure.getMessage());}
- @ExceptionHandler({HttpMessageNotReadableException.class,MethodArgumentNotValidException.class,MethodArgumentTypeMismatchException.class,IllegalArgumentException.class})
+ @ExceptionHandler({HttpMessageNotReadableException.class,MethodArgumentNotValidException.class,MethodArgumentTypeMismatchException.class,org.springframework.web.bind.ServletRequestBindingException.class,IllegalArgumentException.class})
  public void invalid(HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,400,"INVALID_REQUEST","Request is invalid.");}
  @ExceptionHandler(DataIntegrityViolationException.class) public void conflict(HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,409,"RESOURCE_CONFLICT","Resource conflicts with existing state.");}
  @ExceptionHandler({DataAccessException.class,TransactionException.class}) public void unavailable(HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,503,"DEPENDENCY_UNAVAILABLE","Service is temporarily unavailable.");}

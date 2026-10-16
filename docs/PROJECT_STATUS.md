@@ -1,3 +1,5 @@
+Current increment: Phase 1C.3 membership role/status mutations and soft removal. Eighteen focused restricted-runtime tests passed, followed by a successful full verify with 72 tests (17 unit/MVC and 55 PostgreSQL), zero failures/errors/skips. V6 Compose upgrade/start passed; users and organizations both remain empty. Runtime privilege checks confirmed status/revision updates and parent locking while user ownership, audit and account-grant writes remain denied. Revision checks, current delegation ceilings and serialized last-active-Owner protection are required on every exposed mutation. Invitations remain the final pending increment.
+
 # Project status
 
 Updated 2026-10-16 UTC. Current task: Phase 1C backend onboarding. Browser work remains Phase 1D.
@@ -8,9 +10,9 @@ Initial local/fetched origin/master matched ccf94bb with a clean tree. Foundatio
 
 267645e implements one-shot offline initial-account provisioning. Push and remote hash were verified; [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38891771047). Full backend verify passed 53 tests before the final command-logging adjustment; final focused verification passed 3 CLI + 6 PostgreSQL bootstrap tests. CI reran the full backend/frontend/container checks. No persistent initial account was created.
 
-## Current increment: organization boundary
+## Published organization boundary
 
-V5 implements tenant-owned fixed roles, permissions, membership composite keys and safe audit events. POST /api/v1/organizations creates the organization and Owner membership atomically after live identity/account-grant checks. GET collection/detail/member-list/role-catalog queries are user/tenant-qualified and require current permissions. All unimplemented business routes remain denied. Full backend verify passed 63 tests (17 unit/MVC and 46 PostgreSQL, zero failures/errors/skips). Final focused verification after removing a grant-row lock passed all 9 organization HTTP tests with the restricted runtime database role; fixtures/Flyway use a separate operator connection. Final Compose up --build -d --wait passed with all services healthy. Commit/push/CI are checked after the staged gate.
+V5 implements tenant-owned fixed roles, permissions, membership composite keys and safe audit events. POST /api/v1/organizations creates the organization and Owner membership atomically after live identity/account-grant checks. GET collection/detail/member-list/role-catalog queries are user/tenant-qualified and require current permissions. All unimplemented business routes remain denied. Full backend verify passed 63 tests (17 unit/MVC and 46 PostgreSQL, zero failures/errors/skips). Final focused verification after removing a grant-row lock passed all 9 organization HTTP tests with the restricted runtime database role; fixtures/Flyway use a separate operator connection. Final Compose up --build -d --wait passed with all services healthy. Published as 43338a8; remote ref matched and [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38893437874).
 
 See [the Phase 1C implementation and commands](development/PHASE_1C_ONBOARDING.md), [HTTP session design](development/PHASE_1B_HTTP_AUTH.md), [API](api/CONTRACT_OUTLINE.md), [schema](architecture/DATABASE.md) and [security model](security/THREAT_MODEL.md).
 

@@ -30,6 +30,18 @@ public class OrganizationStore {
     public void require(UUID org,UUID membership,String permission){if(!permissions(org,membership).contains(permission))throw new DomainFailure(403,"PERMISSION_DENIED");}
     public List<Role> roles(UUID org,UUID membership){return jdbc.query("SELECT r.id,r.name FROM roles r JOIN membership_roles m ON m.organization_id=r.organization_id AND m.role_id=r.id WHERE m.organization_id=? AND m.membership_id=? ORDER BY r.name",
         (rs,n)->new Role(rs.getObject(1,UUID.class),rs.getString(2)),org,membership);}
+    public Membership byId(UUID org,UUID id){
+        var rows=jdbc.query("SELECT id,user_id,status,revision FROM organization_memberships WHERE organization_id=? AND id=?",(rs,n)->new Membership(rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getString(3),rs.getLong(4)),org,id);
+        if(rows.isEmpty())throw new DomainFailure(404,"NOT_FOUND");return rows.getFirst();
+    }
+    public Set<String> rolePermissions(UUID org,UUID role){return Set.copyOf(jdbc.queryForList("SELECT permission_code FROM role_permissions WHERE organization_id=? AND role_id=?",String.class,org,role));}
+    public List<UUID> activeOwnerUsers(UUID org){return jdbc.queryForList("SELECT DISTINCT m.user_id FROM organization_memberships m JOIN membership_roles a ON a.organization_id=m.organization_id AND a.membership_id=m.id JOIN roles r ON r.organization_id=a.organization_id AND r.id=a.role_id WHERE m.organization_id=? AND m.status='ACTIVE' AND r.name='OWNER'",UUID.class,org);}
+    public Membership change(UUID org,UUID member,long revision,String status,Set<UUID> roles){
+        if(jdbc.update("UPDATE organization_memberships SET status=?,revision=revision+1 WHERE organization_id=? AND id=? AND revision=?",status,org,member,revision)!=1)throw new DomainFailure(409,"STALE_REVISION");
+        jdbc.update("DELETE FROM membership_roles WHERE organization_id=? AND membership_id=?",org,member);
+        roles.forEach(role->jdbc.update("INSERT INTO membership_roles(organization_id,membership_id,role_id) VALUES(?,?,?)",org,member,role));
+        return byId(org,member);
+    }
     public List<Role> catalog(UUID org){return jdbc.query("SELECT id,name FROM roles WHERE organization_id=? ORDER BY name",(rs,n)->new Role(rs.getObject(1,UUID.class),rs.getString(2)),org);}
     public Organization insert(UUID actor,String name,String slug,Instant now){
         UUID org=UUID.randomUUID(),member=UUID.randomUUID();var time=java.sql.Timestamp.from(now);

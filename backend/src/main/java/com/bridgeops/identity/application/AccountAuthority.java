@@ -18,6 +18,8 @@ public class AccountAuthority {
     }
     @Transactional(readOnly=true,timeout=5)
     public void requireLive(UUID user,UUID family){if(!sessions.isActive(user,family))throw new DomainFailure(401,"AUTHENTICATION_REQUIRED");}
+    @Transactional(readOnly=true,timeout=5)
+    public boolean active(UUID user){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND account_status=\'ACTIVE\')",Boolean.class,user));}
     @Transactional(timeout=10)
     public void requireOrganizationGrant(UUID user){
         if(jdbc.queryForList("SELECT user_id FROM user_grants WHERE user_id=? AND grant_code='organization.create'",user).isEmpty())

@@ -74,3 +74,5 @@ With authentication explicitly enabled and signing material configured, GET /api
 Phase 1C.1 adds only the offline bootstrap subcommand and V4 state/grant migration. It enables no HTTP route. Organization and invitation routes remain denied until their subsequent increment is verified. [Operator guide](../development/PHASE_1C_ONBOARDING.md).
 
 Phase 1C.2 implements authenticated organization create/list/detail, member listing and read-only tenant role catalog. See [exact HTTP shapes and authorization](../development/PHASE_1C_ONBOARDING.md). Membership mutations/invitations and all other business routes remain denied until their own verified increment.
+
+Phase 1C.3 enables PATCH/DELETE O/members/{membershipId} with live tenant permission, CSRF/Origin, expectedRevision or quoted If-Match, delegation ceilings and last-Owner protection. See [exact request/state rules](../development/PHASE_1C_ONBOARDING.md). Role-definition mutation and invitation routes remain denied in this checkpoint.

@@ -142,6 +142,84 @@ class OrganizationOnboardingIT {
         mvc.perform(get("/api/v1/organizations/"+org+"/members").header("Authorization","Bearer "+owner.access())).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/organizations").header("Authorization","Bearer "+owner.access())).andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
     }
+    @Test void lastOwnerCannotBeDemotedSuspendedOrRemoved() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"owner-tenant"),member=memberId(org,userId);
+        patchMember(owner,org,member,0,"ACTIVE",List.of(roleId(org,"VIEWER"))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAST_OWNER"));
+        patchMember(owner,org,member,0,"SUSPENDED",List.of(roleId(org,"OWNER"))).andExpect(status().isConflict());
+        deleteMember(owner,org,member,"\"0\"").andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("SELECT revision FROM organization_memberships WHERE id=?",Long.class,member)).isZero();
+    }
+    @Test void memberChangesRequireCurrentPermissionAndRevision() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"member-tenant");Browser viewer=other();UUID member=addMember(org,accessTokens.verify(viewer.access()).userId(),"VIEWER");
+        patchMember(viewer,org,member,0,"ACTIVE",List.of(roleId(org,"OWNER"))).andExpect(status().isForbidden());
+        patchMember(owner,org,member,0,"ACTIVE",List.of(roleId(org,"BUILDER"))).andExpect(status().isOk()).andExpect(jsonPath("$.revision").value(1)).andExpect(jsonPath("$.roles[0].name").value("BUILDER"));
+        patchMember(owner,org,member,0,"ACTIVE",List.of(roleId(org,"VIEWER"))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_REVISION"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='MEMBERSHIP_CHANGED'",Integer.class)).isEqualTo(1);
+    }
+    @Test void administratorsCannotEscalateOrModifyPrivilegedMembers() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"admin-tenant");Browser admin=other();UUID adminMember=addMember(org,accessTokens.verify(admin.access()).userId(),"ADMIN");
+        patchMember(admin,org,adminMember,0,"ACTIVE",List.of(roleId(org,"OWNER"))).andExpect(status().isForbidden());
+        patchMember(admin,org,memberId(org,userId),0,"ACTIVE",List.of(roleId(org,"VIEWER"))).andExpect(status().isForbidden());
+        UUID viewer=fixtureUser("viewer@example.invalid"),target=addMember(org,viewer,"VIEWER");
+        patchMember(admin,org,target,0,"ACTIVE",List.of(roleId(org,"ADMIN"))).andExpect(status().isForbidden());
+        patchMember(admin,org,target,0,"ACTIVE",List.of(roleId(org,"APPROVER"))).andExpect(status().isForbidden());
+        patchMember(admin,org,target,0,"ACTIVE",List.of(roleId(org,"BUILDER"))).andExpect(status().isOk());
+    }
+    @Test void foreignMembershipAndRoleIdentifiersCannotCrossTenants() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"alpha-tenant");Browser other=other();UUID foreign=create(other,"beta-tenant");
+        UUID target=memberId(foreign,accessTokens.verify(other.access()).userId());
+        patchMember(owner,org,target,0,"ACTIVE",List.of(roleId(org,"VIEWER"))).andExpect(status().isNotFound());
+        patchMember(owner,org,memberId(org,userId),0,"ACTIVE",List.of(roleId(foreign,"OWNER"))).andExpect(status().isNotFound());
+        deleteMember(owner,org,target,"\"0\"").andExpect(status().isNotFound());
+    }
+    @Test void concurrentOwnerDemotionsLeaveOneActiveOwner() throws Exception {
+        Browser first=login(bootstrap(null));UUID org=create(first,"concurrent-tenant"),a=memberId(org,userId);Browser second=other();UUID b=addMember(org,accessTokens.verify(second.access()).userId(),"OWNER"),viewer=roleId(org,"VIEWER");
+        var gate=new CountDownLatch(1);try(var pool=Executors.newFixedThreadPool(2)){
+            var left=pool.submit(()->{gate.await();return patchMember(first,org,a,0,"ACTIVE",List.of(viewer)).andReturn().getResponse().getStatus();});
+            var right=pool.submit(()->{gate.await();return patchMember(second,org,b,0,"ACTIVE",List.of(viewer)).andReturn().getResponse().getStatus();});gate.countDown();
+            assertThat(List.of(left.get(20,TimeUnit.SECONDS),right.get(20,TimeUnit.SECONDS))).containsExactlyInAnyOrder(200,409);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM membership_roles m JOIN roles r ON r.organization_id=m.organization_id AND r.id=m.role_id WHERE m.organization_id=? AND r.name='OWNER'",Integer.class,org)).isEqualTo(1);
+    }
+    @Test void disabledOwnersDoNotMakeLastOwnerRemovalSafe() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"disabled-owner-tenant");Browser second=other();UUID otherId=accessTokens.verify(second.access()).userId();addMember(org,otherId,"OWNER");jdbc.update("UPDATE users SET account_status='DISABLED' WHERE id=?",otherId);
+        patchMember(owner,org,memberId(org,userId),0,"ACTIVE",List.of(roleId(org,"VIEWER"))).andExpect(status().isConflict());
+    }
+    @Test void removalRevokesTenantAccessWithoutDisablingIdentity() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"remove-tenant");Browser viewer=other();UUID target=addMember(org,accessTokens.verify(viewer.access()).userId(),"VIEWER");
+        deleteMember(owner,org,target,"\"0\"").andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/organizations/"+org).header("Authorization","Bearer "+viewer.access())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+viewer.access())).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT status FROM organization_memberships WHERE id=?",String.class,target)).isEqualTo("REMOVED");
+    }
+    @Test void missingOrMalformedRevisionsAndUnknownAuthorityFieldsFailSafely() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"revision-tenant"),target=memberId(org,userId);
+        deleteMember(owner,org,target,"*").andExpect(status().isBadRequest());
+        deleteMember(owner,org,target,"\"999\"").andExpect(status().isConflict());
+        var request=patch("/api/v1/organizations/"+org+"/members/"+target).header("Authorization","Bearer "+owner.access()).header("Origin",ORIGIN).cookie(owner.csrf(),owner.refresh()).header("X-CSRF-TOKEN",owner.csrf().getValue())
+            .contentType("application/json").content("{\"expectedRevision\":0,\"status\":\"ACTIVE\",\"roleIds\":[],\"permission\":\"forged\"}");
+        mvc.perform(request).andExpect(status().isBadRequest());
+    }
+    @Test void failedMemberAuditRollsBackRolesAndRevision() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"audit-tenant"),target=addMember(org,fixtureUser("member@example.invalid"),"VIEWER");
+        jdbc.execute("CREATE FUNCTION reject_member_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic rollback'; END $$");
+        jdbc.execute("CREATE TRIGGER reject_member_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION reject_member_audit()");
+        try{patchMember(owner,org,target,0,"ACTIVE",List.of(roleId(org,"BUILDER"))).andExpect(status().isServiceUnavailable());}
+        finally{jdbc.execute("DROP TRIGGER reject_member_audit ON organization_audit_events");jdbc.execute("DROP FUNCTION reject_member_audit()");}
+        assertThat(jdbc.queryForObject("SELECT revision FROM organization_memberships WHERE id=?",Long.class,target)).isZero();
+        assertThat(jdbc.queryForObject("SELECT r.name FROM roles r JOIN membership_roles m ON m.organization_id=r.organization_id AND m.role_id=r.id WHERE m.membership_id=?",String.class,target)).isEqualTo("VIEWER");
+    }
+    private UUID fixtureUser(String email){UUID id=UUID.randomUUID();jdbc.update("INSERT INTO users(id,email,normalized_email,password_hash,display_name,account_status,created_at,email_verified_at) VALUES(?,?,?,?,?,'ACTIVE',?,?)",id,email,email,passwordHash,"Synthetic Member",java.sql.Timestamp.from(NOW),java.sql.Timestamp.from(NOW));return id;}
+    private UUID addMember(UUID org,UUID user,String role){UUID member=UUID.randomUUID();jdbc.update("INSERT INTO organization_memberships(id,organization_id,user_id,status,joined_at) VALUES(?,?,?,'ACTIVE',?)",member,org,user,java.sql.Timestamp.from(NOW));jdbc.update("INSERT INTO membership_roles VALUES(?,?,?)",org,member,roleId(org,role));return member;}
+    private UUID roleId(UUID org,String name){return jdbc.queryForObject("SELECT id FROM roles WHERE organization_id=? AND name=?",UUID.class,org,name);}
+    private UUID memberId(UUID org,UUID user){return jdbc.queryForObject("SELECT id FROM organization_memberships WHERE organization_id=? AND user_id=?",UUID.class,org,user);}
+    private ResultActions patchMember(Browser actor,UUID org,UUID member,long revision,String state,List<UUID> roles)throws Exception{
+        return mvc.perform(patch("/api/v1/organizations/"+org+"/members/"+member).header("Authorization","Bearer "+actor.access()).header("Origin",ORIGIN).cookie(actor.csrf(),actor.refresh()).header("X-CSRF-TOKEN",actor.csrf().getValue())
+            .contentType("application/json").content(new ObjectMapper().writeValueAsString(Map.of("expectedRevision",revision,"status",state,"roleIds",roles))));
+    }
+    private ResultActions deleteMember(Browser actor,UUID org,UUID member,String revision)throws Exception{
+        return mvc.perform(delete("/api/v1/organizations/"+org+"/members/"+member).header("If-Match",revision).header("Authorization","Bearer "+actor.access()).header("Origin",ORIGIN).cookie(actor.csrf(),actor.refresh()).header("X-CSRF-TOKEN",actor.csrf().getValue()));
+    }
     private ResultActions authorizedPost(Browser browser,String path,String body) throws Exception {
         return mvc.perform(post(path).header("Authorization","Bearer "+browser.access()).header("Origin",ORIGIN).cookie(browser.csrf(),browser.refresh())
             .header("X-CSRF-TOKEN",browser.csrf().getValue()).contentType("application/json").content(body));
