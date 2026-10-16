@@ -10,6 +10,17 @@ const changedPassword = "browser-changed-password";
 let step = "launch",
   browser,
   page;
+const observed = new WeakSet();
+function observe(target) {
+  if (observed.has(target)) return;
+  observed.add(target);
+  target.on("response", (response) =>
+    console.log(
+      "HTTP: " + response.request().method() + " " +
+      new URL(response.url()).pathname + " " + response.status(),
+    ),
+  );
+}
 async function mail(recipient, subject) {
   for (let i = 0; i < 30; i++) {
     const response = await fetch(origin + "/__test/mail", {
@@ -27,7 +38,7 @@ async function mail(recipient, subject) {
   throw new Error("Test mail capture timed out");
 }
 async function signIn(target, email, password) {
-  target.on("response", response => console.log("HTTP: " + response.request().method() + " " + new URL(response.url()).pathname + " " + response.status()));
+  observe(target);
   await target.goto("/sign-in");
   await expect(
     target.getByRole("heading", { name: "Sign in to your workspace" }),
@@ -56,7 +67,7 @@ try {
   });
   page = await context.newPage();
   const urls = [];
-  page.on("response",response=>console.log("HTTP: "+response.request().method()+" "+new URL(response.url()).pathname+" "+response.status()));
+  observe(page);
   page.on("request", (request) => urls.push(request.url()));
   step = "invalid credentials";
   console.log("STEP: " + step);
@@ -300,6 +311,10 @@ try {
   step = "recovery request acknowledgement";
   console.log("STEP: " + step);
   await guest.getByRole("link", { name: "Forgot your password?" }).click();
+  // Both routes have Email fields. Wait for the destination before filling one.
+  await expect(
+    guest.getByRole("heading", { name: "Recover your account", exact: true }),
+  ).toBeVisible();
   await guest
     .getByLabel("Email", { exact: true })
     .fill("jordan@example.invalid");
