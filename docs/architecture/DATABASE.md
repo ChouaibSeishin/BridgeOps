@@ -1,6 +1,6 @@
 # Proposed relational model
 
-Status: business model remains planned. Phase 1A implements only V1 technical platform_metadata; identity/tenant migrations follow in Phase 1B/C. Introduce tables in their owning phases, not wholesale in Phase 1. UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revision columns are defaults. JSON is bounded/schema-versioned and never grants authority.
+Status: V1–V7 implement the current foundation/identity/tenant boundary described below; workflow/integration/AI models remain planned. Introduce tables in their owning phases, not wholesale in Phase 1. UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revision columns are defaults. JSON is bounded/schema-versioned and never grants authority.
 
 ## Identity and tenancy ER diagram
 
@@ -156,7 +156,7 @@ Flyway owns schema; JPA uses ddl-auto=validate. Test migration from empty and pr
 
 ## Installation provisioning clarification
 
-Phase 1 introduces a singleton installation_state record with bootstrap_consumed_at and initial_user_id, plus account-level user_grants for organization.create. Offline bootstrap locks the singleton row and atomically creates exactly one verified account and consumes the marker. It creates no organization. Organization creation is an authenticated transaction that checks the account grant and creates Owner membership. Invite acceptance creates no installation-wide grants. This remains planned until Phase 1B/C verification passes.
+Phase 1 introduces a singleton installation_state record with bootstrap_consumed_at and initial_user_id, plus account-level user_grants for organization.create. Offline bootstrap locks the singleton row and atomically creates exactly one verified account and consumes the marker. It creates no organization. Organization creation is an authenticated transaction that checks the account grant and creates Owner membership. Invite acceptance creates no installation-wide grants. This boundary is now implemented by V4/V5/V7; actual verification is recorded in PROJECT_STATUS.md.
 
 Approval uniqueness means one decision-maker per request, distinct from the requester; it does not mean two approvers.
 
@@ -171,3 +171,5 @@ V4 implements installation_state (singleton, locked consumed marker), user_grant
 V5 implements organizations, organization_memberships, tenant-owned roles, fixed permissions, tenant-qualified role_permissions/membership_roles and insert-only organization_audit_events. Composite foreign keys reject foreign-tenant role assignment. Organization, role templates, Owner membership and creation audit commit atomically; no organization is seeded. Mutation/last-Owner and invitation behavior follow in subsequent increments.
 
 V6 adds column-scoped runtime UPDATE privileges for membership status/revision and organization revision (required for SELECT FOR UPDATE), plus DELETE on membership_roles. Application mutations serialize on the organization parent, use expected membership revision and protect the last active Owner. Memberships are soft-removed so history/foreign keys remain intact. Audit UPDATE/DELETE and account-grant writes remain denied.
+
+V7 implements recipient-bound invitations and tenant-qualified invitation_roles, one pending invitation per tenant/email, hashed credentials and terminal timestamps. Runtime generic users INSERT stays denied. A migration-owned enrollment function validates raw proof, recipient, DB deadline/current issuer grants and role consistency before atomically creating only the invited verified account/membership and consuming the token. Its search path is trusted, relations qualified and PUBLIC EXECUTE revoked. It cannot assign account grants or installation state. [Full invariant/configuration evidence](../development/PHASE_1C_ONBOARDING.md).

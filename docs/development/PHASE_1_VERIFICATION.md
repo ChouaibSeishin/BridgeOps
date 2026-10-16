@@ -1,3 +1,5 @@
+Phase 1C current counts: full verify passed 21 unit/MVC plus 72 required PostgreSQL integration tests (93 total). This includes offline bootstrap concurrency/rollback, 35 restricted-runtime organization/member/invitation cases and four no-network SMTP adapter cases. [Current commands and evidence](PHASE_1C_ONBOARDING.md). Older foundation counts below are historical checkpoints, not the current suite size.
+
 # Phase 1 verification
 
 Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The HTTP authentication adapter and its security tests are implemented; onboarding/tenant/browser gates remain planned; do not mark the full phase complete from foundation checks.

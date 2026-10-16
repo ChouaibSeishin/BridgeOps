@@ -1,10 +1,10 @@
-# Proposed API contract outline
+# API contract outline
 
-Status: planned routes and DTO shapes. **Info/health and the six Phase 1B.2 auth routes are implemented. All remaining routes below are planned.** Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths.
+Status: planned routes and DTO shapes. **Info/health, Phase 1B.2 auth and the Phase 1C organization/member/invitation routes listed in the onboarding guide are implemented. Remaining target routes are planned.** Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths.
 
 ## Shared conventions
 
-Authenticated routes require bearer access token, live session and account, active membership, permission and tenant-qualified resource lookup. Organization path IDs select a tenant; they do not prove membership. No membership or foreign-tenant resource returns a uniform 404; valid tenant members lacking the operation permission receive 403. Invalid authentication receives 401. Resource permissions are rechecked in application services.
+Authenticated routes require bearer access token and live session/account. Tenant-scoped routes additionally require active membership, permission and tenant-qualified resource lookup; account-level organization creation checks its separate grant. Organization path IDs select a tenant; they do not prove membership. No membership or foreign-tenant resource returns a uniform 404; valid tenant members lacking the operation permission receive 403. Invalid authentication receives 401. Resource permissions are rechecked in application services.
 
 Safe error DTO: `{code,message,details?,correlationId,timestamp}`. Details contain only safe field/schema validation information. Missing/malformed fields 400; invalid workflow semantics 422; stale revision/idempotency mismatch/state conflict 409; throttling 429 with Retry-After; transient dependency outage 503. Creation 201 with Location; accepted work 202 with execution reference; successful void action 204. Async acceptance never implies completion.
 
@@ -76,3 +76,5 @@ Phase 1C.1 adds only the offline bootstrap subcommand and V4 state/grant migrati
 Phase 1C.2 implements authenticated organization create/list/detail, member listing and read-only tenant role catalog. See [exact HTTP shapes and authorization](../development/PHASE_1C_ONBOARDING.md). Membership mutations/invitations and all other business routes remain denied until their own verified increment.
 
 Phase 1C.3 enables PATCH/DELETE O/members/{membershipId} with live tenant permission, CSRF/Origin, expectedRevision or quoted If-Match, delegation ceilings and last-Owner protection. See [exact request/state rules](../development/PHASE_1C_ONBOARDING.md). Role-definition mutation and invitation routes remain denied in this checkpoint.
+
+Phase 1C.4 implements POST O/invitations, DELETE O/invitations/{id}, authenticated POST /api/v1/invitations/accept, and invitation-only POST /api/v1/invitations/enroll. The enrollment extension is required for first-time invitees; a raw recipient-bound emailed token is mandatory, roles/grants are never body authority, and existing accounts require authenticated accept. It is not general registration. [Exact DTOs, statuses, SMTP and proof rules](../development/PHASE_1C_ONBOARDING.md). HTTP bootstrap, /auth/register and all unrelated business routes remain denied.

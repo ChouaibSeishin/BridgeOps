@@ -2297,3 +2297,7 @@ The primary goal remains a coherent, secure, attractive, well-tested and demonst
 # GitHub development amendment — 2026-10-15
 
 The latest development instructions require a reviewed Conventional Commit after every completed meaningful increment, followed by an authenticated push when access permits. Preserve existing work, branch and history. The confirmed public repository is https://github.com/ChouaibSeishin/BridgeOps. Follow [the Git workflow](../development/GIT_WORKFLOW.md), exclude/scanner-check secrets before publication and continue Phase 1B rather than rebuilding Phase 1A. Do not claim commits, pushes or CI outcomes without actual results.
+
+# Phase 1C checkpoint amendment — 2026-10-16
+
+Offline one-shot account bootstrap, explicit organization creation/Owner membership, tenant-bound roles/member management, revision/last-Owner guards and recipient-bound invitations are implemented. Invitation-only first-time setup consumes emailed proof; existing accounts authenticate to accept. External SMTP configuration and a test sink were selected; no general registration/default account/HTTP bootstrap exists. Generic runtime user INSERT remains denied; enrollment uses a constrained migration-owned capability. See [current status](../PROJECT_STATUS.md) and [the Phase 1C guide](../development/PHASE_1C_ONBOARDING.md) for actual verification and remaining deployment limits. Browser login/onboarding/session coordination/recovery remain Phase 1D before workflows and later AI/MCP. Older first-task/phase descriptions are historical.

@@ -23,9 +23,9 @@ public class AuthenticationThrottle {
         List<Bucket> buckets = new ArrayList<>();
         buckets.add(new Bucket("global",300,60));
         buckets.add(new Bucket("peer:" + peer,120,60));
-        if ("login".equals(operation)) {
-            buckets.add(new Bucket("login-peer:" + peer,20,900));
-            buckets.add(new Bucket("login-account:" + email.trim().toLowerCase(Locale.ROOT),10,900));
+        if (Set.of("login","invite","enroll").contains(operation)) {
+            buckets.add(new Bucket(operation + "-peer:" + peer,20,900));
+            buckets.add(new Bucket(operation + "-account:" + email.trim().toLowerCase(Locale.ROOT),10,900));
         }
         long retry = 0;
         for (Bucket bucket : buckets) {

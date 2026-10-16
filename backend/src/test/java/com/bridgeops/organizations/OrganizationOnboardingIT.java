@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(OrganizationOnboardingIT.TimeConfiguration.class)
 class OrganizationOnboardingIT {
     private static final String ORIGIN="https://bridgeops.invalid";
-    private static final Instant NOW=Instant.parse("2026-10-15T12:00:00Z");
+    private static final Instant NOW=Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
     private static final Path KEY_DIRECTORY=keys();
     @Container static final PostgreSQLContainer postgres=new PostgreSQLContainer(DockerImageName.parse(
         "postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
@@ -43,6 +43,8 @@ class OrganizationOnboardingIT {
         registry.add("bridgeops.auth.csrf-key",()->KEY_DIRECTORY.resolve("csrf.key").toString());
     }
     @Autowired MockMvc mvc;
+    @Autowired TestInbox inbox;
+    @Autowired javax.sql.DataSource runtimeSource;
     @Autowired JdbcTemplate jdbc;
     @Autowired AccountPasswords passwords;
     @Autowired TestClock clock;
@@ -57,6 +59,7 @@ class OrganizationOnboardingIT {
     }
     @BeforeEach void fixture() {
         jdbc=new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword()));
+        inbox.messages.clear();inbox.fail=false;
         clock.now=NOW;
         jdbc.execute("TRUNCATE users,installation_state,authentication_throttles CASCADE");
         jdbc.update("INSERT INTO installation_state(singleton_id) VALUES(1)");
@@ -220,6 +223,166 @@ class OrganizationOnboardingIT {
     private ResultActions deleteMember(Browser actor,UUID org,UUID member,String revision)throws Exception{
         return mvc.perform(delete("/api/v1/organizations/"+org+"/members/"+member).header("If-Match",revision).header("Authorization","Bearer "+actor.access()).header("Origin",ORIGIN).cookie(actor.csrf(),actor.refresh()).header("X-CSRF-TOKEN",actor.csrf().getValue()));
     }
+    @Test void invitationEnrollmentCreatesVerifiedTenantOwnerWithoutGlobalAccountGrant() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"invite-tenant");String email="new@example.invalid";
+        UUID invitation=invite(owner,org,email,"OWNER");String token=inbox.messages.getLast().token();
+        var enrolled=enroll(bootstrap(null),token,email,"synthetic-enrollment-fixture").andExpect(status().isCreated()).andExpect(jsonPath("$.accessToken").doesNotExist()).andExpect(jsonPath("$.passwordHash").doesNotExist()).andReturn();
+        UUID user=UUID.fromString(new ObjectMapper().readTree(enrolled.getResponse().getContentAsString()).path("userId").asString());
+        assertThat(jdbc.queryForObject("SELECT email_verified_at IS NOT NULL FROM users WHERE id=?",Boolean.class,user)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_grants WHERE user_id=?",Integer.class,user)).isZero();
+        assertThat(jdbc.queryForObject("SELECT accepted_at IS NOT NULL FROM invitations WHERE id=?",Boolean.class,invitation)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT token_hash FROM invitations WHERE id=?",String.class,invitation)).isEqualTo(new RefreshTokens().hash(token));
+        Browser member=loginAs(email,"synthetic-enrollment-fixture");
+        mvc.perform(get("/api/v1/organizations/"+org).header("Authorization","Bearer "+member.access())).andExpect(status().isOk());
+        createRequest(member,"not-an-account-grant").andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT bootstrap_consumed_at IS NULL FROM installation_state",Boolean.class)).isTrue();
+    }
+    @Test void existingRecipientsMustAuthenticateAndInvitationsCannotResetPasswords() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"existing-tenant");Browser recipient=other();UUID recipientId=accessTokens.verify(recipient.access()).userId();
+        invite(owner,org,"other@example.invalid","VIEWER");String token=inbox.messages.getLast().token();String original=jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?",String.class,recipientId);
+        enroll(bootstrap(null),token,"other@example.invalid","synthetic-replacement-fixture").andExpect(status().isBadRequest());
+        accept(owner,token).andExpect(status().isBadRequest());
+        assertThatThrownBy(()->runtimeJdbc().queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",token,"other@example.invalid",passwords.hash("synthetic-replacement-fixture"),"Wrong"))
+            .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        accept(recipient,token).andExpect(status().isOk());accept(recipient,token).andExpect(status().isBadRequest());
+        assertThat(jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?",String.class,recipientId)).isEqualTo(original);
+        assertThat(count("users")).isEqualTo(2);assertThat(count("organization_memberships")).isEqualTo(2);
+    }
+    @Test void invalidRecipientUnknownTokenAndWeakPasswordCannotConsumeInvitation() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"proof-tenant");UUID id=invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();
+        enroll(bootstrap(null),token,"wrong@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());
+        enroll(bootstrap(null),new RefreshTokens().generate(),"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());
+        enroll(bootstrap(null),token,"new@example.invalid","short").andExpect(status().isBadRequest());
+        assertThat(count("users")).isEqualTo(1);assertThat(jdbc.queryForObject("SELECT accepted_at IS NULL FROM invitations WHERE id=?",Boolean.class,id)).isTrue();
+    }
+    @Test void invitationExpiryIsStrictAndRevokedProofCannotEnroll() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"expiry-tenant");UUID id=invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();
+        clock.now=NOW.plusSeconds(172800);enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());
+        clock.now=NOW;revokeInvite(owner,org,id).andExpect(status().isNoContent());revokeInvite(owner,org,id).andExpect(status().isNoContent());
+        enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());
+        invite(owner,org,"new@example.invalid","VIEWER");assertThat(inbox.messages.getLast().token()).isNotEqualTo(token);
+    }
+    @Test void onePendingInvitationAndTenantForeignKeysPreventAmbiguousOrForeignGrants() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"alpha-tenant");Browser other=other();UUID foreign=create(other,"beta-tenant");
+        UUID id=invite(owner,org,"new@example.invalid","VIEWER");
+        invitationRequest(owner,org,"new@example.invalid",List.of(roleId(org,"VIEWER"))).andExpect(status().isConflict());
+        invitationRequest(owner,org,"other-new@example.invalid",List.of(roleId(foreign,"OWNER"))).andExpect(status().isNotFound());
+        assertThatThrownBy(()->jdbc.update("INSERT INTO invitation_roles VALUES(?,?,?)",org,id,roleId(foreign,"OWNER"))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(()->jdbc.update("INSERT INTO invitation_roles VALUES(?,?,?)",foreign,id,roleId(foreign,"VIEWER"))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(inbox.messages).hasSize(1);assertThat(count("invitations")).isEqualTo(1);
+    }
+    @Test void invitationDelegationRejectsViewerAndAdministratorEscalation() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"delegate-tenant");Browser actor=other();UUID membership=addMember(org,accessTokens.verify(actor.access()).userId(),"VIEWER");
+        invitationRequest(actor,org,"new@example.invalid",List.of(roleId(org,"VIEWER"))).andExpect(status().isForbidden());
+        patchMember(owner,org,membership,0,"ACTIVE",List.of(roleId(org,"ADMIN"))).andExpect(status().isOk());
+        for(String role:List.of("OWNER","ADMIN","APPROVER"))invitationRequest(actor,org,"new@example.invalid",List.of(roleId(org,role))).andExpect(status().isForbidden());
+        invite(actor,org,"new@example.invalid","BUILDER");assertThat(inbox.messages).hasSize(1);
+    }
+    @Test void acceptanceRevalidatesIssuerDelegationAndDatabaseCapabilityDoesToo() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"changed-issuer-tenant");Browser second=other();addMember(org,accessTokens.verify(second.access()).userId(),"OWNER");
+        invite(owner,org,"new@example.invalid","OWNER");String token=inbox.messages.getLast().token();
+        patchMember(second,org,memberId(org,userId),0,"ACTIVE",List.of(roleId(org,"ADMIN"))).andExpect(status().isOk());
+        enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());
+        assertThatThrownBy(()->runtimeJdbc().queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",token,"new@example.invalid",passwords.hash("synthetic-enrollment-fixture"),"New"))
+            .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(count("users")).isEqualTo(2);
+    }
+    @Test void disabledIssuerCannotOnboardARecipient() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"disabled-issuer-tenant");invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();
+        jdbc.update("UPDATE users SET account_status='DISABLED' WHERE id=?",userId);
+        enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());assertThat(count("users")).isEqualTo(1);
+    }
+    @Test void concurrentInvitationEnrollmentHasOneWinner() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"enrollment-race-tenant");invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();Browser anonymous=bootstrap(null);
+        var gate=new CountDownLatch(1);try(var pool=Executors.newFixedThreadPool(2)){
+            Callable<Integer> task=()->{gate.await();return enroll(anonymous,token,"new@example.invalid","synthetic-enrollment-fixture").andReturn().getResponse().getStatus();};
+            var a=pool.submit(task);var b=pool.submit(task);gate.countDown();assertThat(List.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS))).containsExactlyInAnyOrder(201,400);
+        }
+        assertThat(count("users")).isEqualTo(2);assertThat(count("organization_memberships")).isEqualTo(2);
+    }
+    @Test void concurrentExistingRecipientAcceptanceIsOneUse() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"accept-race-tenant");Browser recipient=other();invite(owner,org,"other@example.invalid","VIEWER");String token=inbox.messages.getLast().token();
+        var gate=new CountDownLatch(1);try(var pool=Executors.newFixedThreadPool(2)){
+            Callable<Integer> task=()->{gate.await();return accept(recipient,token).andReturn().getResponse().getStatus();};
+            var a=pool.submit(task);var b=pool.submit(task);gate.countDown();assertThat(List.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS))).containsExactlyInAnyOrder(200,400);
+        }
+        assertThat(count("organization_memberships")).isEqualTo(2);
+    }
+    @Test void deliveryFailureRollsBackInvitationAndRoles() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"delivery-tenant");inbox.fail=true;
+        invitationRequest(owner,org,"new@example.invalid",List.of(roleId(org,"VIEWER"))).andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("DELIVERY_UNAVAILABLE"));
+        assertThat(count("invitations")).isZero();assertThat(count("invitation_roles")).isZero();inbox.fail=false;invite(owner,org,"new@example.invalid","VIEWER");
+    }
+    @Test void enrollmentAuditFailureRollsBackAccountMembershipAndConsumption() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"enroll-rollback-tenant");UUID id=invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();
+        jdbc.execute("CREATE FUNCTION reject_enroll_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INVITATION_ACCEPTED' THEN RAISE EXCEPTION 'synthetic rollback'; END IF; RETURN NEW; END $$");
+        jdbc.execute("CREATE TRIGGER reject_enroll_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION reject_enroll_audit()");
+        try{enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isServiceUnavailable());}
+        finally{jdbc.execute("DROP TRIGGER reject_enroll_audit ON organization_audit_events");jdbc.execute("DROP FUNCTION reject_enroll_audit()");}
+        assertThat(count("users")).isEqualTo(1);assertThat(count("organization_memberships")).isEqualTo(1);assertThat(jdbc.queryForObject("SELECT accepted_at IS NULL FROM invitations WHERE id=?",Boolean.class,id)).isTrue();
+        enroll(bootstrap(null),token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isCreated());
+    }
+    @Test void enrollmentRequiresOriginCsrfAndRejectsBodyAuthorityClaims() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"request-proof-tenant");invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();Browser anonymous=bootstrap(null);
+        String body=new ObjectMapper().writeValueAsString(Map.of("token",token,"email","new@example.invalid","displayName","New","password","synthetic-enrollment-fixture"));
+        mvc.perform(post("/api/v1/invitations/enroll").contentType("application/json").content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/invitations/enroll").header("Origin","https://evil.invalid").cookie(anonymous.csrf()).header("X-CSRF-TOKEN",anonymous.csrf().getValue()).contentType("application/json").content(body)).andExpect(status().isForbidden());
+        invitationPost(anonymous,"/api/v1/invitations/enroll",body.substring(0,body.length()-1)+",\"roleIds\":[]}").andExpect(status().isBadRequest());
+        assertThat(count("users")).isEqualTo(1);
+    }
+    @Test void enrollmentQuotaCannotBeBypassedByValidInvitationProof() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"quota-tenant");invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token();Browser anonymous=bootstrap(null);
+        jdbc.update("INSERT INTO authentication_throttles VALUES(?,10,?)",new RefreshTokens().hash("enroll-account:new@example.invalid"),java.sql.Timestamp.from(NOW.plusSeconds(900)));
+        enroll(anonymous,token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isTooManyRequests()).andExpect(header().string("Retry-After","900"));assertThat(count("users")).isEqualTo(1);
+        clock.now=NOW.plusSeconds(900);enroll(anonymous,token,"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isCreated());
+    }
+    @Test void enrollmentCapabilityKeepsGenericUserInsertDeniedAndRequiresRawProof() throws Exception {
+        var runtime=runtimeJdbc();assertThat(runtime.queryForObject("SELECT current_user",String.class)).isEqualTo("bridgeops_app");
+        assertThat(runtime.queryForObject("SELECT has_table_privilege(current_user,'users','INSERT') OR has_table_privilege(current_user,'user_grants','INSERT') OR has_table_privilege(current_user,'installation_state','UPDATE')",Boolean.class)).isFalse();
+        assertThat(runtime.queryForObject("SELECT has_function_privilege(current_user,'public.enroll_invitation(text,text,text,text)','EXECUTE')",Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT has_function_privilege(\'invitation_untrusted\',\'public.enroll_invitation(text,text,text,text)\',\'EXECUTE\')",Boolean.class)).isFalse();
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"capability-tenant");UUID id=invite(owner,org,"new@example.invalid","VIEWER");String token=inbox.messages.getLast().token(),hash=passwords.hash("synthetic-enrollment-fixture");
+        for(String proof:List.of(new RefreshTokens().generate(),new RefreshTokens().hash(token)))assertThatThrownBy(()->runtime.queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",proof,"new@example.invalid",hash,"New")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->runtime.queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",token,"wrong@example.invalid",hash,"New")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(()->runtime.queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",token,"new@example.invalid","not-a-hash","New")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        jdbc.update("UPDATE invitations SET created_at=?,expires_at=? WHERE id=?",java.sql.Timestamp.from(NOW.minusSeconds(3600)),java.sql.Timestamp.from(NOW.minusSeconds(1)),id);
+        assertThatThrownBy(()->runtime.queryForList("SELECT * FROM public.enroll_invitation(?,?,?,?)",token,"new@example.invalid",hash,"New")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(count("users")).isEqualTo(1);
+    }
+    @Test void invitationRevokeAndIssueCannotUseForeignTenantIdentifiers() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"local-tenant");Browser foreignOwner=other();UUID foreign=create(foreignOwner,"foreign-tenant");
+        UUID invitation=invite(foreignOwner,foreign,"new@example.invalid","OWNER");
+        invitationRequest(owner,foreign,"another@example.invalid",List.of(roleId(foreign,"VIEWER"))).andExpect(status().isNotFound());
+        revokeInvite(owner,org,invitation).andExpect(status().isNotFound());
+        UUID actor=addMember(foreign,userId,"ADMIN");
+        revokeInvite(owner,foreign,invitation).andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT revoked_at IS NULL FROM invitations WHERE id=?",Boolean.class,invitation)).isTrue();
+    }
+    @Test void deliveredButRolledBackInvitationCannotCreateAnAccount() throws Exception {
+        Browser owner=login(bootstrap(null));UUID org=create(owner,"delivery-rollback-tenant");
+        jdbc.execute("CREATE FUNCTION reject_issued_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INVITATION_ISSUED' THEN RAISE EXCEPTION 'synthetic rollback'; END IF; RETURN NEW; END $$");
+        jdbc.execute("CREATE TRIGGER reject_issued_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION reject_issued_audit()");
+        try{invitationRequest(owner,org,"new@example.invalid",List.of(roleId(org,"VIEWER"))).andExpect(status().isServiceUnavailable());}
+        finally{jdbc.execute("DROP TRIGGER reject_issued_audit ON organization_audit_events");jdbc.execute("DROP FUNCTION reject_issued_audit()");}
+        assertThat(inbox.messages).hasSize(1);assertThat(count("invitations")).isZero();
+        enroll(bootstrap(null),inbox.messages.getLast().token(),"new@example.invalid","synthetic-enrollment-fixture").andExpect(status().isBadRequest());assertThat(count("users")).isEqualTo(1);
+    }
+    private JdbcTemplate runtimeJdbc(){return new JdbcTemplate(runtimeSource);}
+    private UUID invite(Browser actor,UUID org,String email,String role)throws Exception{
+        var result=invitationRequest(actor,org,email,List.of(roleId(org,role))).andExpect(status().isCreated()).andExpect(jsonPath("$.token").doesNotExist()).andExpect(jsonPath("$.tokenHash").doesNotExist()).andReturn();
+        return UUID.fromString(new ObjectMapper().readTree(result.getResponse().getContentAsString()).path("id").asString());
+    }
+    private ResultActions invitationRequest(Browser actor,UUID org,String email,List<UUID> roles)throws Exception{return invitationPost(actor,"/api/v1/organizations/"+org+"/invitations",new ObjectMapper().writeValueAsString(Map.of("email",email,"roleIds",roles)));}
+    private ResultActions enroll(Browser actor,String token,String email,String password)throws Exception{return invitationPost(actor,"/api/v1/invitations/enroll",new ObjectMapper().writeValueAsString(Map.of("token",token,"email",email,"displayName","Synthetic Invitee","password",password)));}
+    private ResultActions accept(Browser actor,String token)throws Exception{return invitationPost(actor,"/api/v1/invitations/accept",new ObjectMapper().writeValueAsString(Map.of("token",token)));}
+    private ResultActions revokeInvite(Browser actor,UUID org,UUID invitation)throws Exception{return mvc.perform(delete("/api/v1/organizations/"+org+"/invitations/"+invitation).header("Authorization","Bearer "+actor.access()).header("Origin",ORIGIN).cookie(actor.csrf(),actor.refresh()).header("X-CSRF-TOKEN",actor.csrf().getValue()));}
+    private ResultActions invitationPost(Browser actor,String path,String body)throws Exception{
+        var request=post(path).header("Origin",ORIGIN).cookie(actor.csrf()).header("X-CSRF-TOKEN",actor.csrf().getValue()).contentType("application/json").content(body);
+        if(actor.refresh()!=null)request.cookie(actor.refresh());if(actor.access()!=null)request.header("Authorization","Bearer "+actor.access());return mvc.perform(request);
+    }
+    private Browser loginAs(String email,String password)throws Exception{
+        var anonymous=bootstrap(null);return browser(invitationPost(anonymous,"/api/v1/auth/login",new ObjectMapper().writeValueAsString(Map.of("email",email,"password",password))).andExpect(status().isOk()).andReturn());
+    }
     private ResultActions authorizedPost(Browser browser,String path,String body) throws Exception {
         return mvc.perform(post(path).header("Authorization","Bearer "+browser.access()).header("Origin",ORIGIN).cookie(browser.csrf(),browser.refresh())
             .header("X-CSRF-TOKEN",browser.csrf().getValue()).contentType("application/json").content(body));
@@ -278,5 +441,13 @@ class OrganizationOnboardingIT {
         @Override public Clock withZone(ZoneId zone){return this;}
         @Override public Instant instant(){return now;}
     }
-    @TestConfiguration static class TimeConfiguration { @Bean @Primary TestClock httpTestClock(){return new TestClock();} }
+    record Delivery(String email,String token,Instant expires){@Override public String toString(){return "Delivery[REDACTED]";}}
+    static class TestInbox implements com.bridgeops.organizations.application.InvitationDelivery {
+        final List<Delivery> messages=new java.util.concurrent.CopyOnWriteArrayList<>();volatile boolean fail;
+        @Override public void deliver(String email,String token,Instant expires){if(fail)throw new com.bridgeops.shared.web.DomainFailure(503,"DELIVERY_UNAVAILABLE");messages.add(new Delivery(email,token,expires));}
+    }
+    @TestConfiguration static class TimeConfiguration {
+        @Bean @Primary TestClock httpTestClock(){return new TestClock();}
+        @Bean @Primary TestInbox testInbox(){return new TestInbox();}
+    }
 }

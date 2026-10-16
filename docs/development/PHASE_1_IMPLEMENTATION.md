@@ -2,7 +2,7 @@
 
 The documentation review authorizes this implementation. Phase 1 now includes both the original technical foundation and original authentication/multi-tenancy phase. Subsequent numbering follows the revised seven-phase backlog.
 
-## 1A — Runnable technical foundation (current increment)
+## 1A — Runnable technical foundation checkpoint
 
 Create backend/pom.xml, Maven Wrapper, BridgeOpsApplication, shared security/error configuration, SystemController, V1 technical metadata migration, application.yml, unit and required PostgreSQL integration tests. Create frontend package/lock/config, React shell with Overview and Runtime routes, real API status/loading/error/retry behavior, retained design tokens, responsive styling and RTL tests. Add Dockerfiles, same-origin nginx proxy, infra/compose.yaml, .env.example, setup/verification scripts, pinned CI and exact README commands.
 

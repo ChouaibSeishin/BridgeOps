@@ -57,6 +57,9 @@ public class AuthenticationConfiguration {
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations").authenticated();
             authorize.requestMatchers(HttpMethod.PATCH,"/api/v1/organizations/*/members/*").authenticated();
             authorize.requestMatchers(HttpMethod.DELETE,"/api/v1/organizations/*/members/*").authenticated();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/invitations/enroll").permitAll();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/invitations","/api/v1/invitations/accept").authenticated();
+            authorize.requestMatchers(HttpMethod.DELETE,"/api/v1/organizations/*/invitations/*").authenticated();
             authorize.anyRequest().denyAll();
         });
         http.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)

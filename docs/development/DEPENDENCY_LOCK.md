@@ -36,3 +36,5 @@ GitHub action releases were queried from their official repositories and resolve
 No release candidate is selected. TypeScript 5.9.3 intentionally satisfies typescript-eslint's <6.1 peer range. No force/legacy-peer-deps install was used. Later feature SDKs are not yet dependencies. Future upgrades update this evidence and rerun relevant checks. A lock does not establish absence of vulnerabilities.
 
 Phase 1B.2 adds spring-security-oauth2-jose without an explicit version: the unchanged Spring Boot 4.1.1 BOM manages Spring Security and Nimbus. RSA signing/verification uses those maintained APIs rather than a separate JWT library/version override.
+
+Phase 1C adds spring-boot-starter-mail under the unchanged Boot 4.1.1 BOM for the user-selected external SMTP requirement. No explicit mail-library version override, framework/toolchain upgrade or additional infrastructure service is introduced.

@@ -2,7 +2,7 @@
 
 A modular Java/Spring Boot and React operations platform for governed workflow automation.
 
-**Current increment: Phase 1B.2 HTTP authentication.** Backend auth routes now integrate RS256 access tokens, live session checks, rotating HttpOnly refresh cookies, signed CSRF cookies, exact Origin checks and PostgreSQL-backed throttling. The frontend remains the live foundation status shell. First-account provisioning, a sign-in UI, tenant membership, workflows, approvals, integrations, AI and MCP remain planned. See [current verification evidence](docs/PROJECT_STATUS.md).
+**Current checkpoint: Phase 1C backend onboarding.** Offline one-shot bootstrap, organization/Owner creation, tenant-bound membership permissions, last-Owner protection and recipient-bound SMTP invitations are implemented. The frontend remains the foundation status shell. Browser sign-in/onboarding, recovery, workflows, integrations, AI and MCP remain planned. See [current verification evidence](docs/PROJECT_STATUS.md).
 
 The [conflict-resolution report](docs/CONFLICT_RESOLUTION.md) records the reviewed decisions. The [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md), [technology lock](docs/development/TECHNOLOGY.md) and [backlog](docs/product/BACKLOG.md) govern the next work. The [master specification](docs/product/MASTER_PROJECT_PROMPT.md) is retained with explicit amendments.
 
@@ -79,7 +79,7 @@ Open [Swagger UI](http://localhost:8081/swagger-ui.html) or [OpenAPI JSON](http:
 
 ## Bootstrap and security boundary
 
-The chosen design provisions one initial account through an explicit offline, one-shot command. That account logs in and creates its organization/Owner membership transactionally; subsequent users join by invitation. **The bootstrap command and sign-in UI are not implemented yet.** The authentication HTTP adapter exists and is enabled by Compose, but no local account is seeded. There are no seed credentials, privileged HTTP bootstrap endpoint, production default account or working sign-in controls. Phase 1B/C implements and tests the [bootstrap lifecycle](docs/architecture/adr/0014-offline-bootstrap.md) and [session strategy](docs/architecture/adr/0002-browser-sessions.md).
+The chosen design provisions one initial account through an explicit offline, one-shot command. That account logs in and creates its organization/Owner membership transactionally; subsequent users join by invitation. **The offline bootstrap command is implemented; the sign-in UI remains Phase 1D.** Compose enables authentication, but normal startup seeds no account or tenant. Use [the Phase 1C operator/API guide](docs/development/PHASE_1C_ONBOARDING.md) for explicit provisioning and SMTP configuration. There are no seed credentials, privileged HTTP bootstrap endpoint, production default account or working sign-in controls. Phase 1B/C implements and tests the [bootstrap lifecycle](docs/architecture/adr/0014-offline-bootstrap.md) and [session strategy](docs/architecture/adr/0002-browser-sessions.md).
 
 No private security-reporting method currently exists; [SECURITY.md](SECURITY.md) describes the public-release gate. No WCAG, production security, hosted deployment or workflow correctness claim is made for this foundation.
 
@@ -95,7 +95,7 @@ No private security-reporting method currently exists; [SECURITY.md](SECURITY.md
 - [ADRs](docs/architecture/adr/README.md)
 - [Repository structure](docs/development/REPOSITORY.md)
 
-Next: Phase 1C offline account bootstrap, organization onboarding and tenant isolation, with a separate browser sign-in/client coordination increment. The first workflow/approval business demonstration follows Phases 2–4; full integrations/webhooks, AI/MCP and delivery polish remain in the revised roadmap.
+Next: Phase 1D real browser sign-in/onboarding, session coordination and recovery. The first workflow/approval business demonstration follows Phases 2–4; full integrations/webhooks, AI/MCP and delivery polish remain in the revised roadmap.
 
 ## Actual foundation preview
 

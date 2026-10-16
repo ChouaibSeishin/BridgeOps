@@ -1,29 +1,55 @@
-Current increment: Phase 1C.3 membership role/status mutations and soft removal. Eighteen focused restricted-runtime tests passed, followed by a successful full verify with 72 tests (17 unit/MVC and 55 PostgreSQL), zero failures/errors/skips. V6 Compose upgrade/start passed; users and organizations both remain empty. Runtime privilege checks confirmed status/revision updates and parent locking while user ownership, audit and account-grant writes remain denied. Revision checks, current delegation ceilings and serialized last-active-Owner protection are required on every exposed mutation. Invitations remain the final pending increment.
-
 # Project status
 
-Updated 2026-10-16 UTC. Current task: Phase 1C backend onboarding. Browser work remains Phase 1D.
+Updated 2026-10-16 UTC. **Phase 1C backend onboarding is implemented and locally verified.** Browser login/onboarding, client session coordination and recovery remain Phase 1D. No workflow/integration/AI work was started.
 
-## Published checkpoints
+## Published increments and continuity
 
-Initial local/fetched origin/master matched ccf94bb with a clean tree. Foundation/session/JWT/HTTP commits b1517ec, ffa151d, f00a1e0 and ccf94bb are preserved. Their 2026-10-15 evidence remains historical; fresh checks below supersede it where rerun.
+Initial local/fetched origin/master matched ccf94bb with a clean tree; existing branch/history/work/data were preserved. Foundation/auth checkpoints b1517ec, ffa151d, f00a1e0 and ccf94bb remain intact.
 
-267645e implements one-shot offline initial-account provisioning. Push and remote hash were verified; [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38891771047). Full backend verify passed 53 tests before the final command-logging adjustment; final focused verification passed 3 CLI + 6 PostgreSQL bootstrap tests. CI reran the full backend/frontend/container checks. No persistent initial account was created.
+| Phase 1C increment | Actual publication evidence |
+| --- | --- |
+| 267645e — one-shot offline verified account | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38891771047) |
+| 43338a8 — atomic organizations and tenant-bound Owner membership | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38893437874) |
+| f12ce04 — delegated roles and concurrent last-Owner protection | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38894768689) |
 
-## Published organization boundary
+The invitation increment's exact hash, push and hosted result are checked after its staged gate; local test results below do not invent future publication/CI outcomes.
 
-V5 implements tenant-owned fixed roles, permissions, membership composite keys and safe audit events. POST /api/v1/organizations creates the organization and Owner membership atomically after live identity/account-grant checks. GET collection/detail/member-list/role-catalog queries are user/tenant-qualified and require current permissions. All unimplemented business routes remain denied. Full backend verify passed 63 tests (17 unit/MVC and 46 PostgreSQL, zero failures/errors/skips). Final focused verification after removing a grant-row lock passed all 9 organization HTTP tests with the restricted runtime database role; fixtures/Flyway use a separate operator connection. Final Compose up --build -d --wait passed with all services healthy. Published as 43338a8; remote ref matched and [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38893437874).
+## Implemented backend
 
-See [the Phase 1C implementation and commands](development/PHASE_1C_ONBOARDING.md), [HTTP session design](development/PHASE_1B_HTTP_AUTH.md), [API](api/CONTRACT_OUTLINE.md), [schema](architecture/DATABASE.md) and [security model](security/THREAT_MODEL.md).
+- Existing BCrypt/opaque refresh/session rotation/replay controls, signed RS256 access, live family/account checks, cookie/CSRF/exact Origin protection, shared bounded throttling and default deny are retained.
+- Explicit disabled-by-default non-web bootstrap, bounded secret stdin/no-echo console, fixed safe output, a locked consumed installation marker, one verified account and only an account-level organization.create grant. No tenant/default account is provisioned by normal startup.
+- Authenticated organization create/list/detail, tenant member listing and read-only role catalog. Creation checks the live account grant and atomically writes the tenant, fixed role/permission templates, Owner membership and safe audit.
+- Tenant-qualified reads/FKs, current permission resolution, revision-checked member role/status changes and soft removal, delegation ceilings, immutable HTTP role definitions and serialized last-active-Owner protection. Disabled accounts do not count as remaining Owners.
+- Recipient-bound one-use invitations, 48-hour expiry, pending uniqueness, revocation, current issuer/grant revalidation, authenticated acceptance for existing accounts and token-guarded first-time enrollment. No existing password is reset and no account-level grant is inherited from tenant Owner status.
+- A constrained migration-owned enrollment function rather than generic runtime users INSERT. It independently verifies raw proof, recipient, state/DB deadline, active issuer and tenant role ceiling before writing only the invited account/membership and consumption/events. Trusted search path, qualified relations and restricted EXECUTE; bootstrap/account-grant writes remain denied.
+- Authenticated external SMTP with required TLS/hostname verification, finite timeouts, redacted provider failures and no plaintext/debug fallback. Defaults disabled. Tests use only a no-network sink/adapter; no real-recipient email was sent.
 
-## Verified operational boundaries
+See [operator/API/configuration guide](development/PHASE_1C_ONBOARDING.md), [API outline](api/CONTRACT_OUTLINE.md), [database](architecture/DATABASE.md), [security](security/THREAT_MODEL.md) and [existing session policy](development/PHASE_1B_HTTP_AUTH.md).
 
-The final bootstrap image build/start passed. Default-disabled admin command exited 2 with a fixed safe message. Existing-volume upgrade installed V4; users count remained 0, marker unconsumed, runtime marker UPDATE/account-grant INSERT both denied. No local secrets were printed, tracked or rotated and no volume was deleted. CLI tests use disposable databases and synthetic secret input. Normal startup never provisions an account. The app remains available at localhost:8088 as the existing status shell.
+## Fresh verification
 
-Java 21, Boot 4.1.1, Maven Wrapper 3.9.16, PostgreSQL 18.6 and Node 24.22.0 remain unchanged. No dependency was added for bootstrap or the organization boundary. Hosted CI reruns frontend checks; frontend source and browser visuals are unchanged.
+| Check | Actual result |
+| --- | --- |
+| Bootstrap | Full run 53 passed before final quiet-command adjustment; final focused 3 CLI + 6 PostgreSQL cases passed; subsequent full runs/CI include the subprocess test |
+| Organization boundary | Full 63 passed; final focused 9 cases passed using restricted runtime credentials, with separate operator migrations/fixtures |
+| Membership protection | Focused 18 cases and full 72 tests passed; includes concurrent Owner demotions and audit rollback |
+| Initial invitation run | All 33 restricted-runtime integration cases passed before final two cases were added |
+| Final full backend verify | BUILD SUCCESS: 21 unit/MVC + 72 required PostgreSQL integration tests, 93 total, zero failures/errors/skips |
+| Final security coverage | 35 tenant/member/invitation cases, four SMTP adapter cases, generic INSERT denial, raw-proof versus stored-hash enforcement, recipient/password takeover prevention, issuer revalidation, strict expiry, replay/concurrency, quotas, foreign IDs/FKs and transaction rollback |
+| Docker/upgrade | Final up --build -d --wait passed; all three services healthy; V1–V7 installed on existing volume |
+| Actual database boundary | Users/organizations/invitations counts all 0, installation unconsumed; runtime user INSERT/account-grant INSERT/marker UPDATE false, capability EXECUTE true, unrelated role EXECUTE false; capability owned by non-superuser bridgeops_migrator with trusted search path |
+| Default controls | Actual default-disabled admin command exited 2; real SMTP disabled. No account/tenant/mail was created by verification |
+| Frontend | Source unchanged; each published CI above reran four tests, typecheck/lint/build. No new browser/visual check or sign-in journey claimed |
+| Documentation/secrets | File/link/fence checker and staged diff/whitespace/secret scan run at each commit gate; .env and generated signing keys remain untracked. No credentials printed or rotated; no volume deleted |
 
-## Remaining Phase 1C work
+All test accounts/keys are disposable fixtures. Documentation checks do not render Mermaid; regex scanning is not proof every possible secret is absent. Exact commands are in the onboarding guide and Maven reports are generated in ignored backend/target.
 
-Membership mutation requires delegated-role ceilings and serialized last-Owner checks before exposure. Invitations are included in the accepted backlog; the user selected externally configured SMTP plus a test delivery sink. Implement recipient binding, hashed one-use tokens, expiry/replay checks, privilege revalidation and token-guarded first-account setup for invitees without public registration. No real-recipient email will be sent during verification. These are pending, so Phase 1C is not complete.
+## Configuration and remaining work
 
-No browser sign-in/client refresh coordination, account recovery, workflows, integrations or AI/MCP in this task. No production security/load/TLS/HA, WCAG, backend vulnerability-scan, backup/restore or managed-vault claim. Compose still shares migration credentials with startup runtime; production needs separate migration/operator execution and protected secrets. No license/private reporting channel is configured. Mermaid rendering is unverified; secret scanners cannot prove every possible secret absent.
+The Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / Node 24.22.0 baseline is unchanged. Boot-managed mail starter is added for the user-selected SMTP requirement, without version overrides or new infrastructure services.
+
+Before real invitations, an operator must configure authenticated TLS SMTP in the ignored environment. External provider credentials, connectivity and actual mailbox delivery were not available/tested. Synchronous SMTP acknowledgement is not transactional with PostgreSQL: a delivered-but-rolled-back message contains an unusable token; a test proves it cannot create an account. No durable outbox/retry guarantee.
+
+The local workspace remains a status shell on localhost:8088 with no seeded application identity or tenant. Use the explicit offline command with your own metadata/secret input before manual API onboarding. HTTP bootstrap and general registration remain denied. Next: Phase 1D browser login/organization/member UI, in-memory access/serialized refresh and recovery/session settings, with real endpoint/browser tests.
+
+No production security/load/TLS/HA, WCAG, backend vulnerability scan, backup/restore, RLS or compromised-runtime containment claim. Production must separate migration/operator execution and protect injected secrets; local Compose still supplies startup migration credentials. No license or verified private reporting channel is configured. Later workflow, integrations and AI/MCP remain pending.

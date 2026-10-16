@@ -1,6 +1,6 @@
 # ADR-0003-tenant-isolation: Shared database tenant isolation
 
-Status: Proposed. Date: 2026-10-15.
+Status: Accepted; Phase 1C organization/member/invitation boundary implemented. Date: 2026-10-15.
 
 ## Context
 

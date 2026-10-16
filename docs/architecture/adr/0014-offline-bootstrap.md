@@ -17,3 +17,5 @@ An explicit disabled-by-default non-web command locks singleton installation sta
 ## Consequences
 
 No HTTP bootstrap or default account/password. Tests must cover default disabled mode, concurrent/repeated bootstrap, account/organization transaction rollback and invite privilege boundaries.
+
+Phase 1C implementation clarification (2026-10-16): first-time invitation recipients enroll with the emailed single-use token plus matching email and initial password, then sign in explicitly. Existing recipients must authenticate as that email; invitations never reset an existing password or grant organization.create. This token-guarded setup is not general registration. SMTP uses external operator credentials; tests substitute an in-memory sink. Runtime cannot INSERT users directly; a tightly scoped migration-owned function validates/consumes invitation proof and writes the invited account/membership atomically. [Implementation and verification](../../development/PHASE_1C_ONBOARDING.md).

@@ -1,3 +1,5 @@
+Historical Phase 1B.2 checkpoint: signature/cookie/CSRF policy below remains applicable. New organization/member/invitation routes and current completion evidence are in [the Phase 1C guide](PHASE_1C_ONBOARDING.md) and PROJECT_STATUS.md; the old statements about all business routes being denied describe that earlier checkpoint.
+
 # Phase 1B.2 — HTTP authentication
 
 ## Scope and checkpoints
