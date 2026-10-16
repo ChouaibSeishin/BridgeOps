@@ -49,6 +49,18 @@ services:
       retries: 10
     stop_grace_period: 30s
     restart: unless-stopped
+  bootstrap:
+    image: bridgeops-backend
+    profiles: [admin]
+    command: [bootstrap]
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/bridgeops
+      DATABASE_USER: bridgeops_migrator
+      DATABASE_PASSWORD: ${MIGRATION_PASSWORD:?Required operator database password}
+      BOOTSTRAP_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
   frontend:
     build:
       context: ..

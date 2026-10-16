@@ -108,3 +108,5 @@ Captured from the running local application, not a mockup. [Mobile dark-theme ca
 The public development repository is [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Publication status is recorded in PROJECT_STATUS.md; a URL alone does not prove a push succeeded. Follow the [Git workflow](docs/development/GIT_WORKFLOW.md) and [local credential rotation guide](docs/security/LOCAL_CREDENTIAL_ROTATION.md). No license has been selected yet.
 
 The [Phase 1B.1 session-core report](docs/development/PHASE_1B_SESSION_CORE.md) explains replay transactions, concurrency guarantees and the historical internal boundary. The [Phase 1B.2 HTTP guide](docs/development/PHASE_1B_HTTP_AUTH.md) documents the current enabled transport and key configuration.
+
+The [Phase 1C guide](docs/development/PHASE_1C_ONBOARDING.md) documents explicit offline initial-account provisioning. It is disabled by default and creates no tenant; normal startup never provisions an account.

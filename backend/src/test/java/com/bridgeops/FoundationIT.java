@@ -37,6 +37,8 @@ class FoundationIT {
 
     @Test
     void emptyDatabaseMigratesAndRecordsSuccessfulVersion() {
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users",Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT bootstrap_consumed_at IS NULL FROM installation_state",Boolean.class)).isTrue();
         assertThat(jdbc.queryForObject("SELECT schema_purpose FROM platform_metadata WHERE singleton_id=1", String.class))
                 .isEqualTo("bridgeops-foundation");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version='1'", Integer.class))

@@ -14,7 +14,7 @@ Add identity application/domain/persistence/web packages; users, session familie
 
 ## 1C — Initial owner and tenant boundary
 
-Implement consumed installation marker and account-level organization.create grant; authenticated create/list organization and Owner membership in one transaction. Invite acceptance is recipient-bound, single-use and delegated-role checked. Add tenant-qualified repositories/composite foreign keys, permission tests, last-owner protection and safe audits. UI provides real login, organization creation/selection and membership display. Test duplicate bootstrap, concurrent bootstrap, production/default disabled mode, cross-tenant access and invitation privilege boundaries.
+Implement consumed installation marker and account-level organization.create grant; authenticated create/list organization and Owner membership in one transaction. Invite acceptance is recipient-bound, single-use and delegated-role checked. Add tenant-qualified repositories/composite foreign keys, permission tests, last-owner protection and safe audits. Current scope amendment: real login, organization creation/selection and membership display UI belong to Phase 1D per the current backlog and user request. Test duplicate bootstrap, concurrent bootstrap, production/default disabled mode, cross-tenant access and invitation privilege boundaries.
 
 ## 1D — Phase 1 completion
 

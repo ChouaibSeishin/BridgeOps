@@ -1,3 +1,9 @@
+## Phase 1C.1 verification — 2026-10-16
+
+Fresh full backend verify passed 53 tests (16 unit/MVC, 37 PostgreSQL; zero failures/errors/skips). After the final quiet-command dispatch, focused verification passed 3 CLI tests and 6 PostgreSQL bootstrap tests, including an actual non-web subprocess. The real Compose command without enablement exited 2 with the fixed disabled message; existing users count is 0, installation state is unconsumed, and runtime UPDATE marker / INSERT grants are both denied. A final Compose build/start is checked before publication. Frontend source is unchanged; its earlier local results remain historical until the hosted workflow reruns them. No persistent account was created.
+
+Current task (2026-10-16): Phase 1C. Local and fetched origin/master matched ccf94bb with a clean initial tree. The offline bootstrap increment is under fresh verification; organization/membership/invitation work remains pending. SMTP delivery plus a test sink was selected by the user. See [the Phase 1C guide](development/PHASE_1C_ONBOARDING.md). All 2026-10-15 results below are historical until rerun.
+
 # Project status
 
 Updated: 2026-10-15 UTC. Current checkpoint: **Phase 1B.2 HTTP authentication implemented and locally verified**. Phase 1A and the 1B.1 session core are preserved. This is a backend checkpoint: browser sign-in, first-account provisioning, account recovery and tenant onboarding are not complete.
