@@ -27,6 +27,7 @@ async function mail(recipient, subject) {
   throw new Error("Test mail capture timed out");
 }
 async function signIn(target, email, password) {
+  target.on("response", response => console.log("HTTP: " + response.request().method() + " " + new URL(response.url()).pathname + " " + response.status()));
   await target.goto("/sign-in");
   await expect(
     target.getByRole("heading", { name: "Sign in to your workspace" }),
@@ -296,6 +297,8 @@ try {
     "jordan@example.invalid",
     invitedPassword,
   );
+  step = "recovery request acknowledgement";
+  console.log("STEP: " + step);
   await guest.getByRole("link", { name: "Forgot your password?" }).click();
   await guest
     .getByLabel("Email", { exact: true })
@@ -304,10 +307,14 @@ try {
   await expect(guest.getByText(/If recovery is available/)).toContainText(
     "Delivery is not guaranteed",
   );
+  step = "recovery test mail capture";
+  console.log("STEP: " + step);
   const proof = await mail(
     "jordan@example.invalid",
     "BridgeOps account recovery",
   );
+  step = "recovery proof submission";
+  console.log("STEP: " + step);
   await guest.getByRole("link", { name: "I have a recovery token" }).click();
   await guest.getByLabel("Recovery token").fill(proof);
   await guest.getByLabel("New password", { exact: true }).fill(resetPassword);
@@ -316,6 +323,8 @@ try {
   await expect(
     guest.getByRole("heading", { name: "Sign in to your workspace" }),
   ).toBeVisible();
+  step = "recovery independent session revocation";
+  console.log("STEP: " + step);
   expect(
     (
       await otherContext.request.get("/api/v1/auth/me", {
@@ -392,8 +401,10 @@ try {
   console.log(
     "PASS: real browser sign-in, concurrent tabs, organization/member/invitation flows, isolation, logout, recovery, password change and responsive renders.",
   );
-} catch {
+} catch (failure) {
   console.error("FAIL: browser journey at step: " + step);
+  // Emit source locations only: assertion messages can contain credential values.
+  console.error("FAIL: source " + ((failure.stack ?? "").match(/journey\.mjs:\d+:\d+/g) ?? []).join(", "));
   if(page)console.error("LAYOUT: "+JSON.stringify(await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(e=>({tag:e.tagName,css:e.className,right:e.getBoundingClientRect().right}))})).catch(()=>({}))));
   if (page)
     console.error(
