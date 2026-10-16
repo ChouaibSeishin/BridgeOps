@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 1C backend onboarding is implemented and locally verified.** Browser login/onboarding, client session coordination and recovery remain Phase 1D. No workflow/integration/AI work was started.
+Updated 2026-10-16 UTC. **Phase 1C backend onboarding is implemented, pushed and verified locally and in hosted CI.** Browser login/onboarding, client session coordination and recovery remain Phase 1D. No workflow/integration/AI work was started.
 
 ## Published increments and continuity
 
@@ -11,8 +11,7 @@ Initial local/fetched origin/master matched ccf94bb with a clean tree; existing 
 | 267645e — one-shot offline verified account | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38891771047) |
 | 43338a8 — atomic organizations and tenant-bound Owner membership | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38893437874) |
 | f12ce04 — delegated roles and concurrent last-Owner protection | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38894768689) |
-
-The invitation increment's exact hash, push and hosted result are checked after its staged gate; local test results below do not invent future publication/CI outcomes.
+| 7aec5ea — recipient-bound invitations and external SMTP adapter | Push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38898903235) |
 
 ## Implemented backend
 
