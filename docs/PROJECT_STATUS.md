@@ -6,6 +6,8 @@ Phase 2 inspection: clean master and GitHub both at 11aec6e9e2e9d2e0ea0aaedde2e2
 
 ## Continuity and publication evidence
 
+Phase 2 persistence progress: V9, public TenantAuthorization, narrow WorkflowAudit and workflow application/persistence services are implemented. All 12 focused disposable PostgreSQL lifecycle/migration tests passed, including V8 preservation, races, immutable rows and audit rollback. HTTP/UI are still unavailable pending their increments. Local data remains preserved. Validator increment 11555f5 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38944732833).
+
 Phase 2 progress: design/document reconciliation 4875c64 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38943543050). The first code increment implements only the bounded definition registry, validator and canonical SHA-256 format; its 28 focused unit cases passed. Persistence, HTTP/UI and full Phase 2 gates remain in progress; no execution is implemented.
 
 Initial inspection found clean local master exactly matching fetched origin/master at ed1aaa88d09f47a5d9bd3ee8ceff43e1d3afdd3f (0 ahead/behind). Existing branch history, ignored .env/signing keys and database volume were preserved.

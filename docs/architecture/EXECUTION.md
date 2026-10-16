@@ -2,6 +2,8 @@
 
 Status: planned Phase 3–4 behavior; no engine is implemented.
 
+Phase 2 now implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Its schema-v1 registry supports only a connected linear manual-trigger/synthetic-action/approval/end chain. Branches, joins, runtime work, TEST snapshots and approval decisions in the target design below remain deferred. Published definitions never execute merely because publication succeeds.
+
 ## Definition and validation
 
 Graph schema: `{schemaVersion,nodes,edges}`. Nodes have stable IDs, registered type versions and typed configuration; UI coordinates are separate presentation data. Reject unknown schema/types/fields, invalid references, cycles, unreachable nodes, incompatible data connections and foreign-tenant connectors. Require exactly one trigger, a reachable end and configured complexity limits. Sequential execution has no parallel forks or ambiguous joins. Conditions select one named branch; unselected paths are skipped. Mutually exclusive branches may converge at a documented selected-predecessor join.
