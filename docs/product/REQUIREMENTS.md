@@ -33,6 +33,10 @@ Node catalog: manual/webhook trigger, internal action, configured HTTP request, 
 
 The visual editor supports node/edge add/delete, config, validation markers, draft save, duplication, publication, history and test runs. Test runs require execution permissions and normal approvals; they are real operations against designated demo connections, not an implied safe dry run. Basic accessible layout and theme support arrive early; richer analytics and complete responsive polish follow in Phase 7.
 
+## Current Phase 2 scope amendment
+
+Phase 1D is verified; implement workflow definitions using the [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md). A small form editor supports bounded versioned manual-trigger/synthetic-action/approval/end definitions, persistence, authoritative validation, immutable publication/history, duplication and archive. These nodes have definition support only. Execution/test runs begin in Phase 3 and approval processing in Phase 4. The broader catalog/canvas requirements above remain later targets. Existing local accounts/data must be preserved; use isolated synthetic test fixtures.
+
 ## Flagship demonstration
 
 High-Priority Ticket Triage: manually start or authenticate a webhook; read up to 50 unresolved high-priority tickets; resolve responsible teams; branch to a no-work result when empty; build deterministic structured assignments; request approval; apply only unchanged approved assignments; notify the operations manager; inspect timeline and audit. A simulated transient notification error retries once, then succeeds. A changed ticket causes a visible stale-plan conflict and requires a new plan/approval. Partial application is visible; successful items are not replayed.

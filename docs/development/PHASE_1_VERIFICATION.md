@@ -1,10 +1,10 @@
-Phase 1C current counts: full verify passed 21 unit/MVC plus 72 required PostgreSQL integration tests (93 total). This includes offline bootstrap concurrency/rollback, 35 restricted-runtime organization/member/invitation cases and four no-network SMTP adapter cases. [Current commands and evidence](PHASE_1C_ONBOARDING.md). Older foundation counts below are historical checkpoints, not the current suite size.
+Historical Phase 1C counts: full verify passed 21 unit/MVC plus 72 required PostgreSQL integration tests (93 total). This includes offline bootstrap concurrency/rollback, 35 restricted-runtime organization/member/invitation cases and four no-network SMTP adapter cases. [Checkpoint evidence](PHASE_1C_ONBOARDING.md). These counts are historical, not the current suite size.
 
 # Phase 1 verification
 
-Phase 1A commands below now exist. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The HTTP authentication adapter and its security tests are implemented; onboarding/tenant/browser gates remain planned; do not mark the full phase complete from foundation checks.
+Phase 1D completed at 11aec6e with [successful hosted verification](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931957774): 110 backend/integration/browser tests and 17 frontend tests. Onboarding, tenancy, browser sessions and recovery are implemented. Current executed outcomes are in [PROJECT_STATUS](../PROJECT_STATUS.md). The foundation commands/counts and earlier planned-gate statements below describe historical checkpoints. Use the current [README build order](../../README.md), including built frontend assets and installed Chromium before Maven verify.
 
-## Exact foundation commands
+## Historical foundation commands (superseded by README)
 
 From repository root, use Java 21 and Node 24.22.0, and a Docker daemon accessible to the executing process:
 

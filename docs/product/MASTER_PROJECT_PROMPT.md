@@ -2288,11 +2288,13 @@ Do not optimize only for the number of technologies used. Optimize for a working
 
 ---
 
-# 23. CURRENT IMPLEMENTATION TASK
+# 23. HISTORICAL INITIAL IMPLEMENTATION TASK
 
 Phase 0 has been reviewed. Preserve the architecture and resolve conflicts per [the report](../CONFLICT_RESOLUTION.md). Lock stable compatible versions, synchronize documentation and implement [Phase 1A](../development/PHASE_1_IMPLEMENTATION.md) as a runnable, testable increment. Phase 1 also includes secure identity, offline initial-account provisioning and organization membership in subsequent increments. Continue the first workflow/approval vertical slice in revised Phases 2–4 before optional complexity. Record actual verification in PROJECT_STATUS.md. Do not claim planned functionality is implemented.
 
 The primary goal remains a coherent, secure, attractive, well-tested and demonstrably functional product.
+
+Current task amendment — 2026-10-16: Phase 1D is verified and published at 11aec6e, including browser onboarding/sessions/recovery. Continue Phase 2 workflow drafts, server validation, immutable publication/history, duplication and archive under [the current contract](../development/PHASE_2_WORKFLOWS.md). Use a small form editor and versioned linear graph registry. No execution/test-run, approval processing, connector, webhook, AI or MCP behavior is enabled by Phase 2. The local user has now provisioned the first account; preserve that account, consumed marker, .env, keys and database volume. Earlier phase-task and empty-installation statements are historical verification checkpoints. Automated tests remain disposable and synthetic.
 
 # GitHub development amendment — 2026-10-15
 

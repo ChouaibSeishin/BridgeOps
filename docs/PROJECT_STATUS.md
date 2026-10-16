@@ -1,6 +1,8 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 1D is implemented, verified locally and published with successful hosted CI.** This is a development checkpoint, not production certification. Workflow execution, integrations, approvals and AI/MCP were not started.
+Updated 2026-10-16 UTC. **Phase 1D is complete; Phase 2 workflow definitions are in progress.** This is a development checkpoint, not production certification. Workflow execution, integrations, approval processing and AI/MCP were not started.
+
+Phase 2 inspection: clean master and GitHub both at 11aec6e9e2e9d2e0ea0aaedde2e286de1191e538, highest migration V8, no workflow source/tables. Actual local state now has one user, zero organizations and a consumed bootstrap marker. The user-created account, environment, keys and volume are preserved. Zero-account observations below describe earlier disposable/local Phase 1 verification, not the current installation. [Accepted Phase 2 design and progress](development/PHASE_2_WORKFLOWS.md): graph schema/limits, existing role grants, persistence/publication lock and hash contracts. No Phase 2 code/test completion is claimed yet.
 
 ## Continuity and publication evidence
 

@@ -1,6 +1,6 @@
 # Proposed relational model
 
-Status: V1–V7 implement the current foundation/identity/tenant boundary described below; workflow/integration/AI models remain planned. Introduce tables in their owning phases, not wholesale in Phase 1. UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revision columns are defaults. JSON is bounded/schema-versioned and never grants authority.
+Status: V1–V8 implement the current foundation/identity/tenant/recovery boundary described below. Phase 2 workflow/draft/version schema is designed in [the implementation contract](../development/PHASE_2_WORKFLOWS.md); it is not yet migrated. Integration/execution/AI models remain planned. Introduce tables in their owning phases. UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revision columns are defaults. JSON is bounded/schema-versioned and never grants authority.
 
 ## Identity and tenancy ER diagram
 

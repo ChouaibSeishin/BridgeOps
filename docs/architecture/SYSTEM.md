@@ -1,6 +1,6 @@
 # Proposed system architecture
 
-Status: architecture retained after review. Phase 1A implements the technical application and persistence foundation; business modules below remain planned. Start with one Spring Boot deployment, one React frontend and PostgreSQL. Bounded workers run in the backend process when Phase 3 introduces execution. Separate workers and a broker require evidence and an ADR update.
+Status: architecture retained after review. Phase 1 implements foundation, identity and organization onboarding/browser boundaries. Workflow definitions are the current Phase 2 implementation task; later modules in the target diagrams remain planned. One Spring Boot deployment, one React frontend and PostgreSQL are retained. Bounded execution workers arrive in Phase 3. Separate workers and a broker require evidence and an ADR update. [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md).
 
 ## Context and containers
 
