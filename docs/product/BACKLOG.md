@@ -24,3 +24,5 @@ Every increment includes validation, backend authorization, migrations, safe err
 ## Current verified checkpoint
 
 Phase 1C backend implementation now includes offline verified-account bootstrap, explicit atomic organization/Owner creation, tenant-qualified permissions and memberships, last-active-Owner/revision protection, and recipient-bound one-use invitations with external SMTP plus a test sink. Fresh full verify passed 93 backend tests; hosted publication/CI evidence is checked per increment in PROJECT_STATUS.md and the task report. No default user/tenant or real-recipient mail was created by tests. Next is Phase 1D browser onboarding, client/session coordination and recovery; all later workflow/integration/AI/MCP work remains pending.
+
+Phase 1D in progress: browser authentication/session coordinator implemented in 1D.1; organization UI, password recovery and real browser release gates remain pending. Do not infer full Phase 1 completion.

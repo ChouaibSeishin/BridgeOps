@@ -110,3 +110,5 @@ The public development repository is [ChouaibSeishin/BridgeOps](https://github.c
 The [Phase 1B.1 session-core report](docs/development/PHASE_1B_SESSION_CORE.md) explains replay transactions, concurrency guarantees and the historical internal boundary. The [Phase 1B.2 HTTP guide](docs/development/PHASE_1B_HTTP_AUTH.md) documents the current enabled transport and key configuration.
 
 The [Phase 1C guide](docs/development/PHASE_1C_ONBOARDING.md) documents explicit offline initial-account provisioning. It is disabled by default and creates no tenant; normal startup never provisions an account.
+
+Phase 1D.1 adds real browser sign-in, protected navigation, memory-only access, cross-tab Web Lock coordination and sign-out/logout-all. Organization onboarding and recovery UI follow. See [browser guide](docs/development/PHASE_1D_BROWSER.md). Earlier foundation screenshots are historical.

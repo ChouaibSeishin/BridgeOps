@@ -52,3 +52,7 @@ Before real invitations, an operator must configure authenticated TLS SMTP in th
 The local workspace remains a status shell on localhost:8088 with no seeded application identity or tenant. Use the explicit offline command with your own metadata/secret input before manual API onboarding. HTTP bootstrap and general registration remain denied. Next: Phase 1D browser login/organization/member UI, in-memory access/serialized refresh and recovery/session settings, with real endpoint/browser tests.
 
 No production security/load/TLS/HA, WCAG, backend vulnerability scan, backup/restore, RLS or compromised-runtime containment claim. Production must separate migration/operator execution and protect injected secrets; local Compose still supplies startup migration credentials. No license or verified private reporting channel is configured. Later workflow, integrations and AI/MCP remain pending.
+
+## Phase 1D progress (2026-10-16 UTC)
+
+1D.1 implements the real sign-in/protected shell and session coordinator. Fresh frontend typecheck, lint, 11 tests and production build passed. Origin-wide Web Locks serialize CSRF/cookie-sensitive sequences; no credential persistence/broadcast. Backend code is unchanged in this increment. Commit/push/hosted results are verified after the commit gate. Organization UI, recovery and browser end-to-end gates remain incomplete; Phase 1 is not complete. [Browser guide](development/PHASE_1D_BROWSER.md).

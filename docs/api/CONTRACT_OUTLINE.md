@@ -78,3 +78,5 @@ Phase 1C.2 implements authenticated organization create/list/detail, member list
 Phase 1C.3 enables PATCH/DELETE O/members/{membershipId} with live tenant permission, CSRF/Origin, expectedRevision or quoted If-Match, delegation ceilings and last-Owner protection. See [exact request/state rules](../development/PHASE_1C_ONBOARDING.md). Role-definition mutation and invitation routes remain denied in this checkpoint.
 
 Phase 1C.4 implements POST O/invitations, DELETE O/invitations/{id}, authenticated POST /api/v1/invitations/accept, and invitation-only POST /api/v1/invitations/enroll. The enrollment extension is required for first-time invitees; a raw recipient-bound emailed token is mandatory, roles/grants are never body authority, and existing accounts require authenticated accept. It is not general registration. [Exact DTOs, statuses, SMTP and proof rules](../development/PHASE_1C_ONBOARDING.md). HTTP bootstrap, /auth/register and all unrelated business routes remain denied.
+
+Phase 1D.1 integrates the existing authentication contract into the browser without adding backend routes. [Session client behavior](../development/PHASE_1D_BROWSER.md).

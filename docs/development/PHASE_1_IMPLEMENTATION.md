@@ -50,3 +50,5 @@ Phase 1B/C add only actual module files, not empty placeholder controllers. Each
 ## Phase 1B subdivision
 
 1B.1 is the internal identity and refresh-session core (V2 migration, BCrypt, hashed opaque tokens, live checks, revocation/replay/concurrency). 1B.2 adds access JWTs and a complete HTTP/CSRF/Origin/cookie/throttle adapter with negative security tests. Keep business HTTP denied until that boundary is complete; no public registration is introduced. See [session-core scope](PHASE_1B_SESSION_CORE.md).
+
+Phase 1D subdivision: 1D.1 browser session lifecycle; 1D.2 organizations/members/invitations; 1D.3 password change and recovery with shared outbound email; 1D.4 truthful dashboard, disposable browser journey and release checks. [Current browser implementation](PHASE_1D_BROWSER.md).
