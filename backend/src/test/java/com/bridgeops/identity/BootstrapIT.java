@@ -33,6 +33,8 @@ class BootstrapIT {
     char[] secret(){return "synthetic-bootstrap-fixture".toCharArray();}
     @Test void createsOneVerifiedAccountAndGrantWithoutAnyTenantAndErasesInput(){
         char[] input=secret();UUID id=provisioner().provision(" Operator@Example.Invalid ","Operator",input);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM organizations",Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_memberships",Integer.class)).isZero();
         assertThat(input).containsOnly('\0');
         assertThat(jdbc.queryForObject("SELECT email_verified_at IS NOT NULL FROM users WHERE id=?",Boolean.class,id)).isTrue();
         assertThat(jdbc.queryForObject("SELECT normalized_email FROM users WHERE id=?",String.class,id)).isEqualTo("operator@example.invalid");

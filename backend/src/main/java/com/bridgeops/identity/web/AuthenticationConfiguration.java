@@ -53,6 +53,8 @@ public class AuthenticationConfiguration {
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/auth/me").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/logout-all").authenticated();
             if (docsEnabled) authorize.requestMatchers(HttpMethod.GET,"/v3/api-docs","/v3/api-docs/**","/swagger-ui.html","/swagger-ui/**").permitAll();
+            authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations","/api/v1/organizations/*","/api/v1/organizations/*/members","/api/v1/organizations/*/roles").authenticated();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations").authenticated();
             authorize.anyRequest().denyAll();
         });
         http.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)

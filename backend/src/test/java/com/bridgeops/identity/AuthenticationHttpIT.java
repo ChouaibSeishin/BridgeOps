@@ -72,7 +72,7 @@ class AuthenticationHttpIT {
         mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+logged.access())).andExpect(status().isOk())
             .andExpect(jsonPath("$.user.id").value(userId.toString())).andExpect(jsonPath("$.user.passwordHash").doesNotExist())
             .andExpect(header().string("Cache-Control","no-store"));
-        mvc.perform(get("/api/v1/organizations").header("Authorization","Bearer "+logged.access())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/organizations").header("Authorization","Bearer "+logged.access())).andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM refresh_sessions WHERE token_hash=?",Integer.class,logged.refresh().getValue())).isZero();
     }
     @Test void exactOriginIsRequiredBeforeLoginOrCookieMutation() throws Exception {

@@ -72,3 +72,5 @@ There is no bootstrap or public registration HTTP route. The offline command pro
 
 With authentication explicitly enabled and signing material configured, GET /api/v1/auth/csrf and /me, and POST /api/v1/auth/login, /refresh, /logout and /logout-all are implemented. The rest of the target route table remains planned. See [the HTTP guide](../development/PHASE_1B_HTTP_AUTH.md) for exact DTOs, required headers, cookie settings, errors and configuration. Never serialize internal Granted objects. Unrelated business routes remain denied even with a valid bearer credential.
 Phase 1C.1 adds only the offline bootstrap subcommand and V4 state/grant migration. It enables no HTTP route. Organization and invitation routes remain denied until their subsequent increment is verified. [Operator guide](../development/PHASE_1C_ONBOARDING.md).
+
+Phase 1C.2 implements authenticated organization create/list/detail, member listing and read-only tenant role catalog. See [exact HTTP shapes and authorization](../development/PHASE_1C_ONBOARDING.md). Membership mutations/invitations and all other business routes remain denied until their own verified increment.
