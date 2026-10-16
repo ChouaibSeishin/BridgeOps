@@ -20,7 +20,17 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
         if (request.getContentLengthLong() > MAX_REQUEST) { tooLarge(request, response); return; }
         byte[] bytes = request.getInputStream().readNBytes(MAX_REQUEST + 1);
         if (bytes.length > MAX_REQUEST) { tooLarge(request, response); return; }
-        try { graphs.checkRequest(bytes); }
+        try {
+            var body = graphs.checkRequest(bytes);
+            if (body != null && body.isObject()) {
+                for (String field : java.util.List.of("name", "description"))
+                    if (body.has(field) && !body.get(field).isString()) throw new IllegalArgumentException("String metadata required.");
+                var revision = body.get("expectedRevision");
+                if (revision != null && (!revision.isIntegralNumber() || revision.bigIntegerValue().signum() < 0
+                    || revision.bigIntegerValue().compareTo(java.math.BigInteger.valueOf(Long.MAX_VALUE)) > 0))
+                    throw new IllegalArgumentException("An exact nonnegative revision is required.");
+            }
+        }
         catch (RuntimeException invalid) { ApiErrors.write(request, response, 400, "INVALID_REQUEST", "Request is invalid."); return; }
         chain.doFilter(new HttpServletRequestWrapper(request) {
             @Override public int getContentLength() { return bytes.length; }

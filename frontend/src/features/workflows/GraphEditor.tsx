@@ -163,7 +163,9 @@ export function GraphEditor({
                             }
                           >
                             {!field.options.includes(
-                              String(node.config[field.key]),
+                              typeof node.config[field.key] === "string"
+                                ? (node.config[field.key] as string)
+                                : "",
                             ) && <option value="">Choose operation</option>}
                             {field.options.map((value) => (
                               <option key={value}>{value}</option>

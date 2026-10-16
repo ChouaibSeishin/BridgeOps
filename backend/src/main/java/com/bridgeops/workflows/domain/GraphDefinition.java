@@ -25,7 +25,7 @@ public class GraphDefinition {
     public record Canonical(String json, String hash, int schemaVersion, int canonicalizationVersion) {}
 
     public JsonNode parse(String text) { return json.readTree(text); }
-    public void checkRequest(byte[] bytes) { json.readTree(bytes); }
+    public JsonNode checkRequest(byte[] bytes) { return json.readTree(bytes); }
 
     /** Saves may retain semantic errors, but never unbounded JSON or presentation/authority metadata. */
     public String bounded(JsonNode definition) {

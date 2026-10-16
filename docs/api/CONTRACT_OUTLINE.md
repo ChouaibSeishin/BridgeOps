@@ -26,7 +26,7 @@ Phase 1A has no business APIs, membership or authentication; Phase 1B/C implemen
 
 Let `O=/api/v1/organizations/{organizationId}`. Codes match the security matrix.
 
-| Phase | Planned operations | DTO outline and permission |
+| Phase | Operations (implemented families identified above) | DTO outline and permission |
 | --- | --- | --- |
 | 1 | POST /auth/login, /refresh, /logout, /logout-all | Login `{email,password}` -> access token/expiry/UserSummary plus cookie. Refresh rotates cookie. CSRF/Origin on cookie-sensitive routes. Logout-all requires live user. Errors generic |
 | 1 | GET /auth/csrf, /auth/me | CSRF bootstrap -> token; me -> user/session summary. Me requires authentication |

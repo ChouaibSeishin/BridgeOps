@@ -15,7 +15,7 @@ Owners govern membership and policies. Administrators manage organization operat
 | R01 | Authenticate and manage sessions | Invalid login fails; rotation/reuse/revocation and CSRF tests pass |
 | R02 | Organization isolation and invitation | User joins through an expiring one-use invitation; foreign tenant IDs never reveal resources |
 | R03 | Approved integrations | Support, team directory and notification capabilities work with synthetic data; secrets never appear in ordinary responses |
-| R04 | Versioned visual workflows | Save/reload the same graph; backend rejects invalid graphs; publication freezes the executed version |
+| R04 | Versioned workflow definitions | Save/reload the same graph; backend rejects invalid publication; immutable published graph/metadata survives draft edits. Runtime version pinning starts in Phase 3 |
 | R05 | Persistent execution | Run, inspect steps, restart, retry eligible failures and cancel without losing durable state |
 | R06 | Sensitive-action approval | Different eligible actor decides exact proposed changes; duplicate decisions cannot resume twice |
 | R07 | Webhook automation | Authentic timestamped delivery produces one execution; invalid signatures/replays fail |

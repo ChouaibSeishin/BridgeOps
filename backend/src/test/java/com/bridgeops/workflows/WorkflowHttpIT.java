@@ -138,6 +138,15 @@ class WorkflowHttpIT {
         assertThat(operator.queryForObject("SELECT count(*) FROM workflows", Long.class)).isZero();
         send(owner, get(base() + "?size=101")).andExpect(status().isBadRequest());
     }
+    @Test void metadataAndRevisionsRejectScalarCoercionWithoutPublishing() throws Exception {
+        String path = path(create());
+        for (String value : List.of("0.5", "\"0\"", "null", "-1", "9223372036854775808"))
+            send(owner, post(path + "/publish").content("{\"expectedRevision\":" + value + "}")).andExpect(status().isBadRequest());
+        for (String invalid : List.of("{\"name\":true,\"description\":\"\",\"definition\":{}}", "{\"name\":\"No\",\"description\":42,\"definition\":{}}"))
+            send(owner, post(base()).content(invalid)).andExpect(status().isBadRequest());
+        send(owner, get(path)).andExpect(jsonPath("$.workflow.revision").value(0));
+        assertThat(operator.queryForObject("SELECT count(*) FROM workflow_versions", Long.class)).isZero();
+    }
     @Test void requiredAuditFailureIsGeneric503AndPublicationRollsBack() throws Exception {
         String path = path(create()); operator.execute("CREATE FUNCTION reject_http_publication() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='WORKFLOW_PUBLISHED' THEN RAISE EXCEPTION 'synthetic provider detail'; END IF; RETURN NEW; END $$");
         operator.execute("CREATE TRIGGER reject_http_publication BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION reject_http_publication()");

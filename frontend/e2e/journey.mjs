@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { workflowJourney } from "./workflows.mjs";
 const origin = process.env.BRIDGEOPS_TEST_ORIGIN;
 const control = process.env.BRIDGEOPS_TEST_CONTROL;
 const ownerPassword = "browser-disposable-password";
@@ -16,8 +17,12 @@ function observe(target) {
   observed.add(target);
   target.on("response", (response) =>
     console.log(
-      "HTTP: " + response.request().method() + " " +
-      new URL(response.url()).pathname + " " + response.status(),
+      "HTTP: " +
+        response.request().method() +
+        " " +
+        new URL(response.url()).pathname +
+        " " +
+        response.status(),
     ),
   );
 }
@@ -239,6 +244,16 @@ try {
   await member.getByRole("button", { name: "Save membership" }).click();
   await expect(member).toContainText("OPERATOR");
   await expect(member).toContainText("Revision 1");
+  await workflowJourney({
+    page,
+    guest,
+    organizationUrl,
+    access: ownerAccess,
+    report: (label) => {
+      step = label;
+      console.log("STEP: " + step);
+    },
+  });
   step = "desktop mobile and dark render captures";
   console.log("STEP: " + step);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -414,13 +429,37 @@ try {
     await guest.evaluate(() => localStorage.length + sessionStorage.length),
   ).toBe(0);
   console.log(
-    "PASS: real browser sign-in, concurrent tabs, organization/member/invitation flows, isolation, logout, recovery, password change and responsive renders.",
+    "PASS: real browser sessions, organizations, workflow drafts/validation/immutable history/conflicts/duplication/archive, tenant denial, recovery and responsive renders.",
   );
 } catch (failure) {
   console.error("FAIL: browser journey at step: " + step);
   // Emit source locations only: assertion messages can contain credential values.
-  console.error("FAIL: source " + ((failure.stack ?? "").match(/journey\.mjs:\d+:\d+/g) ?? []).join(", "));
-  if(page)console.error("LAYOUT: "+JSON.stringify(await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right>innerWidth+1).slice(0,8).map(e=>({tag:e.tagName,css:e.className,right:e.getBoundingClientRect().right}))})).catch(()=>({}))));
+  console.error(
+    "FAIL: source " +
+      (
+        (failure.stack ?? "").match(/(?:journey|workflows)\.mjs:\d+:\d+/g) ?? []
+      ).join(", "),
+  );
+  if (page)
+    console.error(
+      "LAYOUT: " +
+        JSON.stringify(
+          await page
+            .evaluate(() => ({
+              viewport: innerWidth,
+              document: document.documentElement.scrollWidth,
+              overflow: [...document.querySelectorAll("body *")]
+                .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+                .slice(0, 8)
+                .map((e) => ({
+                  tag: e.tagName,
+                  css: e.className,
+                  right: e.getBoundingClientRect().right,
+                })),
+            }))
+            .catch(() => ({})),
+        ),
+    );
   if (page)
     console.error(
       (

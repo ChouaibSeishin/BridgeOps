@@ -14,7 +14,7 @@ import { WorkflowEditor, PublishedVersion } from "./WorkflowEditor";
 import { WorkflowList } from "./WorkflowList";
 import { workflowApi } from "./api";
 import { emptyGraph, addNode } from "./model";
-import type { WorkflowDetail, VersionSummary, Snapshot } from "./model";
+import type { Graph, WorkflowDetail, VersionSummary, Snapshot } from "./model";
 
 const user = {
   id: "user",
@@ -90,6 +90,22 @@ function show(route = "/organizations/org/workflows/workflow") {
 async function ready() {
   await screen.findByRole("heading", { name: "Ticket triage" });
 }
+it("adds and removes a configured node through the accessible palette controls", async () => {
+  show();
+  await ready();
+  fireEvent.change(screen.getByRole("combobox", { name: /^Node type/ }), {
+    target: { value: "approval" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Add node before end" }));
+  const node = screen.getByRole("group", { name: /^Approval gate/ });
+  fireEvent.change(within(node).getByLabelText("Review prompt"), {
+    target: { value: "Review the plan" },
+  });
+  expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  fireEvent.click(within(node).getByRole("button", { name: "Remove node" }));
+  expect(screen.queryByLabelText("Review prompt")).not.toBeInTheDocument();
+  expect(screen.getByText("All changes saved")).toBeInTheDocument();
+});
 it("edits metadata/node configuration and saves the exact graph with the current revision", async () => {
   const save = vi
     .spyOn(workflowApi, "save")
@@ -135,6 +151,23 @@ it("edits metadata/node configuration and saves the exact graph with the current
     }),
   );
   expect(screen.getByText("Saved revision 1")).toBeInTheDocument();
+});
+it("keeps invalid saved configuration correctable without coercing arbitrary objects", async () => {
+  const malformed = detail();
+  const definition = malformed.definition as Graph;
+  const action = definition.nodes.find((node) => node.id === "action");
+  if (!action) throw new Error("Fixture node missing");
+  action.config.operation = { toString: "invalid", valueOf: null };
+  vi.mocked(workflowApi.get).mockResolvedValue(malformed);
+  show();
+  await ready();
+  const operation = within(
+    screen.getByRole("group", { name: /Synthetic action/ }),
+  ).getByRole("combobox", { name: /^Operation/ });
+  expect(operation).toHaveValue("");
+  fireEvent.change(operation, { target: { value: "record" } });
+  expect(operation).toHaveValue("record");
+  expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
 });
 it("maps server validation to the offending node and field", async () => {
   vi.spyOn(workflowApi, "validate").mockResolvedValue({

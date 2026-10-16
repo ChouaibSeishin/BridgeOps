@@ -17,6 +17,8 @@ docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait
 
 Open [BridgeOps](http://localhost:8088). Setup creates unique ignored .env database credentials and ignored signing material; it refuses to overwrite existing files. For an existing workspace, retain .env, keys and volumes; run setup-auth only if authentication material has never been configured. Setup/startup creates no account or tenant. Never commit credentials or keys. Port 8088 is localhost-only; BRIDGEOPS_PORT can be set in .env. The browser uses relative URLs through the same-origin proxy.
 
+For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade to V9.
+
 ### Provision the first account explicitly
 
 After services/migrations are ready, an operator runs:
@@ -92,6 +94,6 @@ The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / Po
 
 ## Browser preview
 
-Actual application/API with disposable test accounts, captured during the browser journey. These are not seeded local accounts or fabricated dashboard data. [Mobile](docs/screenshots/phase1d-organizations-mobile.png) and [dark theme](docs/screenshots/phase1d-organizations-dark.png).
+Actual Phase 2 editor/API with disposable test accounts and two immutable published definitions, captured during the required Chromium journey. Publication has not executed any workflow. These are not local user accounts or fabricated dashboard data. [Mobile](docs/screenshots/phase2-workflow-mobile.png) and [dark theme](docs/screenshots/phase2-workflow-dark.png).
 
-![Phase 1D organization workspace](docs/screenshots/phase1d-organizations-desktop.png)
+![Phase 2 workflow definition editor](docs/screenshots/phase2-workflow-desktop.png)

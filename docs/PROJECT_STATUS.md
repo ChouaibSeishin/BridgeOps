@@ -1,64 +1,60 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 1D is complete; Phase 2 workflow definitions are in progress.** This is a development checkpoint, not production certification. Workflow execution, integrations, approval processing and AI/MCP were not started.
+Updated 2026-10-16 UTC. **Phase 2 workflow definitions are implemented; full local release verification passed; final hosted publication is pending.** Publication stores an immutable definition; it does not execute it. Execution, approval processing, integrations, webhooks, AI and MCP remain later phases.
 
-Phase 2 inspection: clean master and GitHub both at 11aec6e9e2e9d2e0ea0aaedde2e286de1191e538, highest migration V8, no workflow source/tables. Actual local state now has one user, zero organizations and a consumed bootstrap marker. The user-created account, environment, keys and volume are preserved. Zero-account observations below describe earlier disposable/local Phase 1 verification, not the current installation. [Accepted Phase 2 design and progress](development/PHASE_2_WORKFLOWS.md): graph schema/limits, existing role grants, persistence/publication lock and hash contracts. No Phase 2 code/test completion is claimed yet.
+## Starting point and preserved environment
 
-## Continuity and publication evidence
+Phase 2 inspection found clean master and fetched GitHub head both at 11aec6e9e2e9d2e0ea0aaedde2e286de1191e538, with V8 and no workflow source/tables. The user had provisioned one local account: users 1, organizations 0, bootstrap marker consumed. Tests use disposable PostgreSQL and synthetic accounts, not that local identity. Environment, RSA/CSRF keys and named volume are preserved; bootstrap is never rerun. An aggregate account-state fingerprint/count baseline was captured without printing user fields/credentials for the additive V9 upgrade comparison.
 
-Phase 2 UI progress: source implements the real workflow list/editor/validation/publication/history/copy/archive browser experience using existing session/query/design primitives. The frontend's 35 tests, typecheck, lint and production build passed; real-browser/release gates remain pending. HTTP 77411d1 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38947425562). No Phase 2 completion or execution claim is made yet.
+## Verified published increments
 
-Phase 2 HTTP progress: workflow list/create/detail/save/validate/publish/duplicate/archive/history/exact-version endpoints are implemented, with current tenant capability checks, exact Origin/CSRF, safe semantic 422 details, revision conflicts and bounded parsing. Ten restricted-runtime HTTP cases plus 29 selected validator/boundary unit cases passed. Persistence 891cf82 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38946336182). UI/browser/release verification remains in progress; execution stays unavailable.
+Normal commits/pushes and exact remote refs were verified; no reset, force push or history replacement.
 
-Phase 2 persistence progress: V9, public TenantAuthorization, narrow WorkflowAudit and workflow application/persistence services are implemented. All 12 focused disposable PostgreSQL lifecycle/migration tests passed, including V8 preservation, races, immutable rows and audit rollback. HTTP/UI are still unavailable pending their increments. Local data remains preserved. Validator increment 11555f5 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38944732833).
+| Commit | Increment | Actual hosted outcome |
+| --- | --- | --- |
+| 4875c64 | Reconcile stale Git/Phase 1 docs, accept ADR-0004 and Phase 2 contract | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38943543050) |
+| 11555f5 | Versioned node registry, deterministic validator and canonical hash | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38944732833) |
+| 891cf82 | V9 drafts/immutable versions, public tenant/audit boundary, atomic publication | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38946336182) |
+| 77411d1 | Workflow HTTP lifecycle, strict tenant/revision/security contracts | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38947425562) |
+| ee7c98b | Browser authoring, validation, publication/history, duplication/archive | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38949564604) |
 
-Phase 2 progress: design/document reconciliation 4875c64 is pushed/ref-verified and [hosted CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38943543050). The first code increment implements only the bounded definition registry, validator and canonical SHA-256 format; its 28 focused unit cases passed. Persistence, HTTP/UI and full Phase 2 gates remain in progress; no execution is implemented.
+The final browser/input refinement increment passed full local verification and is being published. Final hosted completion is not inferred from earlier commits.
 
-Initial inspection found clean local master exactly matching fetched origin/master at ed1aaa88d09f47a5d9bd3ee8ceff43e1d3afdd3f (0 ahead/behind). Existing branch history, ignored .env/signing keys and database volume were preserved.
+## Implemented Phase 2 behavior
 
-| Increment | Verified publication |
+- Dedicated workflows domain/application/persistence/web module, application DTOs and public TenantAuthorization/WorkflowAudit contracts. No cross-module entity/repository imports; a source-import boundary test checks this rule.
+- Schema-v1 manualTrigger/syntheticAction/approval/end registry with versioned typed config, one connected linear path and deterministic bounded errors. No arbitrary script, SQL, expressions, connector URLs or external dispatch. Definition support is distinct from execution support.
+- Bounded request parsing, duplicate-key/depth/string/number checks, exact integer revisions/string metadata and bounded graph values/bytes/nodes/edges. Invalid bounded drafts remain editable but cannot publish.
+- Organization-qualified workflow/draft/version keys, current-pointer consistency, source-revision uniqueness, column-scoped runtime grants, immutable-row guard and database SHA-256 check. No runtime UPDATE/DELETE/TRUNCATE on versions and no physical workflow delete.
+- Save/reload with optimistic revision; publication locks live account → organization → workflow/draft, reauthorizes, validates persisted content, canonicalizes, allocates a workflow-local version, updates pointer/consumes revision and writes required safe audit in one transaction. Audit failure rolls back publication. Historical graph and metadata remain unchanged.
+- Live workflow.read/edit/publish capabilities use existing fixed role mappings; no new grant or role editor. Foreign resources are concealed; stale revisions conflict. Duplicate copies the persisted draft independently; archive preserves historical reads.
+- Responsive form editor integrated with real organization/session/query APIs: schema-derived config, explicit connections, saved/unsaved state, node/field errors, exact-revision publish confirmation, actual version/hash/actor history and read-only snapshots. Conflicts preserve local edits; discard/reload is explicit. No Run/Test Run control or fabricated execution metrics.
+
+## Verification observed
+
+| Gate | Executed evidence |
 | --- | --- |
-| Phase 1C offline bootstrap / organizations / membership / invitations | 267645e, 43338a8, f12ce04, 7aec5ea; [final checkpoint CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38899423907) |
-| 1D.1 browser sign-in, memory-only session coordination and sign-out | 54a8c1f; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38907270990) |
-| 1D.2 organizations, members and invitation browser journeys / safe read contracts | 078c3e2; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38909776173) |
-| 1D.3 password change/recovery, V8 and neutral shared mail port | 594e0d3; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38911492628) |
-| 1D.4 required Chromium journey, responsive workspace, release gates and recovery navigation synchronization | 6416a5c, 3275ba9, ab9890a, ceeb301; normal pushes/ref verified; [final implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931044047) for ceeb30180a09c9edcc589693384818b8cfe01a90 |
+| Validator/boundary | 28 graph cases + one import-boundary unit case passed; canonical/hash/order, graph/schema/config/count/parser limits and safe errors |
+| Lifecycle/migrations | 10 lifecycle + 2 migration cases passed using bridgeops_app and a separate disposable operator; fresh schema and V8 upgrade preserve existing account/tenant/marker/role mappings |
+| HTTP | All 11 restricted-runtime HTTP cases passed in full regression, including exact scalar types and safe 422/409/401/403/404/413/503 behavior |
+| Frontend | Final 37 tests, strict typecheck, lint and production build passed; production dependency audit found 0 vulnerabilities |
+| Real Chromium | Complete workflow/onboarding/session/recovery journey and database assertions passed in the final full run. Desktop/mobile/dark captures reviewed; mobile overflow and 44px checks passed |
+| Full Maven | BUILD SUCCESS: 162 tests (50 unit/MVC + 112 required PostgreSQL/browser), zero failures/errors/skips; 18 XML reports checked |
+| Compose/local preservation | Config/build/start passed, all three services healthy, V1–V9 installed. Account/installation fingerprints unchanged; users 1, organizations/workflows/versions 0, marker consumed. Version UPDATE/DELETE and user INSERT denied; guard owned by bridgeops_migrator |
+| Documentation/secrets | Current link/fence checks and per-increment staged/history scans passed. Jar/production assets contain no checked fixture classes/routes/passwords. Environment/keys/user data/test outputs remain untracked |
 
-Initial hosted browser runs failed at recovery while the other 88 integration cases passed. Safe substep/source diagnostics pinpointed the acknowledgement assertion with no forgot POST. The test now waits for the destination recovery heading before filling Email, which also exists on the outgoing sign-in route. Local Chromium and the full Linux hosted workflow then passed. No assertion was skipped and no application security control was weakened. Diagnostics expose method/path/status and source locations, excluding credential-bearing assertion messages; cleanup tolerates an environment that was never created.
+The browser initially exposed locator mismatches for nested select/textarea labels; role-based locators corrected these without removing assertions. Capture scroll positions are normalized. Malformed saved operation values remain safely correctable without arbitrary object-to-string conversion. A build alone is not browser evidence.
 
-## Implemented behavior
+Actual nginx smoke passed info/liveness/readiness/CSRF 200 with no-store bootstrap, anonymous workflow GET 401, missing-CSRF mutation 403 and current editor asset checks. A fresh anonymous browser verified actual sign-in/protected navigation with no persistent credential storage and no account login. SMTP remains disabled; no real provider/recipient was contacted.
 
-- Explicit disabled-by-default offline one-shot verified-account bootstrap, locked consumed marker and account-only organization.create grant. Normal startup provisions no account or tenant.
-- RS256 access credentials in browser memory; opaque rotating HttpOnly refresh cookies, signed CSRF/exact Origin, live account/family checks and shared bounded throttling. Cookie-sensitive sequences and protected requests use an origin-wide Web Lock; broadcasts carry only invalidation state. Unsupported browsers fail closed.
-- Actual sign-in/protected shell, initial CSRF/refresh/me restoration, expiry/401 coordination, safe failures, this-browser sign-out and logout-all. No individual remote-session list or persistent credential cache.
-- Own organization listing/creation, actual empty states/totals, tenant detail/member/role display, revision-checked member changes/removal, delegation ceilings and concurrent last-active-Owner protection. Member labels cross only identity's public DTO boundary after tenant authorization.
-- Live create-organization capability, tenant access/assignable-role hints and bounded invitation history. These are UI hints; all mutations recheck current server authority. Recipient-bound invitation issue/revoke, authenticated acceptance and first-time enrollment with explicit subsequent sign-in.
-- Current-password-confirmed change, hash-only one-use 15-minute recovery proofs, strict expiry/current eligibility, all-family/proof invalidation, safe transactional audit and bounded quotas. Generic forgot acknowledgement uses a bounded volatile dispatcher and never confirms mail delivery.
-- Neutral shared authenticated TLS mail transport; existing INVITATION_SMTP_* settings remain compatible and disabled by default. No production fake mailbox or test bootstrap route.
-- Truthful responsive workspace grounded in existing design tokens, real API data, loading/empty/error/retry states and functional controls; unavailable later capabilities omitted.
+## Historical Phase 1 checkpoint
 
-## Fresh verification
-
-| Gate | Executed result |
-| --- | --- |
-| 1D.1 frontend | 11 tests/typecheck/lint/build passed; complete hosted pipeline passed |
-| 1D.2 contracts | 37 restricted-runtime PostgreSQL cases passed, final direct capability assertion also passed; frontend 14 tests and static/build gates passed |
-| 1D.3 recovery | Final 14 PostgreSQL cases passed, including concurrency, strict expiry, supersession, account eligibility, replay, session revocation, quotas, mail/audit rollback and narrow privileges; 21 unit/MVC cases and four transport cases passed in focused runs; frontend 17 tests/typecheck/lint/build passed |
-| Focused Chromium journey | Passed real sign-in/invalid credentials, concurrent tabs/reload, organization create/member views, invitation issue/revoke/enroll, denied global creation/foreign tenant, revision edit, sign-out, recovery invalidation of an independent session, password change and logout-all |
-| Browser credential checks | HttpOnly refresh, no persistent browser credential storage, no token-bearing URLs and no-store authentication responses checked |
-| Visual inspection | Actual disposable-fixture desktop/mobile/dark captures reviewed; mobile horizontal navigation overflow found and fixed; 390px document-width assertion passed |
-| Final full backend | BUILD SUCCESS, 110 total: 21 unit/MVC + 89 required integration/browser cases, zero failures/errors/skips; XML reports checked |
-| Final frontend/container | 17 frontend tests, typecheck/lint/production build; dependency audit 0 vulnerabilities; Compose config/build/start passed, all three services healthy |
-| Final hosted implementation gate | ceeb301 workflow completed SUCCESS: 21 unit/MVC + 89 integration/browser cases, zero failures/errors/skips; frontend checks, Chromium installation, container build/healthy startup, same-origin API/CSRF smoke, audit 0 vulnerabilities and cleanup passed |
-| Actual persistent state/smoke | V1–V8 installed; users/organizations/reset proofs 0, marker unconsumed, SMTP disabled; runtime user INSERT/proof expiry UPDATE denied and consumption allowed; info/readiness/CSRF 200, missing-CSRF forgot 403, unauthenticated me 401 |
-| Documentation/secrets | Local link/fence checker and staged whitespace/secret scan run at each publication gate; actual .env/signing material remains untracked |
-
-Browser fixtures use isolated Testcontainers PostgreSQL, explicit operator bootstrap and a secret-protected loopback gateway/mail capture in test sources. Production jar/images have no such fixture route. No persistent local account or real-recipient mail was created. The Windows JDK selector failure was resolved using a canonical ignored test socket directory; no OS setting or app security control changed. Build success alone is not browser evidence.
+Phase 1D completed at 11aec6e with [successful final CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931957774): 110 backend/integration/browser tests and 17 frontend tests. These counts and the then-empty local installation are historical, not current suite/state. Earlier foundation/auth/session/bootstrap/tenant/invitation work remains in Git history and the [Phase 1 verification](development/PHASE_1_VERIFICATION.md), [onboarding](development/PHASE_1C_ONBOARDING.md) and [browser/recovery](development/PHASE_1D_BROWSER.md) guides.
 
 ## Operation, limits and next work
 
-Follow [clean-checkout startup](../README.md), [offline bootstrap/SMTP](development/PHASE_1C_ONBOARDING.md) and [browser/recovery guide](development/PHASE_1D_BROWSER.md). The normal local stack requires an operator-provisioned identity before manual sign-in. SMTP is disabled until externally configured; no provider credentials/connectivity or actual recipient delivery was tested. Forgot responses remain generic when delivery is disabled/failed. The volatile dispatcher may discard/lose work; no durable outbox, retry or email/DB atomicity guarantee. A delivered-but-rolled-back proof is unusable and tested.
+Use [README](../README.md) and the [Phase 2 contract/commands](development/PHASE_2_WORKFLOWS.md). Existing installations retain their environment, keys, account and volume; only fresh installations use the one-shot offline bootstrap. External SMTP stays disabled until externally configured and was not contacted during verification.
 
-Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 and the React/TypeScript baseline are retained; pinned Playwright 1.64.1 is development-only, Node is 24.22.0. Full verify now requires built frontend assets and installed Chromium and fails if prerequisites are missing.
+Current definition semantics are linear only; branches/joins, runtime work, TEST snapshots and approval decisions are deferred. Unsaved editor state lives only in the current page. Hashes identify content, not authorship/tamper-proof storage. Publication does not run anything. No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment is claimed. Local Compose still supplies startup migration credentials; production must separate migration/operator execution. No license or verified private reporting channel is configured. SMTP dispatcher/outbox limitations from Phase 1 remain unchanged.
 
-No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment claim. Local Compose still supplies startup migration credentials; production must separate operator/migration execution. No license or verified private reporting channel is configured. The next incomplete roadmap task is Phase 2 workflow draft persistence/validation/publication; execution, approvals, integrations and AI/MCP remain later.
+After the pending Phase 2 release gates pass, the next task is Phase 3 durable sequential execution with deterministic synthetic capabilities, state/attempt history, idempotency, retries/delay/deadline/cancel and fencing. Approval processing begins in Phase 4; integration/webhook and AI/MCP phases follow. No later-phase implementation was started.

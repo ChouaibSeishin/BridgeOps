@@ -31,7 +31,7 @@ Backend verify now runs fourteen unit/MVC tests (four foundation, two password/t
 
 Frontend tests cover actual info/readiness requests, loading, recoverable outage, theme and routing. Typecheck and lint are separate gates. A production build is not a browser test; inspect desktop/mobile and both themes before describing visual quality.
 
-## Database/container acceptance
+## Historical foundation database/container acceptance
 
 - Empty isolated test database migrates V1; query flyway_schema_history and technical metadata. Integration test container is disposable and separate from local Compose data.
 - Production images build from locked dependencies; app containers run without root. Runtime DB role cannot create tables or mutate platform metadata; migration role can apply schema.
@@ -42,7 +42,7 @@ Frontend tests cover actual info/readiness requests, loading, recoverable outage
 - Opt-in docs override exposes backend localhost:8081 only; generated OpenAPI includes the implemented info route, no imaginary login/workflow APIs.
 - CI pins official action commits, executes required checks and container smoke, and does not publish/deploy. Hosted CI status is unknown until actually run.
 
-## Phase 1B–D security gates
+## Phase 1B–D security gates (completed checkpoint; retain as regressions)
 
 Bootstrap: default-disabled/no web endpoint, explicit operator mode, secret not in argv/logs, one account only, serialized concurrent runs, repeat refusal, consumed installation marker, no implicit organization or platform privilege. Organization creation checks account-level grant and atomically creates Owner membership. Invites grant only authorized tenant roles.
 
