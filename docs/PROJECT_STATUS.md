@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 1D implementation, full local verification and the real-browser journey are complete; final publication/hosted CI are pending.** This is a development checkpoint, not production certification. Workflow execution, integrations, approvals and AI/MCP were not started.
+Updated 2026-10-16 UTC. **Phase 1D is implemented, verified locally and published with successful hosted CI.** This is a development checkpoint, not production certification. Workflow execution, integrations, approvals and AI/MCP were not started.
 
 ## Continuity and publication evidence
 
@@ -12,8 +12,9 @@ Initial inspection found clean local master exactly matching fetched origin/mast
 | 1D.1 browser sign-in, memory-only session coordination and sign-out | 54a8c1f; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38907270990) |
 | 1D.2 organizations, members and invitation browser journeys / safe read contracts | 078c3e2; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38909776173) |
 | 1D.3 password change/recovery, V8 and neutral shared mail port | 594e0d3; push/ref verified; [CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38911492628) |
+| 1D.4 required Chromium journey, responsive workspace, release gates and recovery navigation synchronization | 6416a5c, 3275ba9, ab9890a, ceeb301; normal pushes/ref verified; [final implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931044047) for ceeb30180a09c9edcc589693384818b8cfe01a90 |
 
-6416a5c was pushed/ref-verified. Its [first hosted browser run failed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38914798975) while the other 88 integration cases passed. The [3275ba9 retry](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38916051501) passed responsive/touch/keyboard checks and reached recovery before failing; cleanup now passes. The [ab9890a diagnostic run](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38930086294) pinpointed the recovery acknowledgement assertion, with no forgot POST. The browser now waits for the destination recovery heading before filling Email, which also exists on the outgoing sign-in route. Method/path/status and source-only diagnostics exclude credential-bearing assertion messages. Local full verification passed; hosted completion remains pending a successful retry.
+Initial hosted browser runs failed at recovery while the other 88 integration cases passed. Safe substep/source diagnostics pinpointed the acknowledgement assertion with no forgot POST. The test now waits for the destination recovery heading before filling Email, which also exists on the outgoing sign-in route. Local Chromium and the full Linux hosted workflow then passed. No assertion was skipped and no application security control was weakened. Diagnostics expose method/path/status and source locations, excluding credential-bearing assertion messages; cleanup tolerates an environment that was never created.
 
 ## Implemented behavior
 
@@ -38,6 +39,7 @@ Initial inspection found clean local master exactly matching fetched origin/mast
 | Visual inspection | Actual disposable-fixture desktop/mobile/dark captures reviewed; mobile horizontal navigation overflow found and fixed; 390px document-width assertion passed |
 | Final full backend | BUILD SUCCESS, 110 total: 21 unit/MVC + 89 required integration/browser cases, zero failures/errors/skips; XML reports checked |
 | Final frontend/container | 17 frontend tests, typecheck/lint/production build; dependency audit 0 vulnerabilities; Compose config/build/start passed, all three services healthy |
+| Final hosted implementation gate | ceeb301 workflow completed SUCCESS: 21 unit/MVC + 89 integration/browser cases, zero failures/errors/skips; frontend checks, Chromium installation, container build/healthy startup, same-origin API/CSRF smoke, audit 0 vulnerabilities and cleanup passed |
 | Actual persistent state/smoke | V1–V8 installed; users/organizations/reset proofs 0, marker unconsumed, SMTP disabled; runtime user INSERT/proof expiry UPDATE denied and consumption allowed; info/readiness/CSRF 200, missing-CSRF forgot 403, unauthenticated me 401 |
 | Documentation/secrets | Local link/fence checker and staged whitespace/secret scan run at each publication gate; actual .env/signing material remains untracked |
 
@@ -49,4 +51,4 @@ Follow [clean-checkout startup](../README.md), [offline bootstrap/SMTP](developm
 
 Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 and the React/TypeScript baseline are retained; pinned Playwright 1.64.1 is development-only, Node is 24.22.0. Full verify now requires built frontend assets and installed Chromium and fails if prerequisites are missing.
 
-No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment claim. Local Compose still supplies startup migration credentials; production must separate operator/migration execution. No license or verified private reporting channel is configured. After Phase 1D final verification, next is Phase 2 workflow draft persistence/validation/publication; execution, approvals, integrations and AI/MCP remain later.
+No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment claim. Local Compose still supplies startup migration credentials; production must separate operator/migration execution. No license or verified private reporting channel is configured. The next incomplete roadmap task is Phase 2 workflow draft persistence/validation/publication; execution, approvals, integrations and AI/MCP remain later.

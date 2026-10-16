@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Current work: Phase 1D browser onboarding and recovery.** Real sign-in, organization creation/selection, member management, invitations, session controls and password change/recovery are implemented. Full local verification passed 110 backend/integration/browser cases and 17 frontend tests, plus container startup and security smoke; hosted publication is checked separately. Workflows, integrations, approvals, AI and MCP remain future roadmap phases. See [current evidence](docs/PROJECT_STATUS.md).
+**Completed: Phase 1D browser onboarding and recovery.** Real sign-in, organization creation/selection, member management, invitations, session controls and password change/recovery are implemented. Local and [hosted verification](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38931044047) passed 110 backend/integration/browser cases and 17 frontend tests, plus container startup and security smoke. Workflows, integrations, approvals, AI and MCP remain future roadmap phases. See [current evidence](docs/PROJECT_STATUS.md).
 
 ## Start from a clean checkout
 
@@ -87,7 +87,7 @@ The local Compose backend receives startup migration credentials. Production mus
 - [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
 - [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 2 draft workflow persistence/validation/publication, after Phase 1D verification is complete; execution, integration adapters and AI remain later.
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 2 draft workflow persistence/validation/publication; execution, integration adapters and AI remain later.
 
 ## Browser preview
 
