@@ -36,6 +36,10 @@ import {
   WorkflowEditor,
   PublishedVersion,
 } from "../features/workflows/WorkflowEditor";
+import {
+  ExecutionList,
+  ExecutionDetail,
+} from "../features/executions/Executions";
 export function App() {
   const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
@@ -180,6 +184,14 @@ export function App() {
               element={<Recovery reset onReset={passwordFinished} />}
             />
             <Route path="/" element={<Organizations user={state.user!} />} />
+            <Route
+              path="/organizations/:id/executions"
+              element={<ExecutionList user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/executions/:executionId"
+              element={<ExecutionDetail user={state.user!} />}
+            />
             <Route
               path="/workflows"
               element={<WorkflowHome user={state.user!} />}

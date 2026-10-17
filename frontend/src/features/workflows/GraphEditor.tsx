@@ -6,6 +6,7 @@ import {
   nodeSchema,
   isGraph,
   emptyGraph,
+  nodeLabels,
 } from "./model";
 import type { Graph, ValidationError } from "./model";
 
@@ -42,6 +43,7 @@ export function GraphEditor({
       </section>
     );
   const graph = definition;
+  const labels = nodeLabels(graph);
   function config(id: string, field: string, value: string) {
     change({
       ...graph,
@@ -128,10 +130,14 @@ export function GraphEditor({
               id={`node-${node.id}`}
               tabIndex={-1}
             >
-              <legend>
-                {schema?.label ?? "Unknown type"} ·{" "}
-                <span className="mono">{node.id}</span>
-              </legend>
+              <legend>{labels.get(node.id)}</legend>
+              <details>
+                <summary>Technical node details</summary>
+                <p>
+                  Stable node ID: <code>{node.id}</code> · type v
+                  {node.typeVersion}
+                </p>
+              </details>
               <div className="node-fields">
                 {unsupported && (
                   <p role="alert">
@@ -234,8 +240,7 @@ export function GraphEditor({
                       .filter((target) => target.id !== node.id)
                       .map((target) => (
                         <option key={target.id} value={target.id}>
-                          {nodeSchema(target.type)?.label ?? target.type} ·{" "}
-                          {target.id}
+                          {labels.get(target.id)}
                         </option>
                       ))}
                   </select>
@@ -269,6 +274,9 @@ export function GraphEditor({
 }
 
 export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
+  const labels = isGraph(definition)
+    ? nodeLabels(definition)
+    : new Map<string, string>();
   return (
     <section className="data-panel">
       <h2>Immutable definition</h2>
@@ -282,7 +290,8 @@ export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
           <ul>
             {definition.edges.map((edge, index) => (
               <li key={index} className="mono">
-                {edge.source} → {edge.target}
+                {labels.get(edge.source) ?? "Unknown node"} →{" "}
+                {labels.get(edge.target) ?? "Unknown node"}
               </li>
             ))}
           </ul>
@@ -290,14 +299,18 @@ export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
           <dl>
             {definition.nodes.map((node) => (
               <div key={node.id}>
-                <dt>
-                  {nodeSchema(node.type)?.label ?? node.type} · {node.id} · v
-                  {node.typeVersion}
-                </dt>
+                <dt>{labels.get(node.id)}</dt>
                 <dd>
+                  <details>
+                    <summary>Technical node details</summary>
+                    <code>{node.id}</code> · type v{node.typeVersion}
+                  </details>
                   {Object.entries(node.config).map(([key, value]) => (
                     <p key={key}>
-                      {key}: {String(value)}
+                      {key}:{" "}
+                      {typeof value === "string"
+                        ? value
+                        : JSON.stringify(value)}
                     </p>
                   ))}
                 </dd>
@@ -306,13 +319,16 @@ export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
           </dl>
         </>
       )}
-      <pre
-        className="definition-json"
-        tabIndex={0}
-        aria-label="Published definition JSON"
-      >
-        {JSON.stringify(definition, null, 2)}
-      </pre>
+      <details>
+        <summary>Technical definition JSON</summary>
+        <pre
+          className="definition-json"
+          tabIndex={0}
+          aria-label="Published definition JSON"
+        >
+          {JSON.stringify(definition, null, 2)}
+        </pre>
+      </details>
     </section>
   );
 }

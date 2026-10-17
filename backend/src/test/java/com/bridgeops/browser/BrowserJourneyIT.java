@@ -1,5 +1,6 @@
 package com.bridgeops.browser;
 import com.bridgeops.identity.application.*;
+import com.bridgeops.executions.application.SyntheticCapability;
 import com.bridgeops.identity.bootstrap.BootstrapProvisioner;
 import com.bridgeops.identity.domain.SessionOutcome.Granted;
 import com.bridgeops.organizations.application.OrganizationService;
@@ -35,7 +36,7 @@ class BrowserJourneyIT {
  static final String ORIGIN="http://127.0.0.1:"+gateway.getAddress().getPort();static final String CONTROL=new RefreshTokens().generate();
  @Container static final PostgreSQLContainer postgres=new PostgreSQLContainer(DockerImageName.parse("postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
  @DynamicPropertySource static void properties(DynamicPropertyRegistry r){r.add("bridgeops.auth.origin",()->ORIGIN);r.add("spring.datasource.url",postgres::getJdbcUrl);r.add("spring.datasource.username",()->"bridgeops_app");r.add("spring.datasource.password",()->"synthetic-runtime-fixture");r.add("spring.flyway.user",postgres::getUsername);r.add("spring.flyway.password",postgres::getPassword);r.add("bridgeops.auth.private-key",()->keys.directory.resolve("private.pem").toString());r.add("bridgeops.auth.public-key",()->keys.directory.resolve("public.pem").toString());r.add("bridgeops.auth.csrf-key",()->keys.directory.resolve("csrf.key").toString());}
- @Autowired Environment environment;@Autowired MailCapture mailbox;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;
+ @Autowired BrowserCapability browserCapability;@Autowired Environment environment;@Autowired MailCapture mailbox;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;
  static HttpServer gateway(){try{
   // Windows short-name TEMP paths can break the JDK selector wakeup socket. Test JVM only.
   if(System.getProperty("os.name").startsWith("Windows") && System.getProperty("jdk.net.unixdomain.tmpdir")==null){Path sockets=Files.createDirectories(Path.of("target","sockets")).toRealPath();System.setProperty("jdk.net.unixdomain.tmpdir",sockets.toString());}
@@ -48,6 +49,10 @@ class BrowserJourneyIT {
   int backendPort=environment.getRequiredProperty("local.server.port",Integer.class);HttpClient proxy=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
   gateway.setExecutor(gatewayThreads);gateway.createContext("/",exchange->{try{
    String path=exchange.getRequestURI().getPath();exchange.getResponseHeaders().set("Cache-Control","no-store");exchange.getResponseHeaders().set("X-Content-Type-Options","nosniff");exchange.getResponseHeaders().set("Referrer-Policy","no-referrer");exchange.getResponseHeaders().set("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+   if(path.equals("/__test/execution-failure")){
+    if(!exchange.getRequestMethod().equals("POST") || !java.security.MessageDigest.isEqual(CONTROL.getBytes(StandardCharsets.UTF_8),Objects.toString(exchange.getRequestHeaders().getFirst("X-Test-Control"),"").getBytes(StandardCharsets.UTF_8))){reply(exchange,404,"text/plain",new byte[0]);return;}
+    browserCapability.remaining.set(3);reply(exchange,204,null,new byte[0]);return;
+   }
    if(path.equals("/__test/mail")){
     if(!exchange.getRequestMethod().equals("POST") || !java.security.MessageDigest.isEqual(CONTROL.getBytes(StandardCharsets.UTF_8),Objects.toString(exchange.getRequestHeaders().getFirst("X-Test-Control"),"").getBytes(StandardCharsets.UTF_8))){reply(exchange,404,"text/plain",new byte[0]);return;}
     var body=new ObjectMapper().readTree(exchange.getRequestBody().readAllBytes());var message=mailbox.messages.stream().filter(m->m.recipient().equals(body.path("recipient").asString()) && m.subject().equals(body.path("subject").asString())).reduce((a,b)->b);
@@ -56,7 +61,7 @@ class BrowserJourneyIT {
    if(path.startsWith("/api/") || path.startsWith("/health/")){
     String target=exchange.getRequestURI().toASCIIString();if(path.startsWith("/health/"))target="/actuator"+target;
     var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+backendPort+target)).timeout(Duration.ofSeconds(20));
-    for(String name:List.of("Origin","Cookie","Authorization","X-CSRF-TOKEN","Content-Type","Accept","If-Match","Sec-Fetch-Site")){var values=exchange.getRequestHeaders().get(name);if(values!=null)for(String value:values)request.header(name,value);}
+    for(String name:List.of("Origin","Cookie","Authorization","X-CSRF-TOKEN","Content-Type","Accept","If-Match","Idempotency-Key","Sec-Fetch-Site")){var values=exchange.getRequestHeaders().get(name);if(values!=null)for(String value:values)request.header(name,value);}
     var response=proxy.send(request.method(exchange.getRequestMethod(),HttpRequest.BodyPublishers.ofByteArray(exchange.getRequestBody().readAllBytes())).build(),HttpResponse.BodyHandlers.ofByteArray());
     for(String name:List.of("Content-Type","Cache-Control","Pragma","Set-Cookie","X-Correlation-ID","Retry-After")){var values=response.headers().allValues(name);if(!values.isEmpty())exchange.getResponseHeaders().put(name,new ArrayList<>(values));}
     reply(exchange,response.statusCode(),null,response.body());return;
@@ -69,13 +74,24 @@ class BrowserJourneyIT {
    boolean completed=process.waitFor(180,TimeUnit.SECONDS);if(!completed)process.destroyForcibly();assertThat(completed).withFailMessage("Browser journey timed out; see ignored browser-checks diagnostics.").isTrue();
    if(process.exitValue()!=0){try(var lines=Files.lines(results.resolve("journey.log"))){lines.filter(line->line.startsWith("STEP:") || line.startsWith("FAIL:") || line.startsWith("HTTP:") || line.startsWith("LAYOUT:")).forEach(System.out::println);}}
    assertThat(process.exitValue()).withFailMessage("Browser journey failed; inspect backend/target/browser-checks/journey.log (redacted step diagnostics).").isZero();
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows",Integer.class)).isEqualTo(2);
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_versions",Integer.class)).isEqualTo(2);
-   assertThat(jdbc.queryForList("SELECT source_revision FROM workflow_versions ORDER BY version_number",Long.class)).containsExactly(2L,4L);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows WHERE name IN ('Ticket Dispatch','Independent dispatch draft')",Integer.class)).isEqualTo(2);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_versions v JOIN workflows w ON w.organization_id=v.organization_id AND w.id=v.workflow_id WHERE w.name='Ticket Dispatch'",Integer.class)).isEqualTo(2);
+   assertThat(jdbc.queryForList("SELECT v.source_revision FROM workflow_versions v JOIN workflows w ON w.organization_id=v.organization_id AND w.id=v.workflow_id WHERE w.name='Ticket Dispatch' ORDER BY v.version_number",Long.class)).containsExactly(2L,4L);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows WHERE status='ARCHIVED'",Integer.class)).isEqualTo(1);
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='WORKFLOW_PUBLISHED'",Integer.class)).isEqualTo(2);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='WORKFLOW_PUBLISHED'",Integer.class)).isEqualTo(4);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows w JOIN organizations o ON o.id=w.organization_id WHERE o.slug='outside-browser-fixture'",Integer.class)).isZero();
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions",Integer.class)).isZero();
+   // Phase 2 definition operations still create no execution; new runtime fixtures are asserted separately.
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions e JOIN workflows w ON w.organization_id=e.organization_id AND w.id=e.workflow_id WHERE w.name IN ('Ticket Dispatch','Independent dispatch draft','Approval definition only')",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows",Integer.class)).isEqualTo(4);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_versions",Integer.class)).isEqualTo(4);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions",Integer.class)).isEqualTo(4);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions WHERE status='SUCCEEDED'",Integer.class)).isEqualTo(2);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions WHERE status='FAILED' AND error_code='TRANSIENT_EXHAUSTED'",Integer.class)).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions WHERE status='CANCELLED'",Integer.class)).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions WHERE retry_of_execution_id IS NOT NULL",Integer.class)).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM synthetic_records",Integer.class)).isEqualTo(4);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_operation_receipts",Integer.class)).isEqualTo(4);
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_events WHERE code='RECEIPT_REUSED'",Integer.class)).isEqualTo(1);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('approval_requests','work_items')",Integer.class)).isZero();
   }finally{if(process.isAlive())process.destroyForcibly();}
  }
@@ -83,5 +99,6 @@ class BrowserJourneyIT {
  @AfterAll static void cleanup()throws Exception{gateway.stop(0);gatewayThreads.shutdownNow();keys.close();}
  record Message(String recipient,String subject,String text){@Override public String toString(){return "Message[REDACTED]";}}
  static class MailCapture implements OutboundEmail{final List<Message> messages=new CopyOnWriteArrayList<>();public void send(String recipient,String subject,String text){messages.add(new Message(recipient,subject,text));}}
- @TestConfiguration static class Configuration{@Bean @Primary MailCapture browserMailCapture(){return new MailCapture();}}
+ static class BrowserCapability extends SyntheticCapability { final java.util.concurrent.atomic.AtomicInteger remaining=new java.util.concurrent.atomic.AtomicInteger(); @Override public void prepare(Invocation call){if(call.node().equals("retry-step") && remaining.getAndUpdate(n->Math.max(0,n-1))>0)throw new Failure(FailureKind.TRANSIENT);} }
+ @TestConfiguration static class Configuration{@Bean @Primary BrowserCapability browserCapability(){return new BrowserCapability();}@Bean @Primary MailCapture browserMailCapture(){return new MailCapture();}}
 }

@@ -257,8 +257,7 @@ export function Organizations({ user }: { user: User }) {
         </section>
       )}
       <p className="muted">
-        Workflow execution, integrations and approvals will be available in
-        later phases.
+        Workflows can run registered internal record operations. Integrations and approval processing remain later phases.
       </p>
     </>
   );

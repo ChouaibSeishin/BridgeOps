@@ -9,6 +9,8 @@ import { useWorkflowAccess } from "./useWorkflowAccess";
 import { Problem, Pager, ValidationResults } from "./Feedback";
 import { GraphEditor, ReadOnlyDefinition } from "./GraphEditor";
 
+import { ExecutionStart } from "../executions/ExecutionStart";
+
 function validationDetails(value: unknown): value is Validation {
   if (!value || typeof value !== "object") return false;
   const result = value as Validation;
@@ -190,9 +192,18 @@ function DraftWorkspace({
         )}
       </div>
       <p className="phase-note">
-        Definition support only: publication freezes a snapshot. Execution
-        begins in Phase 3 and approval processing in Phase 4.
+        Publication freezes a snapshot without running it. Explicit execution
+        supports internal records; approval processing remains Phase 4.
       </p>
+      {!archived && (
+        <ExecutionStart
+          organization={organization}
+          workflow={id}
+          version={saved.currentPublishedVersion?.id ?? null}
+          permissions={permissions}
+          disabled={dirty || frozen}
+        />
+      )}
       {error && (
         <div className="error-panel" role="alert">
           <p>{error}</p>

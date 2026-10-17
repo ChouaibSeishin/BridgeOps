@@ -114,7 +114,7 @@ export async function workflowJourney({
     const workflowId = new URL(workflowUrl).pathname.split("/").at(-1);
     const item = `${base}/${workflowId}`;
     await page
-      .getByRole("group", { name: /^End ·/ })
+      .getByRole("group", { name: /^End$/ })
       .getByRole("button", { name: "Remove node", exact: true })
       .click();
     await save();
@@ -131,10 +131,10 @@ export async function workflowJourney({
     report("workflow graph correction save and reload");
     await add("end");
     const endId = (
-      await page.getByRole("group", { name: /^End ·/ }).getAttribute("id")
+      await page.getByRole("group", { name: /^End$/ }).getAttribute("id")
     ).slice(5);
     await page
-      .getByRole("group", { name: /^Manual trigger ·/ })
+      .getByRole("group", { name: /^Manual trigger$/ })
       .getByRole("combobox", { name: /^Next node/ })
       .selectOption(endId);
     await add("syntheticAction");

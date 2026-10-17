@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { workflowJourney } from "./workflows.mjs";
+import { executionJourney } from "./executions.mjs";
 const origin = process.env.BRIDGEOPS_TEST_ORIGIN;
 const control = process.env.BRIDGEOPS_TEST_CONTROL;
 const ownerPassword = "browser-disposable-password";
@@ -180,7 +181,11 @@ try {
   );
   step = "invited account membership and denied creation";
   console.log("STEP: " + step);
-  await signIn(guest, "jordan@example.invalid", invitedPassword);
+  const invitedAccess = await signIn(
+    guest,
+    "jordan@example.invalid",
+    invitedPassword,
+  );
   await expect(
     guest.getByRole("button", { name: "Create organization" }),
   ).toHaveCount(0);
@@ -249,6 +254,18 @@ try {
     guest,
     organizationUrl,
     access: ownerAccess,
+    report: (label) => {
+      step = label;
+      console.log("STEP: " + step);
+    },
+  });
+  await executionJourney({
+    page,
+    guest,
+    organizationUrl,
+    access: ownerAccess,
+    guestAccess: invitedAccess,
+    control,
     report: (label) => {
       step = label;
       console.log("STEP: " + step);
@@ -429,7 +446,7 @@ try {
     await guest.evaluate(() => localStorage.length + sessionStorage.length),
   ).toBe(0);
   console.log(
-    "PASS: real browser sessions, organizations, workflow drafts/validation/immutable history/conflicts/duplication/archive, tenant denial, recovery and responsive renders.",
+    "PASS: real browser sessions, organizations, workflow drafts/validation/immutable history/conflicts/duplication/archive, durable executions/cancellation/receipt-preserving retry, tenant denial, recovery and responsive renders.",
   );
 } catch (failure) {
   console.error("FAIL: browser journey at step: " + step);
@@ -437,7 +454,9 @@ try {
   console.error(
     "FAIL: source " +
       (
-        (failure.stack ?? "").match(/(?:journey|workflows)\.mjs:\d+:\d+/g) ?? []
+        (failure.stack ?? "").match(
+          /(?:journey|workflows|executions)\.mjs:\d+:\d+/g,
+        ) ?? []
       ).join(", "),
   );
   if (page)

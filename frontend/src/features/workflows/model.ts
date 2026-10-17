@@ -177,3 +177,44 @@ export interface Snapshot {
   version: VersionSummary;
   definition: unknown;
 }
+
+/** Presentation only: stable IDs, persisted definitions and canonical hashes are untouched. */
+export function nodeLabels(graph: Graph): Map<string, string> {
+  const totals = new Map<string, number>();
+  const counts = new Map<string, number>();
+  for (const node of graph.nodes)
+    totals.set(node.type, (totals.get(node.type) ?? 0) + 1);
+  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+  const ordered: NodeDefinition[] = [];
+  const visited = new Set<string>();
+  const triggers = graph.nodes.filter(node => node.type === "manualTrigger");
+  let current = triggers.length === 1 ? triggers[0] : undefined;
+  while(current && !visited.has(current.id)) {
+    visited.add(current.id); ordered.push(current);
+    const edges = graph.edges.filter(edge => edge.source === current?.id);
+    current = edges.length === 1 ? nodes.get(edges[0]!.target) : undefined;
+  }
+  ordered.push(...graph.nodes.filter(node => !visited.has(node.id)).sort((a,b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return new Map(
+    ordered.map((node) => {
+      const ordinal = (counts.get(node.type) ?? 0) + 1;
+      counts.set(node.type, ordinal);
+      const base = nodeSchema(node.type)?.label ?? "Unsupported node";
+      const numbered =
+        node.type === "syntheticAction" ||
+        node.type === "approval" ||
+        (totals.get(node.type) ?? 0) > 1;
+      const value =
+        node.type === "approval" ? node.config.prompt : node.config.message;
+      const text =
+        typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+      const preview = text.length > 60 ? text.slice(0, 57) + "…" : text;
+      return [
+        node.id,
+        base +
+          (numbered ? " " + ordinal : "") +
+          (preview ? " — " + preview : ""),
+      ];
+    }),
+  );
+}
