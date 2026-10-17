@@ -1,6 +1,6 @@
 # ADR-0006-idempotency: Idempotency and external effect limits
 
-Status: Proposed. Date: 2026-10-15.
+Status: Accepted for Phase 3 implementation, 2026-10-17. Proposed: 2026-10-15. Implementation verification remains separate.
 
 ## Context
 
@@ -17,3 +17,5 @@ Canonical request hashes and scoped start keys; stable logical operation/item ke
 ## Consequences
 
 At-least-once processing remains possible. Retention bounds dedup guarantees; provider limitations are visible rather than hidden.
+
+Phase 3 implements the PostgreSQL worker and internal record receipts under [the execution contract](../../development/PHASE_3_EXECUTION.md). Approval signals and external effects remain later phases.

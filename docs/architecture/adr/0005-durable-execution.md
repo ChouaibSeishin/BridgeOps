@@ -1,6 +1,6 @@
 # ADR-0005-durable-execution: Durable scheduling and recovery
 
-Status: Proposed. Date: 2026-10-15.
+Status: Accepted for Phase 3 implementation, 2026-10-17. Proposed: 2026-10-15. Implementation verification remains separate.
 
 ## Context
 
@@ -17,3 +17,5 @@ Persist explicit states, work leases/fencing, due retries/delays, attempts and a
 ## Consequences
 
 Recovery is testable in one datastore. External ambiguous effects still need receipts/reconciliation; PostgreSQL becomes a critical dependency.
+
+Phase 3 implements the PostgreSQL worker and internal record receipts under [the execution contract](../../development/PHASE_3_EXECUTION.md). Approval signals and external effects remain later phases.
