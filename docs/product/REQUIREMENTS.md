@@ -35,7 +35,7 @@ The visual editor supports node/edge add/delete, config, validation markers, dra
 
 ## Current Phase 2 scope amendment
 
-Phase 1D and Phase 2 workflow definitions are implemented and verified; see the [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md). A small form editor supports bounded versioned manual-trigger/synthetic-action/approval/end definitions, persistence, authoritative validation, immutable publication/history, duplication and archive. These nodes have definition support only. Execution/test runs begin in Phase 3 and approval processing in Phase 4. The broader catalog/canvas requirements above remain later targets. Existing local accounts/data must be preserved; use isolated synthetic test fixtures.
+Phase 1D and Phase 2 workflow definitions are implemented and verified; see the [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md). A small form editor supports bounded versioned manual-trigger/synthetic-action/approval/end definitions, persistence, authoritative validation, immutable publication/history, duplication and archive. Phase 3 adds published-version runtime support for manualTrigger/syntheticAction-record/end only, with durable state/attempts/receipts, retries/scheduled start/deadline/cancel and monitoring. Approval-containing versions reject before execution creation. Draft TEST snapshots and graph delay nodes remain deferred; an explicit bounded start delay persists scheduling without changing schema v1. Approval processing begins in Phase 4. The broader catalog/canvas requirements above remain later targets. Existing local accounts/data must be preserved; use isolated synthetic test fixtures.
 
 ## Flagship demonstration
 

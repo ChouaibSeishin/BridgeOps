@@ -279,7 +279,7 @@ it("confirms the exact persisted revision, shows pending publication and refresh
   });
   expect(
     await screen.findByText(
-      /Published version 1\. This definition has not executed/,
+      /Published version 1\. Publication did not start an execution/,
     ),
   ).toBeInTheDocument();
   expect(

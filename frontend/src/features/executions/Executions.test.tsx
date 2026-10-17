@@ -317,3 +317,25 @@ it("denies missing read capability before requesting any execution data", async 
   expect(await screen.findByRole("alert")).toHaveTextContent("not permitted");
   expect(executionApi.get).not.toHaveBeenCalled();
 });
+
+it("shows the persisted automatic retry schedule beside the waiting step", async () => {
+  vi.mocked(executionApi.get).mockResolvedValue(execution("WAITING_FOR_RETRY"));
+  vi.mocked(executionApi.steps).mockResolvedValue([
+    {
+      nodeId: "stable-node",
+      position: 0,
+      type: "syntheticAction",
+      status: "WAITING_FOR_RETRY",
+      attemptCount: 1,
+      startedAt: "2026-10-17T12:00:00Z",
+      completedAt: null,
+      output: null,
+      errorCode: "TRANSIENT_FAILURE",
+      retryAt: "2026-10-17T12:00:02Z",
+    },
+  ]);
+  show();
+  expect(await screen.findByText(/Next automatic attempt:/)).toHaveTextContent(
+    new Date("2026-10-17T12:00:02Z").toLocaleString(),
+  );
+});

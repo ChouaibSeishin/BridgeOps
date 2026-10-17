@@ -11,7 +11,7 @@ public final class ExecutionViews {
         Instant createdAt, Instant startedAt, Instant completedAt, Instant deadlineAt, Instant notBefore,
         String errorCode, UUID retryOfExecutionId, boolean retryEligible) {}
     public record Step(String nodeId, int position, String type, String status, int attemptCount,
-        Instant startedAt, Instant completedAt, Object output, String errorCode) {}
+        Instant startedAt, Instant completedAt, Object output, String errorCode, Instant retryAt) {}
     public record Attempt(UUID id, String nodeId, int attemptNumber, Instant startedAt, Instant completedAt, String outcome, String errorCode) {}
     public record Event(long sequence, Instant occurredAt, String code, String nodeId) {}
     public record Page<T>(List<T> items, int page, int size, long totalElements, long totalPages) {}

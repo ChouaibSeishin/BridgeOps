@@ -1,6 +1,6 @@
 # Phase 2 — workflow definitions
 
-Status: Phase 2 complete. Workflow backend and browser form editor passed full local verification and corresponding hosted implementation CI at c5e588e. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
+Status: historical Phase 2 completion record. Current published execution behavior is in [Phase 3](PHASE_3_EXECUTION.md). Phase 2 complete. Workflow backend and browser form editor passed full local verification and corresponding hosted implementation CI at c5e588e. Phase 1D baseline is 11aec6e. Phase 2 stores definitions only. Published definitions do not execute until Phase 3; approval processing remains Phase 4. No Run/Test Run, connector, webhook, scripting, SQL, AI or MCP capability is introduced.
 
 ## Graph v1 and registry
 

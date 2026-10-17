@@ -1,12 +1,23 @@
 # Project status
 
-Updated 2026-10-16 UTC. **Phase 2 workflow definitions are complete: full local release verification and the corresponding hosted implementation CI passed.** Publication stores an immutable definition; it does not execute it. Execution, approval processing, integrations, webhooks, AI and MCP remain later phases.
+Updated 2026-10-17 UTC. **Phase 3 durable internal execution and monitoring are implemented; local release gates passed and final hosted verification is pending.** Publication stores an immutable definition; an explicit start executes supported internal capabilities. Approval processing, integrations, webhooks, AI and MCP remain later phases.
 
-## Starting point and preserved environment
+## Current Phase 3 delivery
+
+Preflight found clean local/fetched master b0bce52797765e475b7c4a07481802b928eb6304 with [successful corresponding CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38955900005), V9 and healthy Compose. The actual local user had since created one organization, three workflows and two published versions; all are preserved as user data, never used as fixtures. Aggregate table/material/volume fingerprints were captured without printing private rows or keys.
+
+| Phase 3 commit | Verified increment | Hosted evidence |
+| --- | --- | --- |
+| f78c70483ff6be405c8cb4c03104fff3895d8e2d | Guarded state machine/backoff and accepted runtime contracts | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39063792941) |
+| 0dcea6ca40ee410c4b52cdec5dac5deca12866dd | V10, fenced PostgreSQL worker, idempotent record receipts, recovery and authorized HTTP lifecycle | [Passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39065711991) |
+
+The complete local regression passed **206 tests (54 unit/MVC + 152 PostgreSQL/browser)** with zero failures/errors/skips across 24 XML reports. All **54 frontend tests**, strict typecheck, lint and production build passed; production dependency audit found zero vulnerabilities. Coverage includes 31 execution lifecycle cases, six execution HTTP cases, fresh/V9 migrations, runtime privileges, actual disposable PostgreSQL outage and the expanded Chromium journey with persisted database assertions. Final focused checks cover the retry timestamp, organization history link and publication wording. The V10 local upgrade preserved table/material/volume fingerprints, account, consumed bootstrap marker, tenant and saved workflows. All three production containers and anonymous same-origin security smoke passed. Final hosted verification remains pending. [Exact contracts, implementation map, commands and limits](development/PHASE_3_EXECUTION.md).
+
+## Historical Phase 2 starting point and preserved environment
 
 Phase 2 inspection found clean master and fetched GitHub head both at 11aec6e9e2e9d2e0ea0aaedde2e286de1191e538, with V8 and no workflow source/tables. The user had provisioned one local account: users 1, organizations 0, bootstrap marker consumed. Tests use disposable PostgreSQL and synthetic accounts, not that local identity. Environment, RSA/CSRF keys and named volume are preserved; bootstrap is never rerun. An aggregate account-state fingerprint/count baseline was captured without printing user fields/credentials for the additive V9 upgrade comparison.
 
-## Verified published increments
+## Historical Phase 2 published increments
 
 Normal commits/pushes and exact remote refs were verified; no reset, force push or history replacement.
 
@@ -31,7 +42,7 @@ Final implementation commit: c5e588e5f929f7bac782196b481597b44cdb34ad. Its corre
 - Live workflow.read/edit/publish capabilities use existing fixed role mappings; no new grant or role editor. Foreign resources are concealed; stale revisions conflict. Duplicate copies the persisted draft independently; archive preserves historical reads.
 - Responsive form editor integrated with real organization/session/query APIs: schema-derived config, explicit connections, saved/unsaved state, node/field errors, exact-revision publish confirmation, actual version/hash/actor history and read-only snapshots. Conflicts preserve local edits; discard/reload is explicit. No Run/Test Run control or fabricated execution metrics.
 
-## Verification observed
+## Historical Phase 2 verification observed
 
 | Gate | Executed evidence |
 | --- | --- |
@@ -54,8 +65,8 @@ Phase 1D completed at 11aec6e with [successful final CI](https://github.com/Chou
 
 ## Operation, limits and next work
 
-Use [README](../README.md) and the [Phase 2 contract/commands](development/PHASE_2_WORKFLOWS.md). Existing installations retain their environment, keys, account and volume; only fresh installations use the one-shot offline bootstrap. External SMTP stays disabled until externally configured and was not contacted during verification.
+Use [README](../README.md) and the [Phase 3 contract/commands](development/PHASE_3_EXECUTION.md). Existing installations retain their environment, keys, account and volume; only fresh installations use the one-shot offline bootstrap. External SMTP stays disabled until externally configured and was not contacted during verification.
 
-Current definition semantics are linear only; branches/joins, runtime work, TEST snapshots and approval decisions are deferred. Unsaved editor state lives only in the current page. Hashes identify content, not authorship/tamper-proof storage. Publication does not run anything. No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment is claimed. Local Compose still supplies startup migration credentials; production must separate migration/operator execution. No license or verified private reporting channel is configured. SMTP dispatcher/outbox limitations from Phase 1 remain unchanged.
+Current definition semantics are linear only. Phase 3 runs published manual-trigger/internal-record/end chains; branches/joins, TEST snapshots, approval decisions and external effects remain deferred. Unsaved editor state lives only in the current page. Hashes identify content, not authorship/tamper-proof storage. Publication does not run anything. No production deployment/security/load/TLS/HA, WCAG conformance, backend vulnerability audit, backup/restore, RLS, SSO/MFA or compromised-runtime containment is claimed. Local Compose still supplies startup migration credentials; production must separate migration/operator execution. No license or verified private reporting channel is configured. SMTP dispatcher/outbox limitations from Phase 1 remain unchanged.
 
-Phase 2 release gates passed. The next task is Phase 3 durable sequential execution with deterministic synthetic capabilities, state/attempt history, idempotency, retries/delay/deadline/cancel and fencing. Approval processing begins in Phase 4; integration/webhook and AI/MCP phases follow. No later-phase implementation was started.
+Phase 3 local release gates passed. After final hosted verification, the next task is Phase 4 approval processing. Integration/webhook and AI/MCP phases follow; no later-phase implementation was started.

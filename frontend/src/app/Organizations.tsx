@@ -257,7 +257,8 @@ export function Organizations({ user }: { user: User }) {
         </section>
       )}
       <p className="muted">
-        Workflows can run registered internal record operations. Integrations and approval processing remain later phases.
+        Workflows can run registered internal record operations. Integrations
+        and approval processing remain later phases.
       </p>
     </>
   );
@@ -361,6 +362,13 @@ export function OrganizationDetail({ user }: { user: User }) {
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
+      {permissions.includes("execution.read") && (
+        <p>
+          <Link className="button" to={`/organizations/${id}/executions`}>
+            Open executions
+          </Link>
+        </p>
+      )}
       {permissions.includes("workflow.read") && (
         <p>
           <Link

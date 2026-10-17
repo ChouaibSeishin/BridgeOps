@@ -1,8 +1,8 @@
 # Execution and approval design
 
-Status: planned Phase 3–4 behavior; no engine is implemented.
+Status: Phase 3 sequential internal runtime implemented; local release gates passed and final hosted verification is pending. The broader approval/integration sequence below remains Phase 4+ target design. [Exact implemented contract](../development/PHASE_3_EXECUTION.md).
 
-Phase 2 now implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Its schema-v1 registry supports only a connected linear manual-trigger/synthetic-action/approval/end chain. Branches, joins, runtime work, TEST snapshots and approval decisions in the target design below remain deferred. Published definitions never execute merely because publication succeeds.
+Phase 2 implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Its schema-v1 registry supports only a connected linear manual-trigger/synthetic-action/approval/end chain. Phase 3 runs manualTrigger, syntheticAction/record and end only, ordered by edges. Approval-containing versions are rejected before submission. Branches, joins, TEST snapshots and approval decisions in the target design below remain deferred. Published definitions never execute merely because publication succeeds.
 
 ## Definition and validation
 
@@ -102,3 +102,5 @@ RabbitMQ is conditional on measured queue/worker needs. Its introduction require
 ## Deadline enforcement
 
 Persist deadline_at = created_at +24h by default. Queue time, retries, scheduled delays and approval waits all consume this budget. Check before dispatch/resume and in periodic reconciliation; fail with DEADLINE_EXCEEDED when expired and expire outstanding approval. No state transition resets deadline_at. Supported manual retry creates a new execution and a fresh explicit budget, without replaying already-receipted effects. Tests must cover expiry in every waiting state and approval/expiry races.
+
+Phase 3 scope resolution: persisted delaySeconds on published start schedules the initial dispatch (0–3600 seconds); it introduces no graph node or schema-v1 semantic change. No draft test-run route is exposed. Terminal cancellation commits synchronously and returns 200 for this internal transactional runtime. Runtime effects/receipts/results are atomic, failed unvisited steps are skipped, and reconciliation locks actor → organization → execution → work to avoid inverting live cancellation/dispatch locks. See the Phase 3 guide for exact API and future TEST/approval boundaries.

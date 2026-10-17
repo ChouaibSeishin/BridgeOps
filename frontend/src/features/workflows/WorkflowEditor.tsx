@@ -146,7 +146,7 @@ function DraftWorkspace({
       await perform("Publishing…", async () => {
         const snapshot = await workflowApi.publish(organization, id, revision);
         setNotice(
-          `Published version ${snapshot.version.versionNumber}. This definition has not executed.`,
+          `Published version ${snapshot.version.versionNumber}. Publication did not start an execution.`,
         );
         adopt(await workflowApi.get(organization, id));
       });

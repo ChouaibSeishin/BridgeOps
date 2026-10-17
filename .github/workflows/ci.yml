@@ -40,6 +40,8 @@ jobs:
       - name: Backend unit and required PostgreSQL integration tests
         working-directory: backend
         run: chmod +x mvnw && ./mvnw -B -ntp verify
+      - name: Required test report gate
+        run: node scripts/verify-test-reports.mjs
       - name: Generate ephemeral local environment
         shell: pwsh
         run: |

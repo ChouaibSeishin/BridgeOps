@@ -18,6 +18,12 @@ public class AccountAuthority {
     }
     @Transactional(readOnly=true,timeout=5)
     public void requireLive(UUID user,UUID family){if(!sessions.isActive(user,family))throw new DomainFailure(401,"AUTHENTICATION_REQUIRED");}
+    /** Lock a persisted actor for durable terminal/reconciliation writes, even after disablement. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockDurableActor(UUID user) {
+        if(jdbc.queryForList("SELECT id FROM users WHERE id=? FOR UPDATE",user).isEmpty())
+            throw new DomainFailure(404,"NOT_FOUND");
+    }
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void lockActiveWorker(UUID user) {
         if(jdbc.queryForList("SELECT id FROM users WHERE id=? AND account_status='ACTIVE' FOR UPDATE",user).isEmpty())

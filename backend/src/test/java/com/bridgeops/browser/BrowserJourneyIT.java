@@ -29,13 +29,16 @@ import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.ObjectMapper;
 import static org.assertj.core.api.Assertions.*;
 /** Real browser + real API; gateway, operator fixtures and mailbox exist only in test sources. */
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"server.address=127.0.0.1","bridgeops.auth.enabled=true","bridgeops.auth.local-http=true","bridgeops.auth.issuer=browser-test","bridgeops.auth.key-id=browser-test"})
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"server.address=127.0.0.1","bridgeops.auth.enabled=true","bridgeops.auth.local-http=true","bridgeops.auth.issuer=browser-test","bridgeops.auth.key-id=browser-test","bridgeops.executions.worker.enabled=true"})
 @Testcontainers @Import(BrowserJourneyIT.Configuration.class)
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class BrowserJourneyIT {
  static final TestAuthMaterial keys=new TestAuthMaterial();static final HttpServer gateway=gateway();static final ExecutorService gatewayThreads=Executors.newFixedThreadPool(8);
  static final String ORIGIN="http://127.0.0.1:"+gateway.getAddress().getPort();static final String CONTROL=new RefreshTokens().generate();
  @Container static final PostgreSQLContainer postgres=new PostgreSQLContainer(DockerImageName.parse("postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
  @DynamicPropertySource static void properties(DynamicPropertyRegistry r){r.add("bridgeops.auth.origin",()->ORIGIN);r.add("spring.datasource.url",postgres::getJdbcUrl);r.add("spring.datasource.username",()->"bridgeops_app");r.add("spring.datasource.password",()->"synthetic-runtime-fixture");r.add("spring.flyway.user",postgres::getUsername);r.add("spring.flyway.password",postgres::getPassword);r.add("bridgeops.auth.private-key",()->keys.directory.resolve("private.pem").toString());r.add("bridgeops.auth.public-key",()->keys.directory.resolve("public.pem").toString());r.add("bridgeops.auth.csrf-key",()->keys.directory.resolve("csrf.key").toString());}
+ @Autowired com.bridgeops.executions.application.ExecutionWorker liveWorker;
+ @AfterEach void stopLiveWorker(){liveWorker.stop();}
  @Autowired BrowserCapability browserCapability;@Autowired Environment environment;@Autowired MailCapture mailbox;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;
  static HttpServer gateway(){try{
   // Windows short-name TEMP paths can break the JDK selector wakeup socket. Test JVM only.

@@ -1,6 +1,6 @@
 # API contract outline
 
-Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, plus Phase 2 workflow draft/validate/publish/duplicate/archive/version routes are implemented.** [Exact workflow DTOs and semantics](../development/PHASE_2_WORKFLOWS.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
+Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, Phase 2 workflow definition routes, and Phase 3 published execution/start/read/cancel/retry routes are implemented.** [Workflow DTOs](../development/PHASE_2_WORKFLOWS.md) and [execution DTOs and semantics](../development/PHASE_3_EXECUTION.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
 
 ## Shared conventions
 
@@ -45,9 +45,10 @@ Let `O=/api/v1/organizations/{organizationId}`. Codes match the security matrix.
 | 2 | GET/POST O/workflows; GET/PATCH/DELETE .../{id} | WorkflowSummary/Draft `{name,description,definition,expectedRevision}`. workflow.read/edit; DELETE archives |
 | 2 | POST .../{id}/validate, /publish, /duplicate | Validate -> `{valid,errors:[{nodeId,path,code,message}]}`. Publish `{expectedRevision}` -> 201 VersionSummary; workflow.publish. Duplicate -> new draft; workflow.edit |
 | 2 | GET .../{id}/versions; GET .../{id}/versions/{versionId} | Immutable summaries and exact permitted snapshot; workflow.read |
-| 3 | POST .../{id}/executions; POST .../{id}/test-runs | `{versionId?,input,effectsAcknowledged?}` plus Idempotency-Key; 202 ExecutionSummary. execution.run and every reachable write capability checked; test-runs pin draft revision and require effectsAcknowledged=true; missing/false is 422. UI requires explicit real-effects confirmation |
-| 3 | GET O/executions; GET .../{id}, /steps, /events | ExecutionSummary, sanitized StepAttempt/Timeline DTOs; execution.read |
-| 3 | POST O/executions/{id}/cancel, /retry | Expected revision and reason. cancel -> 202 cooperative request; retry -> 202 new linked execution. execution.cancel/retry; permanent failures ineligible |
+| 3 implemented | POST O/workflows/{id}/executions | `{versionId?,input:{},delaySeconds?:0..3600}` plus Idempotency-Key; 202 active / 200 terminal replay, Location. execution.run; published internal record runtime only, approval nodes reject before creation |
+| Deferred | POST .../{id}/test-runs | Planned immutable TEST snapshots with explicit real-effects acknowledgement; no route exists in Phase 3 |
+| 3 implemented | GET O/executions; GET .../{id}, /steps, /attempts, /events | Bounded tenant-qualified summaries, safe steps/attempts/timeline; execution.read |
+| 3 implemented | POST O/executions/{id}/cancel, /retry | `{expectedRevision,reason}`; cancel commits terminal state → 200; retry requires Idempotency-Key → 202 new linked execution (200 terminal replay). execution.cancel/retry plus run on retry; only exhausted transient failure is retryable |
 | 4 | GET O/approvals; GET .../{id} | Exact operation preview, requester, policy, expiry and decision status; approval.read |
 | 4 | POST O/approvals/{id}/approve, /reject | `{expectedRevision,reason?}` -> decision/request. approval.decide plus eligibility. Same decision replay returns original; opposite/stale conflicting decision 409 |
 | 5 | POST O/webhook-endpoints; POST .../{id}/rotate; DELETE .../{id} | Pinned workflow version/automation grant; manage integration and workflow policy. Secret returned once on create/rotate only |
@@ -56,7 +57,7 @@ Let `O=/api/v1/organizations/{organizationId}`. Codes match the security matrix.
 | 6 | POST O/ai/action-plans/{planId}/submit | Persisted canonical plan -> normal execution/approval. ai.use, execution.run and action permissions; no second approve endpoint |
 | 4/7 | GET O/audit-events; GET O/analytics/overview, /executions, /failures | Safe AuditEvent/aggregate DTOs, period/workflow/status filters; audit.read/execution.read respectively |
 
-`/auth` routes in the table are relative to `/api/v1`. Support mutations (assignment/note), notification creation and MCP/AI writes dispatch through action requests and central policy services. Until Phase 3–4 implements safe execution/approval, gated write operations remain unavailable. Phase 5 reads/connection tests follow the synthetic capability introduced in Phase 3; Phase 2 test-run controls arrive with Phase 3, with their dependency explained instead of returning fake results.
+`/auth` routes in the table are relative to `/api/v1`. Support mutations (assignment/note), notification creation and MCP/AI writes are future action-request/policy contracts. Phase 3 executes only the registered internal record capability. Approval processing remains Phase 4; external reads/connection tests follow in Phase 5. Draft TEST snapshots/test-run controls remain deferred.
 
 ## MCP and provider contract boundary
 
@@ -86,3 +87,5 @@ Phase 1D.2 adds UserSummary.canCreateOrganizations, GET O/access and bounded GET
 Phase 1D.3 implements POST /auth/password/change, /auth/forgot and /auth/reset with the exact shapes, generic acknowledgement and invalidation semantics in [the browser/recovery guide](../development/PHASE_1D_BROWSER.md). Forgot returns 202 without a delivery claim; change/reset success returns 204 and clears cookies. V8 reset state and shared outbound transport retain invitation SMTP configuration compatibility.
 
 Current Phase 1D member summaries additionally include account:{id,displayName,email}, resolved through the identity application query boundary after tenant authorization. No account grants, password hashes or entity objects are exposed in the roster.
+
+Phase 3 exact routes, strict input bounds, state machine, DTOs and scheduling/receipt semantics are maintained in [the execution guide](../development/PHASE_3_EXECUTION.md). Approval decisions, external capabilities and draft TEST snapshots remain unavailable. Internal record effects are real persisted rows; execution output does not imply any external service was contacted.

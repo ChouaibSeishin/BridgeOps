@@ -94,12 +94,12 @@ public class ExecutionRuntime {
     }));}
     private void advance(Execution e){jdbc.update("UPDATE workflow_executions SET current_position=current_position+1,revision=revision+1 WHERE organization_id=? AND id=? AND revision=?",e.organization(),e.id(),e.revision());}
     public void acknowledge(Claim c){tx.executeWithoutResult(status->{
-        lockOrganization(c.organization());var e=owned(c);if(e==null)return;
+        lockContext(c);var e=owned(c);if(e==null)return;
         if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return;}
         if(e.position()==store.steps(e.organization(),e.id()).size())succeed(e,clock.instant());else store.release(c,clock.instant(),false);
     });}
     public void failure(Dispatch dispatch,SyntheticCapability.FailureKind kind){tx.executeWithoutResult(status->{
-        var c=dispatch.claim();lockOrganization(c.organization());var e=owned(c);if(e==null)return;Instant now=clock.instant();
+        var c=dispatch.claim();lockContext(c);var e=owned(c);if(e==null)return;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(!step.node().equals(dispatch.node().id())||!step.state().equals("RUNNING"))return;
@@ -110,7 +110,7 @@ public class ExecutionRuntime {
             Instant due=now.plus(retries.delay(step.attempts()));store.state(e,ExecutionState.WAITING_FOR_RETRY,code,now);store.event(e,"RETRY_SCHEDULED",step.node(),now);store.release(c,due,false);
         }else fail(e,kind==SyntheticCapability.FailureKind.TRANSIENT?"TRANSIENT_EXHAUSTED":code,now);
     });}
-    public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockOrganization(c.organization());var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
+    public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockContext(c);var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
     private void fail(Execution e,String code,Instant now){
         service.terminateSteps(e,code.equals("DEADLINE_EXCEEDED")?code:"RECONCILIATION_REQUIRED",now);
         store.state(e,ExecutionState.FAILED,code,now);store.done(e);store.event(e,"EXECUTION_FAILED",null,now);
@@ -123,14 +123,17 @@ public class ExecutionRuntime {
     private void attempt(Execution e,Step step,String outcome,String error,Instant now){
         jdbc.update("INSERT INTO execution_attempts(id,organization_id,execution_id,node_id,attempt_number,started_at,completed_at,outcome,error_code) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",UUID.randomUUID(),e.organization(),e.id(),step.node(),step.attempts(),time(step.started()),time(now),outcome,error);
     }
-    private void lockOrganization(UUID organization){jdbc.queryForList("SELECT id FROM organizations WHERE id=? FOR UPDATE",organization);}
+    private void lockContext(Claim c){
+        var preview=store.get(c.organization(),c.execution(),false);
+        authority.lockDurableContext(preview.actor(),c.organization());
+    }
     /** Bounded reconciliation executes one execution per transaction, preserving lock order. */
     public int reconcile(){
         Instant now=clock.instant();var candidates=jdbc.queryForList("SELECT e.organization_id,e.id FROM workflow_executions e JOIN execution_work_items w ON w.organization_id=e.organization_id AND w.execution_id=e.id WHERE e.completed_at IS NULL AND (e.deadline_at<=? OR (w.state='CLAIMED' AND w.lease_expires_at<=?)) ORDER BY e.deadline_at LIMIT 100",time(now),time(now));
         int count=0;
         for(var candidate:candidates){UUID org=(UUID)candidate.get("organization_id"),id=(UUID)candidate.get("id");
             Boolean changed=tx.execute(status->{
-                lockOrganization(org);var e=store.get(org,id,true);if(e.state().terminal())return false;
+                var preview=store.get(org,id,false);authority.lockDurableContext(preview.actor(),org);var e=store.get(org,id,true);if(e.state().terminal())return false;
                 var work=jdbc.queryForList("SELECT * FROM execution_work_items WHERE organization_id=? AND execution_id=? FOR UPDATE",org,id).getFirst();Instant at=clock.instant();
                 if(!e.deadline().isAfter(at)){fail(e,"DEADLINE_EXCEEDED",at);return true;}
                 var lease=(java.sql.Timestamp)work.get("lease_expires_at");
@@ -148,7 +151,7 @@ public class ExecutionRuntime {
         return count;
     }
     public boolean renew(Claim c,int leaseSeconds){return Boolean.TRUE.equals(tx.execute(status->{
-        lockOrganization(c.organization());var e=owned(c);if(e==null)return false;
+        lockContext(c);var e=owned(c);if(e==null)return false;
         if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return false;}
         return jdbc.update("UPDATE execution_work_items SET lease_expires_at=? WHERE organization_id=? AND execution_id=? AND lease_owner=? AND fencing_token=? AND state='CLAIMED'",time(clock.instant().plusSeconds(leaseSeconds)),c.organization(),c.execution(),c.owner(),c.token())==1;
     }));}

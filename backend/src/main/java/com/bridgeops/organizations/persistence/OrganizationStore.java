@@ -14,6 +14,10 @@ public class OrganizationStore {
     public record Role(UUID id,String name){}
     private final JdbcTemplate jdbc;
     public OrganizationStore(JdbcTemplate jdbc){this.jdbc=jdbc;}
+    /** Internal durable-history lock: archived tenants must still be able to terminate work. */
+    public void lockDurable(UUID id){
+        if(jdbc.queryForList("SELECT id FROM organizations WHERE id=? FOR UPDATE",id).isEmpty())throw new DomainFailure(404,"NOT_FOUND");
+    }
     public Organization organization(UUID id,boolean lock){
         var rows=jdbc.query("SELECT id,name,slug,revision FROM organizations WHERE id=? AND status='ACTIVE'"+(lock?" FOR UPDATE":""),
             (rs,n)->new Organization(rs.getObject(1,UUID.class),rs.getString(2),rs.getString(3),rs.getLong(4)),id);

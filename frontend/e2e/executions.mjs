@@ -134,6 +134,11 @@ export async function executionJourney({
     .getByRole("link", { name: "Inspect execution · SUCCEEDED", exact: true })
     .click();
   await state("SUCCEEDED");
+  await expect(
+    page.getByText('"recorded": true', { exact: false }),
+  ).toHaveCount(2);
+  await expect(page.getByText("Loading attempts…", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Loading timeline…", { exact: true })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: resolve("backend/target/browser-checks/execution-desktop.png"),
@@ -283,5 +288,8 @@ export async function executionJourney({
     ).status,
   ).toBe(200);
   await page.goto(organizationUrl);
+  await expect(
+    page.getByRole("link", { name: "Open executions", exact: true }),
+  ).toHaveAttribute("href", `/organizations/${org}/executions`);
   await guest.goto(organizationUrl);
 }

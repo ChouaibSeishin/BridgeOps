@@ -53,6 +53,12 @@ class ExecutionLifecycleIT {
     }
     @Autowired ExecutionService executions;@Autowired ExecutionRuntime runtime;@Autowired ExecutionStore store;@Autowired WorkflowService workflows;
     @Autowired GraphDefinition graphs;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired com.bridgeops.organizations.application.TenantAuthorization workerAuthority;
+    @Autowired com.bridgeops.workflows.application.WorkflowRuntime snapshots;
+    @Autowired com.bridgeops.workflows.application.WorkflowDefinitions definitions;
+    @Autowired com.bridgeops.audit.application.ExecutionAudit executionAudit;
+    @Autowired ExecutionRandom randomness;
     @Autowired MutableClock clock;@Autowired ControlledCapability capability;@Autowired JdbcTemplate runtimeDb;
     JdbcTemplate operator;Actor owner;UUID org,workflow,version;ExecutionWorker worker;static String passwordHash;
     record Actor(UUID id,UUID family) {}
@@ -140,6 +146,7 @@ class ExecutionLifecycleIT {
     }
     @Test void eligibleTransientFailurePersistsRetryThenSucceedsWithSameOperation(){
         var e=start("transient-key").execution();failure("first",SyntheticCapability.FailureKind.TRANSIENT,1);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_RETRY);assertThat(count("synthetic_records")).isZero();
+        assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s1->s1.nodeId().equals("first")).findFirst().orElseThrow().retryAt()).isEqualTo(clock.instant().plusSeconds(1));
         clock.add(2);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(count("synthetic_records")).isEqualTo(2);
         var attempts=executions.attempts(owner.id(),owner.family(),org,e.id(),0,100).items().stream().filter(a->a.nodeId().equals("first")).toList();assertThat(attempts).extracting(Attempt::outcome).containsExactly("TRANSIENT_FAILURE","SUCCEEDED");
     }
@@ -160,7 +167,11 @@ class ExecutionLifecycleIT {
     }
     @Test void scheduledStartSurvivesFreshRuntimeDispatchAndConsumesOriginalDeadline(){
         var e=executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse("{}"),60,"delay-start-key").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_DELAY);assertThat(claim()).isNull();
-        clock.add(61);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(get(e.id()).deadlineAt()).isEqualTo(e.deadlineAt());
+        clock.add(61);
+        var restarted=new ExecutionRuntime(store,transactions,workerAuthority,snapshots,definitions,executions,executionAudit,clock,randomness);
+        var restartedWorker=new ExecutionWorker(restarted,capability,4,2,30,1000);
+        for(int i=0;i<20;i++){restarted.reconcile();var work=restarted.claim(UUID.randomUUID(),4,2,30);if(work==null)break;restartedWorker.dispatch(work);}
+        assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(get(e.id()).deadlineAt()).isEqualTo(e.deadlineAt());
     }
     @Test void queuedDeadlineExpiresWithoutDispatchOrReset(){
         var e=start("queued-deadline-key").execution();clock.add(86401);runtime.reconcile();assertThat(store.get(org,e.id(),false).error()).isEqualTo("DEADLINE_EXCEEDED");assertThat(claim()).isNull();assertThat(count("synthetic_records")).isZero();assertThat(store.get(org,e.id(),false).deadline()).isEqualTo(e.deadlineAt());
@@ -199,4 +210,72 @@ class ExecutionLifecycleIT {
         var e=start("immutable-history-key").execution();drain();for(String table:List.of("execution_attempts","execution_events","synthetic_records","execution_operation_receipts"))assertThatThrownBy(()->runtimeDb.update("DELETE FROM "+table)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);denied(409,()->executions.cancel(owner.id(),owner.family(),org,e.id(),get(e.id()).revision(),"Terminal"));assertThat(runtime.reconcile()).isZero();
     }
+    @Test void scheduledWaitDeadlineExpiresWithoutResetOrDispatch(){
+        var e=executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse("{}"),3600,"waiting-deadline-key").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_DELAY);clock.add(86401);runtime.reconcile();assertThat(store.get(org,e.id(),false).error()).isEqualTo("DEADLINE_EXCEEDED");assertThat(count("synthetic_records")).isZero();assertThat(claim()).isNull();
+    }
+    @Test void runningCancellationRaceIsConditionalAndCannotDispatchAfterCommit()throws Exception{
+        var e=start("cancel-race-key").execution();worker.dispatch(claim());var c=claim();var dispatch=runtime.prepare(c);long revision=get(e.id()).revision();
+        var pool=Executors.newFixedThreadPool(2);try{
+            var completed=pool.submit(()->runtime.complete(dispatch));var cancelled=pool.submit(()->{try{executions.cancel(owner.id(),owner.family(),org,e.id(),revision,"Concurrent stop");return 200;}catch(DomainFailure conflict){return conflict.status();}});
+            completed.get(20,TimeUnit.SECONDS);int result=cancelled.get(20,TimeUnit.SECONDS);assertThat(result).isIn(200,409);if(result==409)executions.cancel(owner.id(),owner.family(),org,e.id(),get(e.id()).revision(),"Stop after committed result");
+        }finally{pool.shutdownNow();}
+        runtime.acknowledge(c);clock.add(31);runtime.reconcile();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.CANCELLED);assertThat(count("synthetic_records")).isBetween(0L,1L);assertThat(runtime.complete(dispatch)).isFalse();
+    }
+    @Test void disabledActorFailsSafelyButBrowserLogoutAloneDoesNotCancelDurableWork(){
+        var e=start("logout-durable-key").execution();sessions.revokeAll(owner.id());drain();assertThat(store.get(org,e.id(),false).state()).isEqualTo(ExecutionState.SUCCEEDED);
+        var renewed=(Granted)sessions.authenticate("owner@example.invalid","execution-disposable-password");owner=new Actor(owner.id(),renewed.familyId());var disabled=start("disabled-worker-key").execution();operator.update("UPDATE users SET account_status='DISABLED' WHERE id=?",owner.id());drain();assertThat(store.get(org,disabled.id(),false).error()).isEqualTo("PERMISSION_REVOKED");assertThat(count("synthetic_records")).isEqualTo(2);
+    }
+    @Test void retryAuditFailureLeavesOriginalTerminalAndNoPartialLinkedExecution(){
+        var e=start("retry-audit-source-key").execution();failure("second",SyntheticCapability.FailureKind.TRANSIENT,3);drain();clock.add(2);drain();clock.add(3);drain();var failed=get(e.id());
+        operator.execute("CREATE FUNCTION fail_retry_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='EXECUTION_RETRIED' THEN RAISE EXCEPTION 'controlled retry audit failure'; END IF; RETURN NEW; END $$");operator.execute("CREATE TRIGGER fail_retry_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION fail_retry_audit()");
+        try{assertThatThrownBy(()->executions.retry(owner.id(),owner.family(),org,e.id(),failed.revision(),"Retry transient failure","retry-audit-key")).isInstanceOf(RuntimeException.class);assertThat(count("workflow_executions")).isEqualTo(1);assertThat(get(e.id()).status()).isEqualTo(ExecutionState.FAILED);assertThat(count("synthetic_records")).isEqualTo(1);}
+        finally{operator.execute("DROP TRIGGER fail_retry_audit ON organization_audit_events");operator.execute("DROP FUNCTION fail_retry_audit()");}
+    }
+    @Test void terminalDatabaseGuardAndTenantQualifiedWorkKeysRejectInvalidWrites(){
+        var e=start("database-guards-key").execution();drain();assertThatThrownBy(()->runtimeDb.update("UPDATE workflow_executions SET status='QUEUED',revision=revision+1,completed_at=NULL WHERE id=?",e.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        UUID other=organizations.create(owner.id(),owner.family(),"Other","foreign-queue-key").id();assertThatThrownBy(()->runtimeDb.update("INSERT INTO execution_work_items(organization_id,execution_id,due_at,state) VALUES(?,?,now(),'READY')",other,e.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(()->operator.update("UPDATE execution_attempts SET outcome='PERMANENT_FAILURE' WHERE execution_id=?",e.id())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+    @Test void reconciliationLocksActorBeforeOrganizationEvenForExpiredWork()throws Exception{
+        var e=start("reconcile-lock-order-key").execution();clock.add(86401);var pool=Executors.newSingleThreadExecutor();
+        try(var connection=operator.getDataSource().getConnection()){
+            connection.setAutoCommit(false);try(var statement=connection.prepareStatement("SELECT id FROM users WHERE id=? FOR UPDATE")){statement.setObject(1,owner.id());statement.executeQuery().close();}
+            var result=pool.submit(()->runtime.reconcile());
+            try{
+                long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);boolean waiting=false;
+                while(System.nanoTime()<until){waiting=Boolean.TRUE.equals(operator.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT id FROM users WHERE id=%FOR UPDATE%')",Boolean.class));if(waiting)break;Thread.sleep(10);}
+                assertThat(waiting).isTrue();assertThat(operator.queryForObject("SELECT id FROM organizations WHERE id=? FOR UPDATE NOWAIT",UUID.class,org)).isEqualTo(org);
+            }finally{connection.commit();}
+            assertThat(result.get(20,TimeUnit.SECONDS)).isEqualTo(1);assertThat(store.get(org,e.id(),false).error()).isEqualTo("DEADLINE_EXCEEDED");
+        }finally{pool.shutdownNow();}
+    }
+
+    @Test void archivedTenantStillTerminatesRevokedAndExpiredWorkWithoutDispatch(){
+        var denied=start("archived-tenant-denial-key").execution();
+        operator.update("UPDATE organizations SET status='ARCHIVED' WHERE id=?",org);drain();
+        assertThat(store.get(org,denied.id(),false).error()).isEqualTo("PERMISSION_REVOKED");assertThat(count("synthetic_records")).isZero();
+        operator.update("UPDATE organizations SET status='ACTIVE' WHERE id=?",org);var expired=start("archived-tenant-deadline-key").execution();
+        operator.update("UPDATE organizations SET status='ARCHIVED' WHERE id=?",org);clock.add(86401);runtime.reconcile();
+        assertThat(store.get(org,expired.id(),false).error()).isEqualTo("DEADLINE_EXCEEDED");assertThat(claim()).isNull();
+    }
+
+    @Test void globalAdmissionBoundsClaimsAcrossTenantsWithoutLettingOneTenantTakeAllSlots(){
+        start("global-admission-one");start("global-admission-two");start("global-admission-three");
+        for(int tenant=0;tenant<2;tenant++){
+            UUID another=organizations.create(owner.id(),owner.family(),"Another tenant","global-admission-"+tenant).id();
+            UUID draft=workflows.create(owner.id(),owner.family(),another,"Internal chain","",graphs.parse(GRAPH)).workflow().id();UUID pinned=workflows.publish(owner.id(),owner.family(),another,draft,0).version().id();
+            for(int i=0;i<2;i++)executions.start(owner.id(),owner.family(),another,draft,pinned,graphs.parse("{}"),0,"global-admission-"+tenant+"-"+i);
+        }
+        List<ExecutionStore.Claim> claims=new ArrayList<>();for(int i=0;i<4;i++)claims.add(claim());assertThat(claims).doesNotContainNull();assertThat(claim()).isNull();
+        assertThat(claims.stream().map(ExecutionStore.Claim::organization).distinct().count()).isGreaterThanOrEqualTo(2);
+        for(var tenant:claims.stream().map(ExecutionStore.Claim::organization).distinct().toList())assertThat(claims.stream().filter(c->c.organization().equals(tenant)).count()).isLessThanOrEqualTo(2);
+        worker.dispatch(claims.getFirst());assertThat(claim()).isNotNull();
+    }
+    @Test void changedArgumentsForAnExistingOperationReceiptFailForReconciliation(){
+        var e=start("receipt-argument-key").execution();var step=store.steps(org,e.id()).stream().filter(s1->s1.node().equals("first")).findFirst().orElseThrow();
+        operator.update("INSERT INTO synthetic_records(organization_id,logical_operation_id,message,recorded_at) VALUES(?,?,?,?)",org,step.operation(),"Controlled prior effect",java.sql.Timestamp.from(clock.instant()));
+        operator.update("INSERT INTO execution_operation_receipts(organization_id,logical_operation_id,capability,item_id,argument_hash,result_json,committed_at) VALUES(?,?,'synthetic.record',?,?,'{}',?)",org,step.operation(),step.node(),"a".repeat(64),java.sql.Timestamp.from(clock.instant()));
+        drain();assertThat(get(e.id()).errorCode()).isEqualTo("RECONCILIATION_REQUIRED");assertThat(get(e.id()).retryEligible()).isFalse();assertThat(count("synthetic_records")).isEqualTo(1);assertThat(count("execution_operation_receipts")).isEqualTo(1);
+    }
+
 }

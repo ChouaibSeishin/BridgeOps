@@ -77,7 +77,7 @@ export function GraphEditor({
       </div>
       <p>
         Connections define the single path. Card order is presentation only.
-        These definitions do not run actions or process approvals.
+        Editing these definitions does not run actions or process approvals.
       </p>
       <div className="action-row node-palette">
         <label>

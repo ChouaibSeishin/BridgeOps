@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Phase 2 complete: workflow drafts, validation and immutable publication.** Phase 1D onboarding/sessions/recovery and Phase 2 backend/browser authoring are verified. Final local gates passed 162 backend/integration/browser tests and 37 frontend tests, and [implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38955049541). Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Execution, integrations, approval processing, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the workflow guide](docs/development/PHASE_2_WORKFLOWS.md).
+**Phase 3 durable internal execution is implemented; local release gates passed and final hosted verification is pending.** The full local regression passed 206 backend/integration/browser tests with no failures, errors or skips. All 54 frontend tests, typecheck, lint, production build and production dependency audit passed. Phase 1/2 behavior remains covered. Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Explicit execution now runs published manual-trigger/record/end chains. Approval-containing versions reject before submission; external integrations, approvals, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
 
 ## Start from a clean checkout
 
@@ -17,7 +17,7 @@ docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait
 
 Open [BridgeOps](http://localhost:8088). Setup creates unique ignored .env database credentials and ignored signing material; it refuses to overwrite existing files. For an existing workspace, retain .env, keys and volumes; run setup-auth only if authentication material has never been configured. Setup/startup creates no account or tenant. Never commit credentials or keys. Port 8088 is localhost-only; BRIDGEOPS_PORT can be set in .env. The browser uses relative URLs through the same-origin proxy.
 
-For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade to V9.
+For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade to V10.
 
 ### Provision the first account explicitly
 
@@ -31,7 +31,7 @@ Replace the nonsensitive metadata; enter your own password through the no-echo c
 
 Sign in at [the browser sign-in page](http://localhost:8088/sign-in), create an organization and open its members/roles/invitations. Only current permitted actions appear; the backend rechecks authorization, delegation, revisions and last-active-Owner protection. Organization membership does not grant the account-level ability to create other organizations.
 
-For workflow authoring, select an organization and open Workflows. Create a draft, edit its metadata, node configuration and Next node connections, then save and validate it. Publish the saved valid revision and inspect its immutable version in history. Later draft edits, duplication and archive preserve published history. Publishing stores a definition only; it performs no workflow execution or approval decision.
+For workflow authoring, select an organization and open Workflows. Create a draft, edit its metadata, node configuration and Next node connections, then save and validate it. Publish the saved valid revision and inspect its immutable version in history. Later draft edits, duplication and archive preserve published history. Publishing stores a definition only; it performs no workflow execution or approval decision. For a published chain containing only a manual trigger, synthetic record actions and end, choose Run published version and confirm. Execution history shows persisted steps, attempts, receipts/results and timeline. A bounded start delay is optional. Authorized users can cancel active work or create a linked retry of an eligible exhausted transient failure; committed records are never undone. See the Phase 3 guide for scope and limits.
 
 Current secure-context browsers with Web Locks are required (HTTPS or loopback development). Access credentials stay in memory, refresh credentials stay in HttpOnly cookies, cookie-sensitive sequences are serialized across tabs, and broadcasts contain no credentials. Account & sessions offers password change, this-browser sign-out and logout-all; no individual remote-session list is claimed.
 
@@ -55,6 +55,7 @@ npm.cmd --prefix frontend test
 npm.cmd --prefix frontend run build
 npm.cmd --prefix frontend exec -- playwright install chromium
 ./backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
+node scripts/verify-test-reports.mjs
 node scripts/verify-docs.mjs
 ```
 
@@ -83,6 +84,7 @@ The local Compose backend receives startup migration credentials. Production mus
 ## Architecture and delivery
 
 - [Current project status and verified publication](docs/PROJECT_STATUS.md)
+- [Durable internal execution, recovery and monitoring](docs/development/PHASE_3_EXECUTION.md)
 - [Workflow definition schema, revisions and immutable publication](docs/development/PHASE_2_WORKFLOWS.md)
 - [Browser/session/recovery guide](docs/development/PHASE_1D_BROWSER.md)
 - [HTTP authentication and keys](docs/development/PHASE_1B_HTTP_AUTH.md)
@@ -92,7 +94,7 @@ The local Compose backend receives startup migration credentials. Production mus
 - [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
 - [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Next roadmap work is Phase 3 durable sequential execution with synthetic capabilities; approval processing, integration adapters and AI remain later.
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Phase 3 implements durable sequential internal execution. Phase 4 approval processing is next after final hosted verification; integration adapters and AI remain later.
 
 ## Browser preview
 

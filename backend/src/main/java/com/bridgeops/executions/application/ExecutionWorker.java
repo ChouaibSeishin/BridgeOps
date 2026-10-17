@@ -21,11 +21,11 @@ public class ExecutionWorker implements SmartLifecycle {
     public ExecutionWorker(ExecutionRuntime runtime,SyntheticCapability capability,
         @Value("${bridgeops.executions.worker.parallel:4}")int parallel,@Value("${bridgeops.executions.worker.per-organization:2}")int tenantLimit,
         @Value("${bridgeops.executions.worker.lease-seconds:30}")int leaseSeconds,@Value("${bridgeops.executions.worker.poll-millis:1000}")int pollMillis){
-        if(parallel<1||parallel>16||tenantLimit<1||tenantLimit>parallel||leaseSeconds<5||leaseSeconds>120||pollMillis<250||pollMillis>5000)throw new IllegalArgumentException("Invalid execution worker bounds.");
+        if(parallel<1||parallel>16||tenantLimit<1||tenantLimit>parallel||leaseSeconds<5||leaseSeconds>120||pollMillis<250||pollMillis>5000||pollMillis*3>=leaseSeconds*1000)throw new IllegalArgumentException("Invalid execution worker bounds.");
         this.runtime=runtime;this.capability=capability;this.parallel=parallel;this.tenantLimit=tenantLimit;this.leaseSeconds=leaseSeconds;this.pollMillis=pollMillis;
     }
     @Override public void start(){if(!running.compareAndSet(false,true))return;
-        pool=Executors.newFixedThreadPool(parallel,r->{var t=new Thread(r,"bridgeops-execution");t.setDaemon(true);return t;});
+        pool=new ThreadPoolExecutor(parallel,parallel,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(parallel),r->{var t=new Thread(r,"bridgeops-execution");t.setDaemon(true);return t;},new ThreadPoolExecutor.AbortPolicy());
         timer=Executors.newSingleThreadScheduledExecutor(r->{var t=new Thread(r,"bridgeops-execution-poll");t.setDaemon(true);return t;});
         timer.scheduleWithFixedDelay(this::poll,0,pollMillis,TimeUnit.MILLISECONDS);
     }
@@ -50,7 +50,7 @@ public class ExecutionWorker implements SmartLifecycle {
                 if(task.node().type().equals("syntheticAction"))capability.afterCommit(invocation);
                 runtime.acknowledge(claim);
             }
-        }catch(DomainFailure revoked){runtime.permissionDenied(claim);}
+        }catch(DomainFailure revoked){try{runtime.permissionDenied(claim);}catch(RuntimeException unavailable){safeUnavailable();}}
         catch(RuntimeException unavailable){safeUnavailable();}
     }
     private void safeUnavailable(){long now=System.nanoTime();if(now-lastUnavailableLog>TimeUnit.SECONDS.toNanos(30)){lastUnavailableLog=now;LoggerFactory.getLogger(ExecutionWorker.class).warn("Execution worker paused a cycle; durable state will be reconciled.");}}

@@ -73,9 +73,16 @@ it("uses readable published connections while keeping exact IDs in collapsed tec
 });
 
 it("keeps friendly ordinals stable when canonical publication reorders node arrays", () => {
-  const graph = addNode(addNode(emptyGraph(), "syntheticAction", "z-first"), "syntheticAction", "a-second");
+  const graph = addNode(
+    addNode(emptyGraph(), "syntheticAction", "z-first"),
+    "syntheticAction",
+    "a-second",
+  );
   const labels = nodeLabels(graph);
-  const published = {...graph, nodes: [...graph.nodes].sort((a,b) => a.id.localeCompare(b.id))};
+  const published = {
+    ...graph,
+    nodes: [...graph.nodes].sort((a, b) => a.id.localeCompare(b.id)),
+  };
   expect(nodeLabels(published)).toEqual(labels);
   expect(labels.get("z-first")).toBe("Synthetic action 1");
   expect(labels.get("a-second")).toBe("Synthetic action 2");

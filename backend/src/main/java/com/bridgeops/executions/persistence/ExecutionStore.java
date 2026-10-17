@@ -40,6 +40,7 @@ public class ExecutionStore {
         jdbc.update("INSERT INTO execution_steps(organization_id,execution_id,node_id,position,node_type,logical_operation_id,argument_hash) VALUES(?,?,?,?,?,?,?)",org,execution,node,position,type,operation,hash);
     }
     public List<Step> steps(UUID org,UUID execution){return jdbc.query("SELECT * FROM execution_steps WHERE organization_id=? AND execution_id=? ORDER BY position",this::step,org,execution);}
+    public Instant due(UUID org,UUID execution){return jdbc.queryForObject("SELECT due_at FROM execution_work_items WHERE organization_id=? AND execution_id=?",Timestamp.class,org,execution).toInstant();}
     public void event(Execution e,String code,String node,Instant now){
         jdbc.update("INSERT INTO execution_events(id,organization_id,execution_id,event_sequence,occurred_at,code,node_id) SELECT ?,?,?,coalesce(max(event_sequence),0)+1,?,?,? FROM execution_events WHERE organization_id=? AND execution_id=?",
             UUID.randomUUID(),e.organization(),e.id(),time(now),code,node,e.organization(),e.id());

@@ -29,6 +29,7 @@ export interface Execution {
   retryEligible: boolean;
 }
 export interface Step {
+  retryAt?: string | null;
   nodeId: string;
   position: number;
   type: string;

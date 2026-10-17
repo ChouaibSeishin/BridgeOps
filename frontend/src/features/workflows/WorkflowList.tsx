@@ -35,8 +35,8 @@ export function WorkflowHome({ user }: { user: User }) {
         </Link>
       </div>
       <p className="phase-note">
-        Definition lifecycle only. Publication freezes a version; execution
-        begins in Phase 3.
+        Publication freezes a version. Start supported internal executions
+        explicitly from a published workflow.
       </p>
       {organizations.isPending ? (
         <p role="status">Loading organizations…</p>
@@ -128,8 +128,8 @@ function OrganizationWorkflows({
         </div>
       </div>
       <p className="phase-note">
-        Published definitions do not execute in Phase 2. No external integration
-        or approval decision is performed.
+        Publication does not start an execution. Explicit runs support internal
+        records only; no external integration or approval decision is performed.
       </p>
       <section className="data-panel">
         <div className="section-heading">

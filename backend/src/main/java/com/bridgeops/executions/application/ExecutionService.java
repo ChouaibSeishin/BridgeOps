@@ -81,7 +81,8 @@ public class ExecutionService {
     }
     @Transactional(readOnly=true,timeout=5)
     public List<Step> steps(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"execution.read");store.get(org,id,false);
-        return store.steps(org,id).stream().map(s->new Step(s.node(),s.position(),s.type(),s.state(),s.attempts(),s.started(),s.completed(),s.output()==null?null:graphs.parse(s.output()),s.error())).toList();
+        var due=store.due(org,id);
+        return store.steps(org,id).stream().map(s->new Step(s.node(),s.position(),s.type(),s.state(),s.attempts(),s.started(),s.completed(),s.output()==null?null:graphs.parse(s.output()),s.error(),s.state().equals("WAITING_FOR_RETRY")?due:null)).toList();
     }
     @Transactional(readOnly=true,timeout=5)
     public Page<Attempt> attempts(UUID actor,UUID family,UUID org,UUID id,int page,int size){authority.read(actor,family,org,"execution.read");store.get(org,id,false);bounds(page,size);
@@ -97,7 +98,7 @@ public class ExecutionService {
         for(var step:store.steps(e.organization(),e.id()))if(step.state().equals("RUNNING")){
             store.jdbc().update("INSERT INTO execution_attempts(id,organization_id,execution_id,node_id,attempt_number,started_at,completed_at,outcome,error_code) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",UUID.randomUUID(),e.organization(),e.id(),step.node(),step.attempts(),time(step.started()),time(now),outcome,outcome);
         }
-        store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=? WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());
+        store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=CASE WHEN status='PENDING' THEN 'NOT_DISPATCHED' ELSE ? END WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());
     }
     public Summary summary(Execution e){return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e));}
     private boolean eligible(Execution e){return e.state()==ExecutionState.FAILED&&"TRANSIENT_EXHAUSTED".equals(e.error());}

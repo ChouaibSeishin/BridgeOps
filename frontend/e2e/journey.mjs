@@ -13,9 +13,31 @@ let step = "launch",
   browser,
   page;
 const observed = new WeakSet();
+let firstAuthenticationAt;
+let authenticationRetryAt = 0;
 function observe(target) {
   if (observed.has(target)) return;
   observed.add(target);
+  target.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname.startsWith("/api/v1/auth/") &&
+      firstAuthenticationAt === undefined
+    )
+      firstAuthenticationAt = Date.now();
+  });
+  target.on("response", (response) => {
+    if (
+      response.status() !== 429 ||
+      !new URL(response.url()).pathname.startsWith("/api/v1/auth/")
+    )
+      return;
+    const seconds = Number(response.headers()["retry-after"]);
+    if (Number.isInteger(seconds) && seconds > 0 && seconds <= 60)
+      authenticationRetryAt = Math.max(
+        authenticationRetryAt,
+        Date.now() + seconds * 1000,
+      );
+  });
   target.on("response", (response) =>
     console.log(
       "HTTP: " +
@@ -26,6 +48,16 @@ function observe(target) {
         response.status(),
     ),
   );
+}
+async function respectAuthenticationBudget() {
+  // The full shared-peer journey can exceed 120 auth/CSRF requests in a fast CI minute.
+  // Pace the test workload; keep every production quota and assertion unchanged.
+  const readyAt = Math.max(
+    (firstAuthenticationAt ?? Date.now()) + 62000,
+    authenticationRetryAt + 1000,
+  );
+  while (Date.now() < readyAt)
+    await page.waitForTimeout(Math.min(1000, readyAt - Date.now()));
 }
 async function mail(recipient, subject) {
   for (let i = 0; i < 30; i++) {
@@ -271,6 +303,7 @@ try {
       console.log("STEP: " + step);
     },
   });
+  await respectAuthenticationBudget();
   step = "desktop mobile and dark render captures";
   console.log("STEP: " + step);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -375,6 +408,7 @@ try {
   expect(
     (
       await otherContext.request.get("/api/v1/auth/me", {
+        maxRetries: 2,
         headers: { Authorization: `Bearer ${otherAccess}` },
       })
     ).status(),
@@ -403,6 +437,7 @@ try {
   expect(
     (
       await guestContext.request.get("/api/v1/auth/me", {
+        maxRetries: 2,
         headers: { Authorization: `Bearer ${beforeChange}` },
       })
     ).status(),
@@ -422,17 +457,25 @@ try {
   expect(
     (
       await guestContext.request.get("/api/v1/auth/me", {
+        maxRetries: 2,
         headers: { Authorization: `Bearer ${beforeLogout}` },
       })
     ).status(),
   ).toBe(401);
+  const ownerLogout = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/auth/logout") &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  expect((await ownerLogout).status()).toBe(204);
   await expect(
     page.getByRole("heading", { name: "Sign in to your workspace" }),
   ).toBeVisible();
   expect(
     (
       await context.request.get("/api/v1/auth/me", {
+        maxRetries: 2,
         headers: { Authorization: `Bearer ${ownerAccess}` },
       })
     ).status(),
@@ -450,6 +493,15 @@ try {
   );
 } catch (failure) {
   console.error("FAIL: browser journey at step: " + step);
+  const message = String(failure.message ?? "");
+  const category = /ECONNRESET|socket hang up/i.test(message)
+    ? "NETWORK_RESET"
+    : /Timeout|timed out/i.test(message)
+      ? "TIMEOUT"
+      : /AssertionError|expect\(/i.test(message)
+        ? "ASSERTION"
+        : "OTHER";
+  console.error("FAIL: category " + category);
   // Emit source locations only: assertion messages can contain credential values.
   console.error(
     "FAIL: source " +

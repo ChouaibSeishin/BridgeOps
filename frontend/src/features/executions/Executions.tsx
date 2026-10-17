@@ -508,6 +508,7 @@ function StepView({ step, name }: { step: Step; name: string }) {
         {when(step.completedAt)}
       </p>
       {step.errorCode && <p>Reason: {stateLabel(step.errorCode)}</p>}
+      {step.retryAt && <p>Next automatic attempt: {when(step.retryAt)}</p>}
       {step.output !== null && (
         <pre className="definition-json" tabIndex={0}>
           {JSON.stringify(step.output, null, 2)}

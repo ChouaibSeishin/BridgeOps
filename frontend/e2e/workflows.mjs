@@ -176,9 +176,12 @@ export async function workflowJourney({
     const firstResponse = await publish(201);
     const first = await firstResponse.json();
     await expect(
-      page.getByText("Published version 1. This definition has not executed.", {
-        exact: true,
-      }),
+      page.getByText(
+        "Published version 1. Publication did not start an execution.",
+        {
+          exact: true,
+        },
+      ),
     ).toBeVisible();
     await page
       .getByRole("link", { name: "Inspect version 1", exact: true })

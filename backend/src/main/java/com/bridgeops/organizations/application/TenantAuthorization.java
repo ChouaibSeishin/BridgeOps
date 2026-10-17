@@ -21,6 +21,12 @@ public class TenantAuthorization {
         organizations.organization(organization, false);
         organizations.require(organization, member.id(), permission);
     }
+    /** Locks only; grants no dispatch authority. Used for cancellation/deadline terminal records. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockDurableContext(UUID actor, UUID organization) {
+        identities.lockDurableActor(actor);
+        organizations.lockDurable(organization);
+    }
     /** Trusted durable worker context; browser session expiry is not execution authority. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void worker(UUID user, UUID organization) {
