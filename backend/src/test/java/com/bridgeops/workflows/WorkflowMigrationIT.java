@@ -28,7 +28,7 @@ class WorkflowMigrationIT {
         if (target != null) configuration.target(target); return configuration.load();
     }
     @Test void emptyDatabaseMigratesAllNineWithoutCreatingAnAccountOrTenant() {
-        String url = database(); migration(url, null).migrate();
+        String url = database(); migration(url, "9").migrate();
         var jdbc = new JdbcTemplate(new DriverManagerDataSource(url, postgres.getUsername(), postgres.getPassword()));
         assertThat(jdbc.queryForObject("SELECT max(version::int) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(9);
         for (String table : List.of("users", "organizations", "workflows", "workflow_drafts", "workflow_versions"))
@@ -44,7 +44,7 @@ class WorkflowMigrationIT {
         jdbc.update("INSERT INTO user_grants VALUES(?,'organization.create',?)", user, now);
         UUID organization = new OrganizationStore(jdbc).insert(user, "Existing organization", "existing-upgrade", Instant.now()).id();
         var users = jdbc.queryForList("SELECT * FROM users"); var tenants = jdbc.queryForList("SELECT * FROM organizations"); var roles = jdbc.queryForList("SELECT * FROM role_permissions ORDER BY organization_id,role_id,permission_code");
-        assertThat(migration(url, null).migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(migration(url, "9").migrate().migrationsExecuted).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT * FROM users")).isEqualTo(users); assertThat(jdbc.queryForList("SELECT * FROM organizations")).isEqualTo(tenants);
         assertThat(jdbc.queryForList("SELECT * FROM role_permissions ORDER BY organization_id,role_id,permission_code")).isEqualTo(roles);
         assertThat(jdbc.queryForObject("SELECT initial_user_id FROM installation_state", UUID.class)).isEqualTo(user);

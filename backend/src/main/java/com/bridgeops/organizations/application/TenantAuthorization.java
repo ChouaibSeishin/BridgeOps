@@ -21,6 +21,14 @@ public class TenantAuthorization {
         organizations.organization(organization, false);
         organizations.require(organization, member.id(), permission);
     }
+    /** Trusted durable worker context; browser session expiry is not execution authority. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void worker(UUID user, UUID organization) {
+        identities.lockActiveWorker(user);
+        organizations.organization(organization, true);
+        var member = organizations.member(organization, user);
+        organizations.require(organization, member.id(), "execution.run");
+    }
     /** The enclosing business transaction retains these locks through its required audit write. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void write(UUID user, UUID family, UUID organization, String permission) {

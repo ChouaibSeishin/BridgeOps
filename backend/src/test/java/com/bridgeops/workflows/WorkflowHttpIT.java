@@ -157,10 +157,12 @@ class WorkflowHttpIT {
         send(owner, get(path)).andExpect(jsonPath("$.workflow.revision").value(0)).andExpect(jsonPath("$.currentPublishedVersion").isEmpty());
         send(owner, get(path + "/versions")).andExpect(jsonPath("$.totalElements").value(0));
     }
-    @Test void openApiDescribesOnlyDefinitionRoutesAndExecutionStaysDenied() throws Exception {
+    @Test void openApiRetainsDefinitionRoutesAndUnpublishedExecutionCannotRun() throws Exception {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andExpect(jsonPath("$.paths['/api/v1/organizations/{organization}/workflows'].post").exists()).andExpect(jsonPath("$.paths['/api/v1/organizations/{organization}/workflows/{id}/versions/{version}'].get").exists());
-        String path = path(create()); for (String action : List.of("executions", "test-runs", "approve")) send(owner, post(path + "/" + action).content("{}")).andExpect(status().isForbidden());
-        assertThat(operator.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('workflow_executions','approval_requests','work_items')", Long.class)).isZero();
+        String path = path(create()); for (String action : List.of("test-runs", "approve")) send(owner, post(path + "/" + action).content("{}")).andExpect(status().isForbidden());
+        send(owner, post(path + "/executions").header("Idempotency-Key","unpublished-workflow-key").content("{\"input\":{}}")).andExpect(status().isUnprocessableContent());
+        assertThat(operator.queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('approval_requests','work_items')", Long.class)).isZero();
     }
     @AfterAll static void cleanup() throws Exception { keys.close(); }
 }

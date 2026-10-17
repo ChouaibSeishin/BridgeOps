@@ -14,7 +14,7 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
     private final GraphDefinition graphs;
     public WorkflowRequestLimits(GraphDefinition graphs) { this.graphs = graphs; }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/workflows(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH"));
+        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/(?:workflows|executions)(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH"));
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         if (request.getContentLengthLong() > MAX_REQUEST) { tooLarge(request, response); return; }
@@ -23,8 +23,13 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
         try {
             var body = graphs.checkRequest(bytes);
             if (body != null && body.isObject()) {
-                for (String field : java.util.List.of("name", "description"))
+                for (String field : java.util.List.of("name", "description", "reason", "versionId"))
                     if (body.has(field) && !body.get(field).isString()) throw new IllegalArgumentException("String metadata required.");
+                if (body.has("delaySeconds")) {
+                    var delay = body.get("delaySeconds");
+                    if (!delay.isIntegralNumber() || delay.bigIntegerValue().signum() < 0 || delay.bigIntegerValue().compareTo(java.math.BigInteger.valueOf(3600)) > 0)
+                        throw new IllegalArgumentException("Bounded exact delay required.");
+                }
                 var revision = body.get("expectedRevision");
                 if (revision != null && (!revision.isIntegralNumber() || revision.bigIntegerValue().signum() < 0
                     || revision.bigIntegerValue().compareTo(java.math.BigInteger.valueOf(Long.MAX_VALUE)) > 0))

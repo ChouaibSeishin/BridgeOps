@@ -75,7 +75,8 @@ class BrowserJourneyIT {
    assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows WHERE status='ARCHIVED'",Integer.class)).isEqualTo(1);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='WORKFLOW_PUBLISHED'",Integer.class)).isEqualTo(2);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows w JOIN organizations o ON o.id=w.organization_id WHERE o.slug='outside-browser-fixture'",Integer.class)).isZero();
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('workflow_executions','approval_requests','work_items')",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('approval_requests','work_items')",Integer.class)).isZero();
   }finally{if(process.isAlive())process.destroyForcibly();}
  }
  static void reply(HttpExchange exchange,int status,String mime,byte[] bytes)throws java.io.IOException{if(mime!=null)exchange.getResponseHeaders().set("Content-Type",mime);exchange.sendResponseHeaders(status,status==204?-1:bytes.length);if(status!=204)exchange.getResponseBody().write(bytes);}

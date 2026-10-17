@@ -18,6 +18,11 @@ public class AccountAuthority {
     }
     @Transactional(readOnly=true,timeout=5)
     public void requireLive(UUID user,UUID family){if(!sessions.isActive(user,family))throw new DomainFailure(401,"AUTHENTICATION_REQUIRED");}
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockActiveWorker(UUID user) {
+        if(jdbc.queryForList("SELECT id FROM users WHERE id=? AND account_status='ACTIVE' FOR UPDATE",user).isEmpty())
+            throw new DomainFailure(403,"PERMISSION_DENIED");
+    }
     @Transactional(readOnly=true,timeout=5)
     public boolean active(UUID user){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND account_status=\'ACTIVE\')",Boolean.class,user));}
     @Transactional(timeout=10)
