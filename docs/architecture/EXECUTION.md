@@ -1,6 +1,6 @@
 # Execution and approval design
 
-Status: Phase 3 sequential internal runtime implemented; local release gates passed and final hosted verification is pending. The broader approval/integration sequence below remains Phase 4+ target design. [Exact implemented contract](../development/PHASE_3_EXECUTION.md).
+Status: Phase 3 sequential internal runtime implemented; local release gates and corresponding hosted implementation CI passed. The broader approval/integration sequence below remains Phase 4+ target design. [Exact implemented contract](../development/PHASE_3_EXECUTION.md).
 
 Phase 2 implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Its schema-v1 registry supports only a connected linear manual-trigger/synthetic-action/approval/end chain. Phase 3 runs manualTrigger, syntheticAction/record and end only, ordered by edges. Approval-containing versions are rejected before submission. Branches, joins, TEST snapshots and approval decisions in the target design below remain deferred. Published definitions never execute merely because publication succeeds.
 

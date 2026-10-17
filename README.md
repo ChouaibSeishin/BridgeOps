@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Phase 3 durable internal execution is implemented; local release gates passed and final hosted verification is pending.** The full local regression passed 206 backend/integration/browser tests with no failures, errors or skips. All 54 frontend tests, typecheck, lint, production build and production dependency audit passed. Phase 1/2 behavior remains covered. Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Explicit execution now runs published manual-trigger/record/end chains. Approval-containing versions reject before submission; external integrations, approvals, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
+**Phase 3 durable internal execution is complete and verified.** [Implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39070309725). The full local regression passed 206 backend/integration/browser tests with no failures, errors or skips. All 54 frontend tests, typecheck, lint, production build and production dependency audit passed. Phase 1/2 behavior remains covered. Definitions can be saved, validated, published, inspected, duplicated and archived; publication does not execute anything. Explicit execution now runs published manual-trigger/record/end chains. Approval-containing versions reject before submission; external integrations, approvals, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
 
 ## Start from a clean checkout
 
@@ -94,7 +94,7 @@ The local Compose backend receives startup migration credentials. Production mus
 - [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
 - [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Phase 3 implements durable sequential internal execution. Phase 4 approval processing is next after final hosted verification; integration adapters and AI remain later.
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Phase 3 implements durable sequential internal execution. Phase 4 approval processing is next; integration adapters and AI remain later.
 
 ## Browser preview
 
