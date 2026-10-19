@@ -4,6 +4,8 @@ Status: mixed implemented and proposed controls; current tested boundaries are r
 
 ## Trust boundaries
 
+Phase 4 implemented boundary: every record passes the central gate, including graphs with no approval node. Exact immutable intent binds tenant, execution, source hash, requester, operation/arguments, policy and expiry. Self-approval is forbidden for all role combinations. Decision, signal consumption and effect use live authorization; revoked/disabled actors, changed policy/intent, expired requests and terminal executions cannot authorize dispatch. Immutable decisions/signals/receipts and fenced execution writes prevent duplicate resumption/effects. Policy, lifecycle and consumption audit failures roll back their transaction. APIs reauthorize in application services and conceal foreign resources; CSRF/Origin remain mandatory for mutations. The [approval guide](../development/PHASE_4_APPROVALS.md) distinguishes these tested controls from future external/AI controls.
+
 Browser -> TLS edge -> adapters -> application authorization -> tenant repositories. Workers cross from persisted messages into revalidated authority. Connector calls leave the trust boundary. LLM responses and ticket text are untrusted. MCP clients are separate authenticated clients, never trusted because they speak the protocol. Managed-secret access and database maintenance roles have separate credentials. Platform administration grants no automatic tenant access.
 
 ## Threats, controls and required verification

@@ -78,6 +78,11 @@ public class WorkflowService {
     public Snapshot version(UUID user, UUID family, UUID organization, UUID id, UUID versionId) {
         authority.read(user, family, organization, "workflow.read"); store.get(organization, id, false); return snapshot(store.version(organization, id, versionId));
     }
+    /** Authorized bounded source metadata without returning the definition graph. */
+    @Transactional(readOnly=true,timeout=5)
+    public VersionSummary reference(UUID user,UUID family,UUID organization,UUID id,UUID versionId) {
+        authority.read(user,family,organization,"workflow.read");return version(store.version(organization,id,versionId));
+    }
     private Summary summary(WorkflowStore.Row row) { return new Summary(row.id(), row.name(), row.description(), row.status(), row.revision(), row.currentVersion(), row.updatedAt()); }
     private Detail detail(WorkflowStore.Row row) { return new Detail(summary(row), graphs.parse(row.definition()), row.currentVersion() == null ? null : version(store.version(row.organizationId(), row.id(), row.currentVersion()))); }
     private VersionSummary version(WorkflowStore.Version row) { return new VersionSummary(row.id(), row.workflowId(), row.number(), row.sourceRevision(), row.schemaVersion(), row.canonicalizationVersion(), row.name(), row.description(), row.hash(), row.actor(), row.publishedAt()); }

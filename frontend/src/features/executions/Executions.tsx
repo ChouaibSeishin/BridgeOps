@@ -66,6 +66,7 @@ export function ExecutionList({ user }: { user: User }) {
                 "RUNNING",
                 "WAITING_FOR_RETRY",
                 "WAITING_FOR_DELAY",
+                "WAITING_FOR_APPROVAL",
                 "SUCCEEDED",
                 "FAILED",
                 "CANCELLED",
@@ -240,7 +241,9 @@ function ExecutionWorkspace({
     names.set(
       step.nodeId,
       (nodeSchema(step.type)?.label ?? "Step") +
-        (step.type === "syntheticAction" ? ` ${n}` : ""),
+        (step.type === "syntheticAction" || step.type === "approval"
+          ? ` ${n}`
+          : ""),
     );
   }
   async function mutate() {
@@ -318,6 +321,25 @@ function ExecutionWorkspace({
               ? "Awaiting dispatch"
               : "No remaining dispatch"}
         </p>
+        {e.status === "WAITING_FOR_APPROVAL" && (
+          <div className="phase-note">
+            <p>
+              A distinct eligible person must review the exact proposed
+              operation. Completed records remain visible while this execution
+              waits.
+            </p>
+            {e.approvalId && (
+              <Link
+                to={`/organizations/${organization}/approvals/${e.approvalId}`}
+              >
+                Review outstanding approval
+              </Link>
+            )}
+            {e.approvalExpiresAt && (
+              <p>Approval expires: {when(e.approvalExpiresAt)}</p>
+            )}
+          </div>
+        )}
         {e.errorCode && (
           <p role="alert">
             Reason: {stateLabel(e.errorCode)}. Earlier completed effects remain
@@ -330,6 +352,13 @@ function ExecutionWorkspace({
           Inspect pinned workflow version
         </Link>
         <code className="definition-hash">SHA-256 {e.definitionHash}</code>
+        <p>
+          <Link
+            to={`/organizations/${organization}/approvals?executionId=${e.id}`}
+          >
+            Approval history for this execution
+          </Link>
+        </p>
         {e.retryOfExecutionId && (
           <Link
             to={`/organizations/${organization}/executions/${e.retryOfExecutionId}`}

@@ -190,25 +190,30 @@ public class ExecutionRuntime {
         approvals.reconcile(e.organization(),e.id(),e.actor());boolean changed=false;
         for(var signal:approvals.signals(e.organization(),e.id())){
             e=store.get(e.organization(),e.id(),false);Instant now=clock.instant();
-            if(e.state().terminal()){changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
-            if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
-            if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL){fail(e,"RECONCILIATION_REQUIRED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
-            try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            if(e.state().terminal()){changed|=consumeApprovalSignal(e,signal);continue;}
+            if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);changed|=consumeApprovalSignal(e,signal);continue;}
+            if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL){fail(e,"RECONCILIATION_REQUIRED",now);changed|=consumeApprovalSignal(e,signal);continue;}
+            try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=consumeApprovalSignal(e,signal);continue;}
             var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.from(snapshot.graph(),graphs);
-            if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=consumeApprovalSignal(e,signal);continue;}
             var gate=approvals.resumeCheck(seed(e,plan,e.position()),actors);
             if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS)continue;
-            if(!signal.outcome().equals("APPROVED")||gate.result()!=ApprovalRuntime.Result.ALLOW){fail(e,gate.error()==null?"APPROVAL_"+signal.outcome():gate.error(),now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            if(!signal.outcome().equals("APPROVED")||gate.result()!=ApprovalRuntime.Result.ALLOW){fail(e,gate.error()==null?"APPROVAL_"+signal.outcome():gate.error(),now);changed|=consumeApprovalSignal(e,signal);continue;}
+            changed|=consumeApprovalSignal(e,signal);
             var node=plan.get(e.position());
             if(node.type().equals("approval")){
                 jdbc.update("UPDATE execution_steps SET status='SUCCEEDED',attempt_count=1,attempt_started_at=?,completed_at=?,output_json='{\"approved\":true}',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=? AND status='WAITING_FOR_APPROVAL'",time(signal.createdAt()),time(now),e.organization(),e.id(),node.id());
                 var step=store.steps(e.organization(),e.id()).get(e.position());attempt(e,step,"SUCCEEDED",null,now);store.event(e,"STEP_SUCCEEDED",node.id(),now);advance(e);e=store.get(e.organization(),e.id(),false);
             }else jdbc.update("UPDATE execution_steps SET status='PENDING',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=? AND status='WAITING_FOR_APPROVAL'",e.organization(),e.id(),node.id());
             store.state(e,ExecutionState.QUEUED,null,now);store.resume(e,now);store.event(e,"EXECUTION_RESUMED",node.id(),now);
-            changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());
         }
         return changed;
     }));}
+    private boolean consumeApprovalSignal(Execution e,ApprovalRuntime.SignalView signal){
+        if(!approvals.consume(e.organization(),e.id(),signal.id(),e.actor()))return false;
+        store.event(e,"APPROVAL_SIGNAL_"+signal.outcome(),signal.gate(),clock.instant());
+        store.event(e,"APPROVAL_SIGNAL_CONSUMED",signal.gate(),clock.instant());return true;
+    }
     public boolean renew(Claim c,int leaseSeconds){return Boolean.TRUE.equals(tx.execute(status->{
         lockContext(c);var e=owned(c);if(e==null)return false;
         if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return false;}

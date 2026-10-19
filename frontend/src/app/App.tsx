@@ -40,6 +40,11 @@ import {
   ExecutionList,
   ExecutionDetail,
 } from "../features/executions/Executions";
+import {
+  ApprovalInbox,
+  ApprovalDetail,
+  ApprovalPolicy,
+} from "../features/approvals/Approvals";
 export function App() {
   const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
@@ -184,6 +189,18 @@ export function App() {
               element={<Recovery reset onReset={passwordFinished} />}
             />
             <Route path="/" element={<Organizations user={state.user!} />} />
+            <Route
+              path="/organizations/:id/approvals"
+              element={<ApprovalInbox user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/approvals/:approvalId"
+              element={<ApprovalDetail user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/approval-policy"
+              element={<ApprovalPolicy user={state.user!} />}
+            />
             <Route
               path="/organizations/:id/executions"
               element={<ExecutionList user={state.user!} />}

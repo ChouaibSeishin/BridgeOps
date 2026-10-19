@@ -1,8 +1,10 @@
 # Proposed relational model
 
-Status: V1–V8 implement foundation/identity/tenant/recovery. V9 workflow/draft/version persistence passed empty-schema and V8-upgrade tests and the additive local Compose upgrade with existing account/installation state preserved. V10 adds the durable internal execution subset below. Broader integration/approval/AI models remain planned. [Exact workflow contract](../development/PHASE_2_WORKFLOWS.md). UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revisions are defaults. JSON is bounded/schema-versioned and never grants authority.
+Status: V1–V8 implement foundation/identity/tenant/recovery. V9 workflow/draft/version persistence passed empty-schema and V8-upgrade tests and the additive local Compose upgrade with existing account/installation state preserved. V10 adds the durable internal execution subset below. V11 adds the human-approval subset described below; broader integrations/AI models remain planned. [Exact workflow contract](../development/PHASE_2_WORKFLOWS.md). UUID IDs, UTC timestamptz/Java Instant, explicit nullability/checks and optimistic revisions are defaults. JSON is bounded/schema-versioned and never grants authority.
 
 ## Identity and tenancy ER diagram
+
+V11 adds implemented approval_policy_versions, organization_approval_policies, approval_requests and append-only approval_decisions, approval_signals, approval_signal_receipts, approval_invalidations and approval_events. Tenant-qualified foreign keys bind pinned execution/version/hash, gate/action, logical operation/hash and policy. Requests finalize once, with one decision and signal per request and one receipt per signal. Narrow runtime grants deny history mutation and deletion. Fresh V11 and V10 upgrade tests verify preservation, constraints and privileges. The [approval guide](../development/PHASE_4_APPROVALS.md) documents exact fields and acceptance; broader models below remain target design.
 
 ```mermaid
 erDiagram

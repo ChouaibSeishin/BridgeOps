@@ -89,3 +89,17 @@ Phase 1D.3 implements POST /auth/password/change, /auth/forgot and /auth/reset w
 Current Phase 1D member summaries additionally include account:{id,displayName,email}, resolved through the identity application query boundary after tenant authorization. No account grants, password hashes or entity objects are exposed in the roster.
 
 Phase 3 exact routes, strict input bounds, state machine, DTOs and scheduling/receipt semantics are maintained in [the execution guide](../development/PHASE_3_EXECUTION.md). Approval decisions, external capabilities and draft TEST snapshots remain unavailable. Internal record effects are real persisted rows; execution output does not imply any external service was contacted.
+
+## Implemented Phase 4 approval routes
+
+All routes below use `/api/v1/organizations/{organizationId}` and live tenant/application-service authorization, bearer/session checks and existing mutation CSRF/Origin protection. No anonymous decision link or execution mutation is hidden behind a read route.
+
+| Method/path | Permission | Contract |
+| --- | --- | --- |
+| GET `/approvals` | approval.read | Bounded page/size, optional status and executionId filters |
+| GET `/approvals/{approvalId}` | approval.read | Exact read-only arguments, pinned version/hash, participants, status/revision/expiry, final decision/events and backend actionability |
+| POST `/approvals/{approvalId}/decision` | approval.decide | expectedRevision, decision APPROVE or REJECT, optional bounded reason; 200 committed decision does not imply execution success |
+| GET `/approval-policy` | approval.read | Effective immutable version, requireRecordApproval and lifetimeSeconds |
+| PUT `/approval-policy` | policy.manage | expectedRevision, exact boolean requireRecordApproval and integer lifetimeSeconds 60–86400; 200 persisted new version |
+
+Distinct requester/decision actor is mandatory. Repeated/stale/final decision conflicts return 409; self/permission denial 403, foreign resources 404, malformed scalar/body 400, invalid policy 422 and unavailable dependency 503. Bodies are bounded to 256 KiB and unknown fields reject. Decisions and policy changes commit required audit atomically. Signals are durable worker input, not a public resume endpoint. [Exact DTOs, error codes, state and retry semantics](../development/PHASE_4_APPROVALS.md).

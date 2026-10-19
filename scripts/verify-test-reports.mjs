@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 const directories = ["backend/target/surefire-reports", "backend/target/failsafe-reports"];
-const required = ["BrowserJourneyIT", "ExecutionLifecycleIT", "ExecutionHttpIT", "ExecutionMigrationIT", "ExecutionOutageIT"];
+const required = ["BrowserJourneyIT", "ExecutionLifecycleIT", "ExecutionHttpIT", "ExecutionMigrationIT", "ExecutionOutageIT", "ApprovalBrowserIT", "ApprovalLifecycleIT", "ApprovalHttpIT", "ApprovalMigrationIT", "ApprovalContractsTest", "ApprovalBoundariesTest"];
 const found = new Set();
 const totals = { reports: 0, tests: 0, failures: 0, errors: 0, skipped: 0 };
 for (const directory of directories) {

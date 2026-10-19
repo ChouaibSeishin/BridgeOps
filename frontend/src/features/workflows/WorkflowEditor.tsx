@@ -193,7 +193,7 @@ function DraftWorkspace({
       </div>
       <p className="phase-note">
         Publication freezes a snapshot without running it. Explicit execution
-        supports internal records; approval processing remains Phase 4.
+        supports internal records and distinct-human approval gates.
       </p>
       {!archived && (
         <ExecutionStart

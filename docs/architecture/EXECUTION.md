@@ -1,8 +1,8 @@
 # Execution and approval design
 
-Status: Phase 3 sequential internal runtime implemented; local release gates and corresponding hosted implementation CI passed. The broader approval/integration sequence below remains Phase 4+ target design. [Exact implemented contract](../development/PHASE_3_EXECUTION.md).
+Status: sequential internal execution and Phase 4 human approval runtime implemented. [Execution contract](../development/PHASE_3_EXECUTION.md), [approval contract and release evidence](../development/PHASE_4_APPROVALS.md). External integrations, notifications, TEST snapshots and richer graphs below remain deferred target design.
 
-Phase 2 implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Its schema-v1 registry supports only a connected linear manual-trigger/synthetic-action/approval/end chain. Phase 3 runs manualTrigger, syntheticAction/record and end only, ordered by edges. Approval-containing versions are rejected before submission. Branches, joins, TEST snapshots and approval decisions in the target design below remain deferred. Published definitions never execute merely because publication succeeds.
+Phase 2 implements definition validation/persistence/publication through [the workflow contract](../development/PHASE_2_WORKFLOWS.md). Schema v1 supports only a connected linear manual-trigger/synthetic-action/approval/end chain; runtime order follows edges. Phase 4 executes an approval node only when immediately followed by syntheticAction/record; other approval targets reject before persistence. Every record also passes the policy gate, so omitting a node cannot bypass approval. One different eligible human decides exact immutable intent. WAITING_FOR_APPROVAL parks work and releases the lease; a final signal is consumed once before a valid resume. Requester, approver, capability, policy, expiry and intent are rechecked before effects. Terminal executions never resume; historical decisions are never rewritten. Publication never executes a definition.
 
 ## Definition and validation
 

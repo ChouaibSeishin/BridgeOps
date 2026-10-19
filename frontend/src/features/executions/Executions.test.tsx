@@ -144,7 +144,10 @@ it("confirms the exact snapshot, shows submission state and preserves an idempot
     screen.getByRole("button", { name: "Run published version" }),
   );
   expect(screen.getByRole("dialog")).toHaveTextContent(
-    "No external service or approval decision",
+    "No external service is contacted",
+  );
+  expect(screen.getByRole("dialog")).toHaveTextContent(
+    "starting never approves it",
   );
   fireEvent.change(screen.getByLabelText("Start delay in seconds"), {
     target: { value: "12" },
@@ -183,6 +186,27 @@ it("reports unsupported approval definitions without fabricating execution succe
   expect(
     screen.queryByRole("heading", { name: "Execution detail" }),
   ).not.toBeInTheDocument();
+});
+it("shows a persisted approval wait, its deadline and history without hiding cancellation", async () => {
+  vi.mocked(executionApi.get).mockResolvedValue({
+    ...execution("WAITING_FOR_APPROVAL"),
+    approvalId: "request",
+    approvalExpiresAt: "2099-10-19T13:00:00Z",
+  });
+  show();
+  expect(
+    await screen.findByRole("link", { name: "Review outstanding approval" }),
+  ).toHaveAttribute("href", "/organizations/org/approvals/request");
+  expect(
+    screen.getByRole("link", { name: "Approval history for this execution" }),
+  ).toHaveAttribute(
+    "href",
+    "/organizations/org/approvals?executionId=execution",
+  );
+  expect(
+    screen.getByRole("button", { name: "Cancel execution" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Approval expires:/)).toBeInTheDocument();
 });
 it("renders persisted result, attempts, timeline and immutable version link with terminal controls absent", async () => {
   show();

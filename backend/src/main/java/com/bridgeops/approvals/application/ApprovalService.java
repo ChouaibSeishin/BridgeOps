@@ -4,6 +4,7 @@ import com.bridgeops.approvals.domain.ApprovalState;
 import com.bridgeops.approvals.persistence.ApprovalStore;
 import com.bridgeops.approvals.persistence.ApprovalStore.*;
 import com.bridgeops.audit.application.ApprovalAudit;
+import com.bridgeops.identity.application.IdentityQueries;
 import com.bridgeops.organizations.application.TenantAuthorization;
 import com.bridgeops.shared.web.DomainFailure;
 import java.time.*;
@@ -16,18 +17,19 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class ApprovalService {
     public record PolicyView(long version,long revision,boolean requireRecordApproval,int lifetimeSeconds) {}
-    public record DecisionView(UUID id,UUID actor,String decision,Instant at,long expectedRevision,String reason) {}
-    public record EventView(long sequence,Instant occurredAt,UUID actor,String code) {}
+    public record DecisionView(UUID id,UUID actor,String decision,Instant at,long expectedRevision,String reason,String actorName) {}
+    public record EventView(long sequence,Instant occurredAt,UUID actor,String code,String actorName) {}
     public record View(UUID id,UUID executionId,UUID workflowId,UUID versionId,String definitionHash,UUID requestedBy,
         String gateNodeId,String actionNodeId,String prompt,String capability,String operation,JsonNode arguments,String argumentHash,String intentHash,
         long policyVersion,JsonNode policySnapshot,Instant createdAt,Instant expiresAt,Instant deadlineAt,
         ApprovalState status,long revision,Instant finalizedAt,String errorCode,String executionStatus,boolean actionable,boolean invalidated,
-        DecisionView decision,List<EventView> events) {}
+        DecisionView decision,List<EventView> events,String workflowName,int versionNumber,String requesterName) {}
     public record Page(List<View> items,int page,int size,long totalElements,long totalPages) {}
     private final ApprovalStore store;private final TenantAuthorization authority;private final ApprovalExecutionContext executions;
     private final ApprovalLifecycle lifecycle;private final ApprovalAudit audit;private final Clock clock;
+    private final IdentityQueries identities;
     private final JsonMapper json=JsonMapper.builder().build();
-    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;}
+    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock,IdentityQueries identities){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;this.identities=identities;}
     @Transactional(readOnly=true,timeout=5)
     public PolicyView policy(UUID actor,UUID family,UUID org){authority.read(actor,family,org,"approval.read");return policyView(store.policy(org));}
     @Transactional(timeout=10)
@@ -36,7 +38,7 @@ public class ApprovalService {
         if(expected<0||lifetime<60||lifetime>86400)throw new DomainFailure(422,"INVALID_APPROVAL_POLICY");
         var old=store.policy(org);if(old.version()!=expected)throw new DomainFailure(409,"STALE_REVISION");Instant now=clock.instant();
         store.ensurePolicy(org,now);var next=new Policy(old.version()+1,required,lifetime);store.changePolicy(org,actor,next,now);
-        for(var r:store.pending(org,null))lifecycle.finish(r,ApprovalState.INVALIDATED,"POLICY_CHANGED",actor,now);
+        for(var r:store.pending(org,null))lifecycle.finish(r,r.expires().isAfter(now)?ApprovalState.INVALIDATED:ApprovalState.EXPIRED,r.expires().isAfter(now)?"POLICY_CHANGED":"APPROVAL_EXPIRED",actor,now);
         audit.write(org,actor,ApprovalAudit.Action.APPROVAL_POLICY_CHANGED,org,next.version(),now);return policyView(next);
     }
     @Transactional(readOnly=true,timeout=5)
@@ -51,7 +53,7 @@ public class ApprovalService {
     public View decide(UUID actor,UUID family,UUID org,UUID id,long revision,String outcome,String reason){
         authority.write(actor,family,org,"approval.decide");
         if(revision<0||!Set.of("APPROVE","REJECT").contains(outcome==null?"":outcome)||reason!=null&&(reason.length()>200||reason.codePoints().anyMatch(Character::isISOControl)))throw new DomainFailure(400,"INVALID_REQUEST");
-        var preview=store.get(org,id,false);var execution=executions.lock(org,preview.execution());var r=store.get(org,id,true);Instant now=clock.instant();
+        var preview=store.get(org,id,false);var execution=executions.lock(actor,family,org,preview.execution());var r=store.get(org,id,true);Instant now=clock.instant();
         if(r.requester().equals(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
         if(r.revision()!=revision||r.state()!=ApprovalState.PENDING)throw new DomainFailure(409,"APPROVAL_CONFLICT");
         if(!r.expires().isAfter(now)||!execution.deadline().isAfter(now))throw new DomainFailure(409,"APPROVAL_EXPIRED");
@@ -67,12 +69,15 @@ public class ApprovalService {
         return view(actor,family,store.get(org,id,false),true);
     }
     private View view(UUID actor,UUID family,Request r,boolean detail){
-        var e=executions.read(r.organization(),r.execution());boolean decide=authority.permitted(actor,family,r.organization(),"approval.decide");
+        var e=executions.read(actor,family,r.organization(),r.execution());boolean decide=authority.permitted(actor,family,r.organization(),"approval.decide");
         boolean invalid=store.invalidated(r.organization(),r.id())||r.policyVersion()!=store.policy(r.organization()).version();Instant now=clock.instant();
         boolean actionable=decide&&!actor.equals(r.requester())&&r.state()==ApprovalState.PENDING&&!invalid&&r.expires().isAfter(now)&&e.deadline().isAfter(now)&&e.status().equals("WAITING_FOR_APPROVAL");
-        var decision=store.decision(r.organization(),r.id()).map(d->new DecisionView(d.id(),d.actor(),d.decision(),d.at(),d.expectedRevision(),d.reason())).orElse(null);
-        var events=detail?store.events(r.organization(),r.id()).stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code())).toList():List.<EventView>of();
-        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),"synthetic","record",json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events);
+        var recorded=store.decision(r.organization(),r.id());var history=detail?store.events(r.organization(),r.id()):List.<Event>of();
+        var actors=new HashSet<UUID>();actors.add(r.requester());recorded.ifPresent(d->actors.add(d.actor()));history.forEach(v->actors.add(v.actor()));var labels=identities.labels(actors);
+        java.util.function.Function<UUID,String> name=id->labels.containsKey(id)?labels.get(id).displayName():"Member";
+        var decision=recorded.map(d->new DecisionView(d.id(),d.actor(),d.decision(),d.at(),d.expectedRevision(),d.reason(),name.apply(d.actor()))).orElse(null);
+        var events=history.stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code(),name.apply(v.actor()))).toList();
+        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),"synthetic","record",json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),name.apply(r.requester()));
     }
     private PolicyView policyView(Policy p){return new PolicyView(p.version(),p.version(),p.required(),p.lifetime());}
 }

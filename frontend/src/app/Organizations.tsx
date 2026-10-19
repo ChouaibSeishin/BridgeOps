@@ -258,7 +258,8 @@ export function Organizations({ user }: { user: User }) {
       )}
       <p className="muted">
         Workflows can run registered internal record operations. Integrations
-        and approval processing remain later phases.
+        remain later phases. Internal workflows can pause for a distinct human
+        approval.
       </p>
     </>
   );
@@ -362,6 +363,13 @@ export function OrganizationDetail({ user }: { user: User }) {
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
+      {permissions.includes("approval.read") && (
+        <p>
+          <Link className="button" to={`/organizations/${id}/approvals`}>
+            Open approvals
+          </Link>
+        </p>
+      )}
       {permissions.includes("execution.read") && (
         <p>
           <Link className="button" to={`/organizations/${id}/executions`}>

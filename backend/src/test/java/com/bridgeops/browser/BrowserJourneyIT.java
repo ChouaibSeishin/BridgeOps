@@ -95,7 +95,11 @@ class BrowserJourneyIT {
    assertThat(jdbc.queryForObject("SELECT count(*) FROM synthetic_records",Integer.class)).isEqualTo(4);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_operation_receipts",Integer.class)).isEqualTo(4);
    assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_events WHERE code='RECEIPT_REUSED'",Integer.class)).isEqualTo(1);
-   assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('approval_requests','work_items')",Integer.class)).isZero();
+   // V11 introduces approval tables; the retained Phase 1–3 journey must create no governance requests or decisions.
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM approval_requests",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM approval_decisions",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM approval_signals",Integer.class)).isZero();
+   assertThat(jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='work_items'",Integer.class)).isZero();
   }finally{if(process.isAlive())process.destroyForcibly();}
  }
  static void reply(HttpExchange exchange,int status,String mime,byte[] bytes)throws java.io.IOException{if(mime!=null)exchange.getResponseHeaders().set("Content-Type",mime);exchange.sendResponseHeaders(status,status==204?-1:bytes.length);if(status!=204)exchange.getResponseBody().write(bytes);}

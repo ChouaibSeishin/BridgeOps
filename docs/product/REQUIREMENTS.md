@@ -4,6 +4,8 @@ Status: active requirements, amended 2026-10-15 by the documentation review. The
 
 ## Product and users
 
+Current implementation checkpoint (2026-10-19): R06 is implemented for synthetic.record through a distinct eligible human, exact immutable intent, policy enforcement even without a graph gate, durable signal consumption and live authority checks before effects. See [Phase 4 contracts and verification](../development/PHASE_4_APPROVALS.md). External integrations, webhook automation, AI/MCP and external ticket revision semantics remain future work. Existing graph schema v1 and fixed role grants are unchanged.
+
 BridgeOps lets an organization connect approved business capabilities, publish visual workflows, execute them durably, and investigate or propose actions through authorized AI tools. Its differentiator is a traceable route from an operational question to an approved business change.
 
 Owners govern membership and policies. Administrators manage organization operations. Builders configure connections and publish workflows. Operators run and recover work. Approvers decide sensitive requests. Viewers inspect permitted data. Platform administrators manage platform configuration without automatic tenant access. Every role maps to explicit permissions; see the [permission matrix](../security/THREAT_MODEL.md).

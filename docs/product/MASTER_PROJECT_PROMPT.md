@@ -4,6 +4,8 @@ The documentation review supersedes the original first-task checkpoint and imple
 
 ---
 # BRIDGEOPS — MASTER PROJECT PROMPT
+Current delivery amendment — 2026-10-19: Phase 4 implements human approval for internal synthetic.record. The [approval guide](../development/PHASE_4_APPROVALS.md) specifies exact intent, the immediate next-record interpretation of schema-v1 approval nodes, central policy enforcement without a node, distinct eligible actors, durable signals and reauthorization before effects. Default policy permits a low-risk record without an implicit gate; explicit gates always require a human. Only requireRecordApproval and lifetimeSeconds are configurable. Historical definitions/hashes and role grants remain unchanged. External integrations remain Phase 5, AI/MCP Phase 6. Project status records actual completion evidence separately.
+
 ## AI-Powered Enterprise Integration and Workflow Automation Platform
 
 **Project codename:** BridgeOps  

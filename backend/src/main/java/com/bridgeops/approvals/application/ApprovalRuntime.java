@@ -35,6 +35,9 @@ public class ApprovalRuntime {
     @Transactional(propagation=Propagation.MANDATORY)
     public Gate resumeCheck(Seed seed,Set<UUID> lockedActors){return gate(seed,true,lockedActors,false);}
     private Gate gate(Seed seed,boolean explicit,Set<UUID> lockedActors,boolean requireConsumed){
+        if(!lockedActors.contains(seed.requester()))return new Gate(Result.RECHECK_ACTORS,null,null,false);
+        try{authority.trusted(seed.requester(),seed.organization(),"capability.write");}
+        catch(DomainFailure revoked){return new Gate(Result.FAIL,null,"CAPABILITY_PERMISSION_REVOKED",false);}
         var policy=store.policy(seed.organization());var existing=store.action(seed.organization(),seed.execution(),seed.action());Instant now=clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         if(existing.isEmpty()){
             if(!explicit&&!policy.required())return new Gate(Result.ALLOW,null,null,false);
@@ -45,6 +48,7 @@ public class ApprovalRuntime {
             return new Gate(Result.WAIT,r.id(),null,true);
         }
         var r=store.get(seed.organization(),existing.get().id(),true);
+        if(r.state()!=ApprovalState.PENDING&&r.state()!=ApprovalState.APPROVED)return new Gate(Result.FAIL,r.id(),r.error()==null?"APPROVAL_"+r.state().name():r.error(),false);
         String invalid=null;
         if(!r.operationHash().equals(seed.operationHash()))invalid="INTENT_MISMATCH";
         else {

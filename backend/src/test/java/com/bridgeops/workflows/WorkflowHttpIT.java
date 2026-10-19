@@ -162,7 +162,10 @@ class WorkflowHttpIT {
         String path = path(create()); for (String action : List.of("test-runs", "approve")) send(owner, post(path + "/" + action).content("{}")).andExpect(status().isForbidden());
         send(owner, post(path + "/executions").header("Idempotency-Key","unpublished-workflow-key").content("{\"input\":{}}")).andExpect(status().isUnprocessableContent());
         assertThat(operator.queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isZero();
-        assertThat(operator.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('approval_requests','work_items')", Long.class)).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM approval_requests", Long.class)).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM approval_decisions", Long.class)).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM approval_signals", Long.class)).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='work_items'", Long.class)).isZero();
     }
     @AfterAll static void cleanup() throws Exception { keys.close(); }
 }

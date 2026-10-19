@@ -1,8 +1,10 @@
 # Proposed system architecture
 
-Status: architecture retained after review. Phase 1 implements foundation, identity and organization onboarding/browser boundaries. Phase 2 implements workflow definitions, HTTP lifecycle and browser authoring; later modules in the target diagrams remain planned. One Spring Boot deployment, one React frontend and PostgreSQL are retained. Phase 3 adds bounded PostgreSQL-backed execution workers in the same deployment. Separate workers and a broker require evidence and an ADR update. [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md).
+Status: architecture retained after review. Phase 1 implements foundation, identity and organization onboarding/browser boundaries. Phase 2 implements workflow definitions, HTTP lifecycle and browser authoring; later modules in the target diagrams remain planned. One Spring Boot deployment, one React frontend and PostgreSQL are retained. Phase 3 adds bounded PostgreSQL-backed execution workers in the same deployment. Phase 4 adds human approvals through owned public ports and durable signals. Separate workers and a broker require evidence and an ADR update. [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md).
 
 ## Context and containers
+
+Phase 4 implements approvals.domain/application/persistence/web and React inbox/detail/policy UI in the same deployment. Approvals owns the ApprovalExecutionContext public port; executions supplies an authorized adapter and consumes signals through ApprovalRuntime. Neither module imports the other's persistence classes. Mutations lock declared user IDs in sorted order before organization, execution and work. Policy invalidation acquires no execution locks. Human waits hold no worker thread/lease or open transaction. Typed ApprovalAudit participates in lifecycle transactions. No broker, notification dispatcher or external decision URL is introduced. [Exact contracts and verification](../development/PHASE_4_APPROVALS.md).
 
 ```mermaid
 flowchart LR
