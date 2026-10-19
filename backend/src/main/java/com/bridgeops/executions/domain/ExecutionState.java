@@ -4,7 +4,7 @@ import java.util.Set;
 
 /** Explicit guards are shared by submission, dispatch, recovery and cancellation. */
 public enum ExecutionState {
-    QUEUED, RUNNING, WAITING_FOR_RETRY, WAITING_FOR_DELAY, SUCCEEDED, FAILED, CANCELLED;
+    QUEUED, RUNNING, WAITING_FOR_RETRY, WAITING_FOR_DELAY, WAITING_FOR_APPROVAL, SUCCEEDED, FAILED, CANCELLED;
 
     public boolean terminal() { return this == SUCCEEDED || this == FAILED || this == CANCELLED; }
 
@@ -13,8 +13,8 @@ public enum ExecutionState {
         if (next == FAILED || next == CANCELLED) return true;
         return switch (this) {
             case QUEUED -> next == RUNNING;
-            case RUNNING -> Set.of(WAITING_FOR_RETRY, WAITING_FOR_DELAY, SUCCEEDED).contains(next);
-            case WAITING_FOR_RETRY, WAITING_FOR_DELAY -> next == QUEUED;
+            case RUNNING -> Set.of(WAITING_FOR_RETRY, WAITING_FOR_DELAY, WAITING_FOR_APPROVAL, SUCCEEDED).contains(next);
+            case WAITING_FOR_RETRY, WAITING_FOR_DELAY, WAITING_FOR_APPROVAL -> next == QUEUED;
             default -> false;
         };
     }

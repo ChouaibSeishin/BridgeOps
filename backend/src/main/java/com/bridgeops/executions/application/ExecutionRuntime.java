@@ -1,6 +1,7 @@
 package com.bridgeops.executions.application;
 
 import com.bridgeops.audit.application.ExecutionAudit;
+import com.bridgeops.approvals.application.ApprovalRuntime;
 import com.bridgeops.executions.domain.*;
 import com.bridgeops.executions.persistence.ExecutionStore;
 import com.bridgeops.executions.persistence.ExecutionStore.*;
@@ -22,10 +23,11 @@ public class ExecutionRuntime {
     private final ExecutionStore store;private final JdbcTemplate jdbc;private final TransactionTemplate tx;
     private final TenantAuthorization authority;private final WorkflowRuntime workflows;private final WorkflowDefinitions graphs;
     private final ExecutionService service;private final ExecutionAudit audit;private final Clock clock;private final RetryPolicy retries;
+    private final ApprovalRuntime approvals;
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
-        WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness){
+        WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals){
         this.store=store;this.jdbc=store.jdbc();this.tx=new TransactionTemplate(manager);tx.setTimeout(10);
-        this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.service=service;this.audit=audit;this.clock=clock;this.retries=new RetryPolicy(randomness::sample);
+        this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.service=service;this.audit=audit;this.clock=clock;this.retries=new RetryPolicy(randomness::sample);this.approvals=approvals;
     }
     public Claim claim(UUID owner,int globalLimit,int tenantLimit,int leaseSeconds){
         if(globalLimit<1||globalLimit>16||tenantLimit<1||tenantLimit>globalLimit||leaseSeconds<5||leaseSeconds>120)throw new IllegalArgumentException("Invalid worker bounds.");
@@ -49,6 +51,7 @@ public class ExecutionRuntime {
     }
     public Dispatch prepare(Claim c){return tx.execute(status->{
         var preview=store.get(c.organization(),c.execution(),false);
+        var actors=workerActors(preview);
         var snapshot=workflows.snapshot(preview.actor(),c.organization(),preview.workflow(),preview.version());
         var e=owned(c);if(e==null)return null;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return null;}
@@ -63,6 +66,11 @@ public class ExecutionRuntime {
         var node=plan.get(e.position());var step=steps.get(e.position());
         if(!node.id().equals(step.node())||!node.argumentHash().equals(step.argumentHash())){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
         if(step.state().equals("SUCCEEDED")){advance(e);return null;}
+        if(node.type().equals("approval")||node.type().equals("syntheticAction")){
+            var gate=approvals.check(seed(e,plan,e.position()),explicit(plan,e.position()),actors);
+            if(handleGate(e,c,node,gate,now))return null;
+            if(node.type().equals("approval")){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
+        }
         if(step.attempts()>=3){fail(e,"TRANSIENT_EXHAUSTED",now);return null;}
         jdbc.update("UPDATE execution_steps SET status='RUNNING',attempt_count=attempt_count+1,attempt_started_at=?,error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),e.organization(),e.id(),node.id());
         store.event(e,"STEP_STARTED",node.id(),now);
@@ -70,12 +78,16 @@ public class ExecutionRuntime {
     });}
     /** Effect, receipt, successful attempt and step result share one fenced database transaction. */
     public boolean complete(Dispatch dispatch){return Boolean.TRUE.equals(tx.execute(status->{
-        var c=dispatch.claim();authority.worker(dispatch.actor(),c.organization());var e=owned(c);if(e==null)return false;Instant now=clock.instant();
+        var c=dispatch.claim();var preview=store.get(c.organization(),c.execution(),false);var actors=workerActors(preview);authority.worker(dispatch.actor(),c.organization());var e=owned(c);if(e==null)return false;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return false;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(!step.node().equals(dispatch.node().id())||!step.state().equals("RUNNING"))return false;
         String output="{}";
         if(step.type().equals("syntheticAction")){
+            var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.from(snapshot.graph(),graphs);
+            if(!dispatch.node().equals(plan.get(e.position()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
+            var gate=approvals.check(seed(e,plan,e.position()),explicit(plan,e.position()),actors);
+            if(handleGate(e,c,dispatch.node(),gate,now))return false;
             var receipts=jdbc.queryForList("SELECT argument_hash,result_json FROM execution_operation_receipts WHERE organization_id=? AND capability='synthetic.record' AND logical_operation_id=? AND item_id=?",e.organization(),step.operation(),step.node());
             if(!receipts.isEmpty()){
                 if(!step.argumentHash().equals(receipts.getFirst().get("argument_hash"))){fail(e,"RECONCILIATION_REQUIRED",now);return false;}
@@ -113,6 +125,7 @@ public class ExecutionRuntime {
     public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockContext(c);var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
     private void fail(Execution e,String code,Instant now){
         service.terminateSteps(e,code.equals("DEADLINE_EXCEEDED")?code:"RECONCILIATION_REQUIRED",now);
+        approvals.terminate(e.organization(),e.id(),e.actor(),code);
         store.state(e,ExecutionState.FAILED,code,now);store.done(e);store.event(e,"EXECUTION_FAILED",null,now);
         audit.write(e.organization(),e.actor(),ExecutionAudit.Action.EXECUTION_FAILED,e.id(),e.revision()+1,e.version(),e.hash(),now);
     }
@@ -148,8 +161,54 @@ public class ExecutionRuntime {
                 store.event(e,"LEASE_RECOVERED",null,at);return true;
             });if(Boolean.TRUE.equals(changed))count++;
         }
+        for(var candidate:approvals.candidates())if(resumeApproval(candidate))count++;
         return count;
     }
+    private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
+    private boolean explicit(List<ExecutionPlan.Node> plan,int position){return plan.get(position).type().equals("approval")||position>0&&plan.get(position-1).type().equals("approval");}
+    private ApprovalRuntime.Seed seed(Execution e,List<ExecutionPlan.Node> plan,int position){
+        var current=plan.get(position);var action=current.type().equals("approval")?plan.get(position+1):current;
+        var gate=current.type().equals("approval")?current:position>0&&plan.get(position-1).type().equals("approval")?plan.get(position-1):current;
+        var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();
+        return new ApprovalRuntime.Seed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),gate.type().equals("approval")?gate.prompt():"Review the exact internal record operation",action.message(),e.deadline());
+    }
+    private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){
+        if(gate.result()==ApprovalRuntime.Result.ALLOW)return false;
+        if(gate.result()==ApprovalRuntime.Result.FAIL){fail(e,gate.error(),now);return true;}
+        var step=store.steps(e.organization(),e.id()).get(e.position());
+        if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS){
+            if(step.state().equals("RUNNING")){attempt(e,step,"INTERRUPTED","ACTOR_SET_CHANGED",now);jdbc.update("UPDATE execution_steps SET status='WAITING_FOR_RETRY',error_code='ACTOR_SET_CHANGED' WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),step.node());store.state(e,ExecutionState.WAITING_FOR_RETRY,"ACTOR_SET_CHANGED",now);}
+            store.release(c,now,false);return true;
+        }
+        if(step.state().equals("RUNNING"))attempt(e,step,"INTERRUPTED","APPROVAL_REQUIRED",now);
+        jdbc.update("UPDATE execution_steps SET status='WAITING_FOR_APPROVAL',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),node.id());
+        store.state(e,ExecutionState.WAITING_FOR_APPROVAL,null,now);store.park(c,now);store.event(e,gate.created()?"APPROVAL_REQUESTED":"APPROVAL_WAITING",node.id(),now);return true;
+    }
+    private boolean resumeApproval(ApprovalRuntime.Candidate candidate){return Boolean.TRUE.equals(tx.execute(status->{
+        var preview=store.get(candidate.organization(),candidate.execution(),false);var actors=workerActors(preview);authority.lockDurableContext(preview.actor(),preview.organization());
+        var e=store.get(preview.organization(),preview.id(),true);jdbc.queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? FOR UPDATE",e.organization(),e.id());
+        approvals.reconcile(e.organization(),e.id(),e.actor());boolean changed=false;
+        for(var signal:approvals.signals(e.organization(),e.id())){
+            e=store.get(e.organization(),e.id(),false);Instant now=clock.instant();
+            if(e.state().terminal()){changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL){fail(e,"RECONCILIATION_REQUIRED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.from(snapshot.graph(),graphs);
+            if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            var gate=approvals.resumeCheck(seed(e,plan,e.position()),actors);
+            if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS)continue;
+            if(!signal.outcome().equals("APPROVED")||gate.result()!=ApprovalRuntime.Result.ALLOW){fail(e,gate.error()==null?"APPROVAL_"+signal.outcome():gate.error(),now);changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());continue;}
+            var node=plan.get(e.position());
+            if(node.type().equals("approval")){
+                jdbc.update("UPDATE execution_steps SET status='SUCCEEDED',attempt_count=1,attempt_started_at=?,completed_at=?,output_json='{\"approved\":true}',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=? AND status='WAITING_FOR_APPROVAL'",time(signal.createdAt()),time(now),e.organization(),e.id(),node.id());
+                var step=store.steps(e.organization(),e.id()).get(e.position());attempt(e,step,"SUCCEEDED",null,now);store.event(e,"STEP_SUCCEEDED",node.id(),now);advance(e);e=store.get(e.organization(),e.id(),false);
+            }else jdbc.update("UPDATE execution_steps SET status='PENDING',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=? AND status='WAITING_FOR_APPROVAL'",e.organization(),e.id(),node.id());
+            store.state(e,ExecutionState.QUEUED,null,now);store.resume(e,now);store.event(e,"EXECUTION_RESUMED",node.id(),now);
+            changed|=approvals.consume(e.organization(),e.id(),signal.id(),e.actor());
+        }
+        return changed;
+    }));}
     public boolean renew(Claim c,int leaseSeconds){return Boolean.TRUE.equals(tx.execute(status->{
         lockContext(c);var e=owned(c);if(e==null)return false;
         if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return false;}

@@ -5,6 +5,7 @@ export type State =
   | "RUNNING"
   | "WAITING_FOR_RETRY"
   | "WAITING_FOR_DELAY"
+  | "WAITING_FOR_APPROVAL"
   | "SUCCEEDED"
   | "FAILED"
   | "CANCELLED";
@@ -27,6 +28,8 @@ export interface Execution {
   errorCode: string | null;
   retryOfExecutionId: string | null;
   retryEligible: boolean;
+  approvalId?: string | null;
+  approvalExpiresAt?: string | null;
 }
 export interface Step {
   retryAt?: string | null;
@@ -115,8 +118,10 @@ export const executionApi = {
 };
 export function executionFailure(error: unknown): string {
   if (error instanceof HttpFailure) {
+    if (error.code === "INVALID_APPROVAL_TARGET")
+      return "Each approval gate must immediately protect one supported internal record action. No execution was created.";
     if (error.code === "UNSUPPORTED_RUNTIME_NODE")
-      return "This version contains an approval gate or another unsupported runtime node. Approval processing arrives in Phase 4. No execution was created.";
+      return "This version contains an unsupported runtime node. No execution was created.";
     if (error.code === "WORKFLOW_NOT_PUBLISHED")
       return "Publish a valid workflow before starting an execution.";
     if (error.code === "RETRY_INELIGIBLE")

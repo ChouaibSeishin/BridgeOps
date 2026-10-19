@@ -9,7 +9,7 @@ public final class ExecutionViews {
     public record Summary(UUID id, UUID workflowId, UUID versionId, String definitionHash, UUID requestedBy,
         String source, String mode, ExecutionState status, long revision, int currentPosition,
         Instant createdAt, Instant startedAt, Instant completedAt, Instant deadlineAt, Instant notBefore,
-        String errorCode, UUID retryOfExecutionId, boolean retryEligible) {}
+        String errorCode, UUID retryOfExecutionId, boolean retryEligible,UUID approvalId,Instant approvalExpiresAt) {}
     public record Step(String nodeId, int position, String type, String status, int attemptCount,
         Instant startedAt, Instant completedAt, Object output, String errorCode, Instant retryAt) {}
     public record Attempt(UUID id, String nodeId, int attemptNumber, Instant startedAt, Instant completedAt, String outcome, String errorCode) {}

@@ -59,6 +59,7 @@ class ExecutionLifecycleIT {
     @Autowired com.bridgeops.workflows.application.WorkflowDefinitions definitions;
     @Autowired com.bridgeops.audit.application.ExecutionAudit executionAudit;
     @Autowired ExecutionRandom randomness;
+    @Autowired com.bridgeops.approvals.application.ApprovalRuntime approvals;
     @Autowired MutableClock clock;@Autowired ControlledCapability capability;@Autowired JdbcTemplate runtimeDb;
     JdbcTemplate operator;Actor owner;UUID org,workflow,version;ExecutionWorker worker;static String passwordHash;
     record Actor(UUID id,UUID family) {}
@@ -121,7 +122,7 @@ class ExecutionLifecycleIT {
         UUID unpublished=workflows.create(owner.id(),owner.family(),org,"Unpublished","",graphs.parse("{}")).workflow().id();
         denied(422,()->executions.start(owner.id(),owner.family(),org,unpublished,null,graphs.parse("{}"),0,"unpublished-key"));
         denied(422,()->executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse("[]"),0,"invalid-input-key"));
-        workflows.save(owner.id(),owner.family(),org,workflow,1,"Approval","",graphs.parse(GRAPH.replace("\"type\":\"syntheticAction\",\"typeVersion\":1,\"config\":{\"operation\":\"record\",\"message\":\"First record\"}","\"type\":\"approval\",\"typeVersion\":1,\"config\":{\"prompt\":\"Review\"}")));
+        workflows.save(owner.id(),owner.family(),org,workflow,1,"Approval","",graphs.parse(GRAPH.replace("\"type\":\"syntheticAction\",\"typeVersion\":1,\"config\":{\"operation\":\"record\",\"message\":\"Second record\"}","\"type\":\"approval\",\"typeVersion\":1,\"config\":{\"prompt\":\"Review\"}")));
         UUID approvalVersion=workflows.publish(owner.id(),owner.family(),org,workflow,2).version().id();
         denied(422,()->executions.start(owner.id(),owner.family(),org,workflow,approvalVersion,graphs.parse("{}"),0,"approval-key"));assertThat(count("workflow_executions")).isZero();
     }
@@ -168,7 +169,7 @@ class ExecutionLifecycleIT {
     @Test void scheduledStartSurvivesFreshRuntimeDispatchAndConsumesOriginalDeadline(){
         var e=executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse("{}"),60,"delay-start-key").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_DELAY);assertThat(claim()).isNull();
         clock.add(61);
-        var restarted=new ExecutionRuntime(store,transactions,workerAuthority,snapshots,definitions,executions,executionAudit,clock,randomness);
+        var restarted=new ExecutionRuntime(store,transactions,workerAuthority,snapshots,definitions,executions,executionAudit,clock,randomness,approvals);
         var restartedWorker=new ExecutionWorker(restarted,capability,4,2,30,1000);
         for(int i=0;i<20;i++){restarted.reconcile();var work=restarted.claim(UUID.randomUUID(),4,2,30);if(work==null)break;restartedWorker.dispatch(work);}
         assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(get(e.id()).deadlineAt()).isEqualTo(e.deadlineAt());

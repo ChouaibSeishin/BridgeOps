@@ -14,6 +14,9 @@ class ExecutionStateTest {
         assertThat(ExecutionState.QUEUED.canTransitionTo(ExecutionState.RUNNING)).isTrue();
         assertThat(ExecutionState.RUNNING.canTransitionTo(ExecutionState.WAITING_FOR_RETRY)).isTrue();
         assertThat(ExecutionState.RUNNING.canTransitionTo(ExecutionState.WAITING_FOR_DELAY)).isTrue();
+        assertThat(ExecutionState.RUNNING.canTransitionTo(ExecutionState.WAITING_FOR_APPROVAL)).isTrue();
+        assertThat(ExecutionState.WAITING_FOR_APPROVAL.canTransitionTo(ExecutionState.QUEUED)).isTrue();
+        assertThat(ExecutionState.WAITING_FOR_APPROVAL.canTransitionTo(ExecutionState.RUNNING)).isFalse();
         for (var state : ExecutionState.values()) if (!state.terminal()) {
             assertThat(state.canTransitionTo(ExecutionState.CANCELLED)).isTrue();
             assertThat(state.canTransitionTo(ExecutionState.FAILED)).isTrue();

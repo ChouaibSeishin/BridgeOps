@@ -19,7 +19,7 @@ class ExecutionOutageIT {
             postgres.start();String url=postgres.getJdbcUrl()+"&connectTimeout=1&socketTimeout=1";
             Flyway.configure().dataSource(url,postgres.getUsername(),postgres.getPassword()).load().migrate();
             var source=new DriverManagerDataSource(url,"bridgeops_app","synthetic-runtime-fixture");var store=new ExecutionStore(new JdbcTemplate(source));
-            var manager=new DataSourceTransactionManager(source);var runtime=new ExecutionRuntime(store,manager,null,null,null,null,null,Clock.systemUTC(),new ExecutionRandom());
+            var manager=new DataSourceTransactionManager(source);var runtime=new ExecutionRuntime(store,manager,null,null,null,null,null,Clock.systemUTC(),new ExecutionRandom(),null);
             assertThat(store.jdbc().queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isZero();
             // Stops only this method's disposable container, never the user's Compose stack.
             postgres.stop();

@@ -29,6 +29,11 @@ public class AccountAuthority {
         if(jdbc.queryForList("SELECT id FROM users WHERE id=? AND account_status='ACTIVE' FOR UPDATE",user).isEmpty())
             throw new DomainFailure(403,"PERMISSION_DENIED");
     }
+    /** Locked read without a rollback-marking denial; caller may persist a safe terminal outcome. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public boolean lockWorkerEligibility(UUID user) {
+        return !jdbc.queryForList("SELECT id FROM users WHERE id=? AND account_status='ACTIVE' FOR UPDATE",user).isEmpty();
+    }
     @Transactional(readOnly=true,timeout=5)
     public boolean active(UUID user){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND account_status=\'ACTIVE\')",Boolean.class,user));}
     @Transactional(timeout=10)

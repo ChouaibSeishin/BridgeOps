@@ -1,6 +1,7 @@
 package com.bridgeops.executions.application;
 
 import com.bridgeops.audit.application.ExecutionAudit;
+import com.bridgeops.approvals.application.ApprovalRuntime;
 import com.bridgeops.executions.domain.*;
 import com.bridgeops.executions.persistence.ExecutionStore;
 import com.bridgeops.executions.persistence.ExecutionStore.Execution;
@@ -20,8 +21,9 @@ import static com.bridgeops.executions.persistence.ExecutionStore.time;
 public class ExecutionService {
     private final TenantAuthorization authority;private final WorkflowService workflows;private final WorkflowDefinitions graphs;
     private final ExecutionStore store;private final ExecutionAudit audit;private final Clock clock;
-    public ExecutionService(TenantAuthorization authority,WorkflowService workflows,WorkflowDefinitions graphs,ExecutionStore store,ExecutionAudit audit,Clock clock){
-        this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.store=store;this.audit=audit;this.clock=clock;
+    private final ApprovalRuntime approvals;
+    public ExecutionService(TenantAuthorization authority,WorkflowService workflows,WorkflowDefinitions graphs,ExecutionStore store,ExecutionAudit audit,Clock clock,ApprovalRuntime approvals){
+        this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.store=store;this.audit=audit;this.clock=clock;this.approvals=approvals;
     }
     @Transactional(timeout=10)
     public Submission start(UUID actor,UUID family,UUID org,UUID workflow,UUID version,JsonNode input,int delay,String key){
@@ -60,6 +62,7 @@ public class ExecutionService {
         if(e.state().terminal())throw new DomainFailure(409,"EXECUTION_TERMINAL");
         Instant now=clock.instant();terminateSteps(e,"CANCELLED",now);
         store.state(e,ExecutionState.CANCELLED,"CANCELLED_BY_USER",now);store.done(e);store.event(e,"EXECUTION_CANCELLED",null,now);
+        approvals.terminate(org,id,actor,"CANCELLED");
         audit.write(org,actor,ExecutionAudit.Action.EXECUTION_CANCELLED,id,revision+1,e.version(),e.hash(),now);return summary(store.get(org,id,false));
     }
     @Transactional(timeout=10)
@@ -100,7 +103,7 @@ public class ExecutionService {
         }
         store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=CASE WHEN status='PENDING' THEN 'NOT_DISPATCHED' ELSE ? END WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());
     }
-    public Summary summary(Execution e){return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e));}
+    public Summary summary(Execution e){var waiting=e.state()==ExecutionState.WAITING_FOR_APPROVAL?approvals.waiting(e.organization(),e.id()):null;return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e),waiting==null?null:waiting.id(),waiting==null?null:waiting.expiresAt());}
     private boolean eligible(Execution e){return e.state()==ExecutionState.FAILED&&"TRANSIENT_EXHAUSTED".equals(e.error());}
     private void revision(Execution e,long expected){if(expected<0)throw new DomainFailure(400,"INVALID_REQUEST");if(e.revision()!=expected)throw new DomainFailure(409,"STALE_REVISION");}
     private void reason(String value){if(value==null||value.isBlank()||value.length()>200||value.codePoints().anyMatch(Character::isISOControl))throw new DomainFailure(400,"INVALID_REQUEST");}
