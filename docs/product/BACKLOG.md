@@ -21,10 +21,12 @@ P0 means first operational MVP, not optional security. AI/MCP remain required po
 
 Every increment includes validation, backend authorization, migrations, safe errors, meaningful tests, frontend states and synchronized docs. Source generation, skipped tests or a Compose file alone do not meet acceptance. Use the [Phase 1 sequence](../development/PHASE_1_IMPLEMENTATION.md) and [verification plan](../development/PHASE_1_VERIFICATION.md).
 
-## Current checkpoint
+## Historical Phase 3 checkpoint
 
 Phase 1D, Phase 2 and Phase 3 are complete. Phase 3 runs immutable published linear manual-trigger/internal-record/end chains through PostgreSQL durable work, fenced recovery, receipts, attempts, retries, deadlines and cancellation. Tenant-authorized APIs and persisted browser monitoring are verified. All 206 backend/integration/browser tests and 54 frontend tests passed, along with container/same-origin, fresh/V9 migration, preservation, dependency/secret scans and [corresponding implementation CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39070309725). [Evidence and limitations](../PROJECT_STATUS.md). Existing account, consumed marker, environment, keys, tenant, saved definitions and volume remain preserved.
 
-Phase 4 implementation now adds distinct-human decisions, bounded immutable policies, exact intent, central capability enforcement, durable waiting/signals/receipts, expiry/cancellation/recovery and authenticated inbox/detail/policy UI. Final release gates and hosted evidence are tracked in the [approval guide](../development/PHASE_4_APPROVALS.md) and current project status; preceding Phase 3 counts are historical.
+## Current Phase 4 checkpoint
 
-Next after verified Phase 4 delivery: controlled external integrations/webhooks in Phase 5, then AI/MCP in Phase 6. Draft TEST snapshots and richer graphs remain deferred. Internal record approval is the current end-to-end slice; external support triage depends on Phase 5.
+Phase 4 is complete and verified: distinct-human decisions, bounded immutable policies, exact intent, central capability enforcement, durable waiting/signals/receipts, expiry/cancellation/recovery and authenticated inbox/detail/policy UI. All 265 backend/PostgreSQL/browser tests and 68 frontend tests passed with no failures/errors/skips. Fresh/V10 migrations, preserved-data V11 production upgrade, security smoke, production build, dependency/secret scans and [corresponding implementation CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314) passed. Exact contracts/evidence are in the [approval guide](../development/PHASE_4_APPROVALS.md) and project status; preceding Phase 3 counts are historical.
+
+Next: controlled external integrations/webhooks in Phase 5, then AI/MCP in Phase 6. Draft TEST snapshots and richer graphs remain deferred. Internal record approval is the current end-to-end slice; external support triage depends on Phase 5.

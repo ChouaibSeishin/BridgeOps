@@ -18,4 +18,4 @@ Canonical request hashes and scoped start keys; stable logical operation/item ke
 
 At-least-once processing remains possible. Retention bounds dedup guarantees; provider limitations are visible rather than hidden.
 
-Phase 3 implements the PostgreSQL worker and internal record receipts under [the execution contract](../../development/PHASE_3_EXECUTION.md). Approval signals and external effects remain later phases.
+Phase 3 implements the PostgreSQL worker and internal record receipts under [the execution contract](../../development/PHASE_3_EXECUTION.md). Phase 4 adds durable approval signals and unique consumption receipts under [the approval contract](../../development/PHASE_4_APPROVALS.md). External effects remain later work.

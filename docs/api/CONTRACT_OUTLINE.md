@@ -1,6 +1,6 @@
 # API contract outline
 
-Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, Phase 2 workflow definition routes, and Phase 3 published execution/start/read/cancel/retry routes are implemented.** [Workflow DTOs](../development/PHASE_2_WORKFLOWS.md) and [execution DTOs and semantics](../development/PHASE_3_EXECUTION.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
+Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, Phase 2 workflow definition routes, Phase 3 published execution/start/read/cancel/retry and Phase 4 approval/policy routes are implemented.** [Workflow DTOs](../development/PHASE_2_WORKFLOWS.md) and [execution DTOs and semantics](../development/PHASE_3_EXECUTION.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
 
 ## Shared conventions
 
@@ -45,12 +45,12 @@ Let `O=/api/v1/organizations/{organizationId}`. Codes match the security matrix.
 | 2 | GET/POST O/workflows; GET/PATCH/DELETE .../{id} | WorkflowSummary/Draft `{name,description,definition,expectedRevision}`. workflow.read/edit; DELETE archives |
 | 2 | POST .../{id}/validate, /publish, /duplicate | Validate -> `{valid,errors:[{nodeId,path,code,message}]}`. Publish `{expectedRevision}` -> 201 VersionSummary; workflow.publish. Duplicate -> new draft; workflow.edit |
 | 2 | GET .../{id}/versions; GET .../{id}/versions/{versionId} | Immutable summaries and exact permitted snapshot; workflow.read |
-| 3 implemented | POST O/workflows/{id}/executions | `{versionId?,input:{},delaySeconds?:0..3600}` plus Idempotency-Key; 202 active / 200 terminal replay, Location. execution.run; published internal record runtime only, approval nodes reject before creation |
+| 3 implemented | POST O/workflows/{id}/executions | `{versionId?,input:{},delaySeconds?:0..3600}` plus Idempotency-Key; 202 active / 200 terminal replay, Location. execution.run; published internal record runtime; Phase 4 supports approval immediately followed by record, with central policy enforcement |
 | Deferred | POST .../{id}/test-runs | Planned immutable TEST snapshots with explicit real-effects acknowledgement; no route exists in Phase 3 |
 | 3 implemented | GET O/executions; GET .../{id}, /steps, /attempts, /events | Bounded tenant-qualified summaries, safe steps/attempts/timeline; execution.read |
 | 3 implemented | POST O/executions/{id}/cancel, /retry | `{expectedRevision,reason}`; cancel commits terminal state → 200; retry requires Idempotency-Key → 202 new linked execution (200 terminal replay). execution.cancel/retry plus run on retry; only exhausted transient failure is retryable |
-| 4 | GET O/approvals; GET .../{id} | Exact operation preview, requester, policy, expiry and decision status; approval.read |
-| 4 | POST O/approvals/{id}/approve, /reject | `{expectedRevision,reason?}` -> decision/request. approval.decide plus eligibility. Same decision replay returns original; opposite/stale conflicting decision 409 |
+| 4 implemented | GET O/approvals; GET .../{id} | Exact operation preview, requester, policy, expiry and decision status; approval.read |
+| 4 implemented | POST O/approvals/{id}/decision | `{expectedRevision,decision:APPROVE\|REJECT,reason?}` -> committed request/current execution. approval.decide plus distinct actor; all repeated/stale/final decisions return 409 |
 | 5 | POST O/webhook-endpoints; POST .../{id}/rotate; DELETE .../{id} | Pinned workflow version/automation grant; manage integration and workflow policy. Secret returned once on create/rotate only |
 | 5 | POST /webhooks/{publicWebhookId} | Raw bounded payload; HMAC timestamp/signature/key ID/delivery ID headers. Valid -> 202 execution ID. Wrong signature 401, stale timestamp 401, duplicate same digest existing reference, conflict digest 409, too large 413 |
 | 6 | POST/GET O/ai/conversations; GET .../{id}; POST .../{id}/messages | `{message}` -> providerMode, response and validated tool trace or async execution reference; ai.use plus tool permissions; user-scoped conversation ownership |

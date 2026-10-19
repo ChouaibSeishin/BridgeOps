@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Phase 4 human approvals are implemented; final release verification is in progress.** Published workflows execute internal record operations through the durable PostgreSQL worker. An approval gate pauses execution for a different eligible human; organization policy can require approval even when a graph omits the gate. Decisions bind exact immutable intent and are rechecked before an effect. Publication itself never executes anything. External integrations, webhooks, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md), [the approval guide](docs/development/PHASE_4_APPROVALS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
+**Phase 4 human approvals are complete and verified.** [Implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314): 265 backend/PostgreSQL/browser tests and 68 frontend tests passed, with no failures, errors or skips. Published workflows execute internal record operations through the durable PostgreSQL worker. An approval gate pauses execution for a different eligible human; organization policy can require approval even when a graph omits the gate. Decisions bind exact immutable intent and are rechecked before an effect. Publication itself never executes anything. External integrations, webhooks, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md), [the approval guide](docs/development/PHASE_4_APPROVALS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
 
 ## Start from a clean checkout
 
@@ -86,6 +86,7 @@ The local Compose backend receives startup migration credentials. Production mus
 ## Architecture and delivery
 
 - [Current project status and verified publication](docs/PROJECT_STATUS.md)
+- [Human approval, policy and durable resumption](docs/development/PHASE_4_APPROVALS.md)
 - [Durable internal execution, recovery and monitoring](docs/development/PHASE_3_EXECUTION.md)
 - [Workflow definition schema, revisions and immutable publication](docs/development/PHASE_2_WORKFLOWS.md)
 - [Browser/session/recovery guide](docs/development/PHASE_1D_BROWSER.md)
@@ -96,9 +97,13 @@ The local Compose backend receives startup migration credentials. Production mus
 - [Design foundation](docs/design/FOUNDATION.md), [implementation sequence](docs/development/PHASE_1_IMPLEMENTATION.md) and [backlog](docs/product/BACKLOG.md)
 - [Git workflow](docs/development/GIT_WORKFLOW.md), [credential rotation](docs/security/LOCAL_CREDENTIAL_ROTATION.md) and [security reporting](SECURITY.md)
 
-The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Phase 3 implements durable sequential internal execution. Phase 4 approval processing is next; integration adapters and AI remain later.
+The modular monolith and locked Java 21 / Boot 4.1.1 / Maven Wrapper 3.9.16 / PostgreSQL 18.6 / React/TypeScript baseline are retained. Development repository: [ChouaibSeishin/BridgeOps](https://github.com/ChouaibSeishin/BridgeOps). Hosted checks are reported only after actual completion. Phase 3 implements durable sequential internal execution. Phase 4 adds distinct-human approval and policy enforcement. Controlled integrations are next in Phase 5; AI/MCP remain later.
 
 ## Browser preview
+
+Actual Phase 4 exact-intent review with separate disposable requester/reviewer accounts. Approval acceptance and execution completion are displayed separately. [Mobile](docs/screenshots/phase4-approval-detail-mobile.png) and [dark theme](docs/screenshots/phase4-approval-detail-dark.png).
+
+![Phase 4 exact-intent approval](docs/screenshots/phase4-approval-detail-desktop.png)
 
 Actual Phase 2 editor/API with disposable test accounts and two immutable published definitions, captured during the required Chromium journey. Publication has not executed any workflow. These are not local user accounts or fabricated dashboard data. [Mobile](docs/screenshots/phase2-workflow-mobile.png) and [dark theme](docs/screenshots/phase2-workflow-dark.png).
 
