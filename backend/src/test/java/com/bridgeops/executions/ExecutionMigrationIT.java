@@ -29,7 +29,7 @@ class ExecutionMigrationIT {
     }
     JdbcTemplate operator(String url){return new JdbcTemplate(new DriverManagerDataSource(url,postgres.getUsername(),postgres.getPassword()));}
     @Test void freshSchemaHasRestrictedRuntimeAndNoProvisionedIdentityOrExecution() {
-        String url=database();migrate(url,null).migrate();var db=operator(url);
+        String url=database();migrate(url,"10").migrate();var db=operator(url);
         assertThat(db.queryForObject("SELECT max(version::int) FROM flyway_schema_history WHERE success",Integer.class)).isEqualTo(10);
         for(String table:List.of("users","organizations","workflows","workflow_executions","execution_work_items","synthetic_records"))assertThat(db.queryForObject("SELECT count(*) FROM "+table,Long.class)).isZero();
         assertThat(db.queryForObject("SELECT bootstrap_consumed_at IS NULL FROM installation_state",Boolean.class)).isTrue();
@@ -50,7 +50,7 @@ class ExecutionMigrationIT {
         UUID version=store.publish(store.get(org,workflow,false),user,canonical.json(),canonical.hash(),now);store.point(store.get(org,workflow,false),version,now);
         var tables=List.of("users","installation_state","organizations","role_permissions","workflows","workflow_drafts","workflow_versions");
         Map<String,List<Map<String,Object>>> before=new HashMap<>();for(String table:tables)before.put(table,db.queryForList("SELECT * FROM "+table));
-        assertThat(migrate(url,null).migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(migrate(url,"10").migrate().migrationsExecuted).isEqualTo(1);
         for(String table:tables)assertThat(db.queryForList("SELECT * FROM "+table)).containsExactlyInAnyOrderElementsOf(before.get(table));
         assertThat(db.queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isZero();
         assertThat(db.queryForObject("SELECT bootstrap_consumed_at IS NOT NULL FROM installation_state",Boolean.class)).isTrue();
