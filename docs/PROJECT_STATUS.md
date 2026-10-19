@@ -1,8 +1,12 @@
 # Project status
 
-Updated 2026-10-17 UTC. **Phase 3 durable internal execution and monitoring are complete: local release gates and corresponding hosted implementation CI passed.** Publication stores an immutable definition; an explicit start executes supported internal capabilities. Approval processing, integrations, webhooks, AI and MCP remain later phases.
+Updated 2026-10-19 UTC. **Phase 3 is complete; Phase 4 real human approval processing is in progress.** Publication stores an immutable definition; an explicit start executes supported internal capabilities. Approval processing is not enabled by the first contract increment. Integrations, webhooks, AI and MCP remain later phases.
 
-## Current Phase 3 delivery
+## Current Phase 4 work
+
+Preflight verified clean local/fetched master b2985dd3d178d9fddda59f163d762de8b0ce0270 with successful corresponding hosted CI, V10 and three healthy Compose services. Existing data is one account/organization/membership, three workflows, two published versions, no executions/receipts and a consumed bootstrap marker. Private preservation fingerprints now include execution/receipt history and signing material/volume identity. The [Phase 4 contract](development/PHASE_4_APPROVALS.md) records fixed-role authorization, schema-v1 next-record interpretation, policy/defaults, exact intent, durable signals and lock ordering. Runtime/API/UI implementation and full verification remain outstanding; no Phase 4 completion is claimed.
+
+## Historical Phase 3 delivery
 
 Preflight found clean local/fetched master b0bce52797765e475b7c4a07481802b928eb6304 with [successful corresponding CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/38955900005), V9 and healthy Compose. The actual local user had since created one organization, three workflows and two published versions; all are preserved as user data, never used as fixtures. Aggregate table/material/volume fingerprints were captured without printing private rows or keys.
 
