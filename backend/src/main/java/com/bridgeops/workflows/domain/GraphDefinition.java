@@ -47,6 +47,7 @@ public class GraphDefinition {
     }
 
     public Validation validate(JsonNode root) {
+        if (root != null && root.isObject() && integer(root.get("schemaVersion"), 2)) return GraphV2Definition.validate(root);
         var errors = new ArrayList<Error>();
         if (root == null || !root.isObject()) return new Validation(false, List.of(new Error(null, "$", "OBJECT_REQUIRED", "Use a graph object.")));
         fields(root, Set.of("schemaVersion", "nodes", "edges"), "$", null, errors);
@@ -118,13 +119,14 @@ public class GraphDefinition {
     public Canonical canonical(JsonNode definition) {
         bounded(definition);
         if (!validate(definition).valid()) throw new IllegalArgumentException("A valid graph is required.");
-        var root = json.createObjectNode(); root.put("schemaVersion", 1);
+        int schema = definition.path("schemaVersion").asInt();
+        var root = json.createObjectNode(); root.put("schemaVersion", schema);
         var nodes = json.createArrayNode(); var sortedNodes = new ArrayList<JsonNode>(); definition.path("nodes").forEach(sortedNodes::add);
         sortedNodes.sort(Comparator.comparing(n -> n.path("id").asString())); sortedNodes.forEach(n -> nodes.add(sorted(n))); root.set("nodes", nodes);
         var edges = json.createArrayNode(); var sortedEdges = new ArrayList<JsonNode>(); definition.path("edges").forEach(sortedEdges::add);
         sortedEdges.sort(Comparator.comparing((JsonNode n) -> n.path("source").asString()).thenComparing(n -> n.path("target").asString())); sortedEdges.forEach(n -> edges.add(sorted(n))); root.set("edges", edges);
         String text = json.writeValueAsString(sorted(root));
-        try { return new Canonical(text, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8))), 1, 1); }
+        try { return new Canonical(text, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8))), schema, schema); }
         catch (java.security.NoSuchAlgorithmException unavailable) { throw new IllegalStateException("SHA-256 unavailable."); }
     }
     private JsonNode sorted(JsonNode node) {

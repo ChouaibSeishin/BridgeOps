@@ -12,6 +12,7 @@ public final class ExecutionPlan {
     private ExecutionPlan() {}
     public static List<Node> from(JsonNode graph,WorkflowDefinitions definitions) {
         if(!definitions.valid(graph))throw new DomainFailure(422,"INVALID_WORKFLOW");
+        if(graph.path("schemaVersion").asInt()!=1)throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_SCHEMA");
         Map<String,JsonNode> nodes=new HashMap<>();Map<String,String> next=new HashMap<>();String start=null;
         for(var node:graph.path("nodes")) {
             String type=node.path("type").asString();

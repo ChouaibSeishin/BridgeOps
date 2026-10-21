@@ -46,11 +46,15 @@ public class WorkflowStore {
         jdbc.update("UPDATE workflows SET current_published_version_id=?,updated_at=? WHERE organization_id=? AND id=?", version, Timestamp.from(now), row.organizationId(), row.id());
     }
     public UUID publish(Row row, UUID user, String definition, String hash, Instant now) {
+        return publish(row, user, definition, hash, 1, 1, now);
+    }
+    public UUID publish(Row row, UUID user, String definition, String hash, int schema, int canonicalization, Instant now) {
+        if (!Set.of(1, 2).contains(schema) || canonicalization != schema) throw new IllegalArgumentException("Unsupported graph/canonicalization pair.");
         Integer previous = jdbc.queryForObject("SELECT coalesce(max(version_number),0) FROM workflow_versions WHERE organization_id=? AND workflow_id=?", Integer.class, row.organizationId(), row.id());
         if (previous == Integer.MAX_VALUE) throw new DomainFailure(409, "VERSION_LIMIT");
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO workflow_versions(id,organization_id,workflow_id,version_number,source_revision,schema_version,canonicalization_version,name,description,definition_json,definition_hash,published_by,published_at) VALUES(?,?,?,?,?,1,1,?,?,?,?,?,?)",
-            id, row.organizationId(), row.id(), previous + 1, row.revision(), row.name(), row.description(), definition, hash, user, Timestamp.from(now));
+        jdbc.update("INSERT INTO workflow_versions(id,organization_id,workflow_id,version_number,source_revision,schema_version,canonicalization_version,name,description,definition_json,definition_hash,published_by,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            id, row.organizationId(), row.id(), previous + 1, row.revision(), schema, canonicalization, row.name(), row.description(), definition, hash, user, Timestamp.from(now));
         return id;
     }
     public Version version(UUID organization, UUID workflow, UUID id) {

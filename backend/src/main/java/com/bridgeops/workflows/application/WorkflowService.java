@@ -51,7 +51,7 @@ public class WorkflowService {
     public Snapshot publish(UUID user, UUID family, UUID organization, UUID id, long expected) {
         authority.write(user, family, organization, "workflow.publish"); var row = store.get(organization, id, true); revision(row, expected); active(row);
         var definition = graphs.parse(row.definition()); var validation = graphs.validate(definition); if (!validation.valid()) throw new InvalidDefinition(validation);
-        var canonical = graphs.canonical(definition); UUID version = store.publish(row, user, canonical.json(), canonical.hash(), clock.instant());
+        var canonical = graphs.canonical(definition); UUID version = store.publish(row, user, canonical.json(), canonical.hash(), canonical.schemaVersion(), canonical.canonicalizationVersion(), clock.instant());
         store.point(row, version, clock.instant()); store.advance(row, user, row.definition(), clock.instant());
         audit.write(organization, user, Action.WORKFLOW_PUBLISHED, id, expected, version, canonical.hash(), clock.instant());
         return snapshot(store.version(organization, id, version));

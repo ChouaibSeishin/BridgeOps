@@ -76,6 +76,16 @@ class WorkflowLifecycleIT {
         denied(409, () -> workflows.save(owner.id(), owner.family(), organization, id, 0, "Stale", "", graphs.parse(GraphDefinitionTest.GRAPH)));
         assertThat(get(id)).isEqualTo(saved); assertThat(count("workflow_versions")).isZero();
     }
+    @Test void v2PublicationPinsSeparateCanonicalVersionAndRetainsHistoricalV1() {
+        var original = create(); var historical = publish(original.workflow().id(), 0);
+        var saved = workflows.save(owner.id(), owner.family(), organization, original.workflow().id(), 1, "Branched definition", "V2", graphs.parse(GraphV2DefinitionTest.GRAPH));
+        assertThat(workflows.validate(owner.id(), owner.family(), organization, original.workflow().id(), saved.workflow().revision()).valid()).isTrue();
+        var current = publish(original.workflow().id(), saved.workflow().revision());
+        assertThat(current.version().schemaVersion()).isEqualTo(2); assertThat(current.version().canonicalizationVersion()).isEqualTo(2);
+        assertThat(current.version().definitionHash()).isEqualTo(graphs.canonical(graphs.parse(GraphV2DefinitionTest.GRAPH)).hash());
+        assertThat(workflows.version(owner.id(), owner.family(), organization, original.workflow().id(), historical.version().id())).isEqualTo(historical);
+        assertThat(count("workflow_executions")).isZero();
+    }
     @Test void boundedInvalidDraftsSaveButCannotPublishOrAllocateVersion() {
         var draft = workflows.create(owner.id(), owner.family(), organization, "Incomplete", "", graphs.parse("{\"schemaVersion\":1,\"nodes\":[],\"edges\":[]}"));
         UUID id = draft.workflow().id(); assertThat(workflows.validate(owner.id(), owner.family(), organization, id, 0).valid()).isFalse();
