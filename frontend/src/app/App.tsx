@@ -45,6 +45,7 @@ import {
   ApprovalDetail,
   ApprovalPolicy,
 } from "../features/approvals/Approvals";
+import { BusinessWorkspace } from "../features/integrations/BusinessWorkspace";
 export function App() {
   const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
@@ -189,6 +190,10 @@ export function App() {
               element={<Recovery reset onReset={passwordFinished} />}
             />
             <Route path="/" element={<Organizations user={state.user!} />} />
+            <Route
+              path="/organizations/:id/business"
+              element={<BusinessWorkspace user={state.user!} />}
+            />
             <Route
               path="/organizations/:id/approvals"
               element={<ApprovalInbox user={state.user!} />}

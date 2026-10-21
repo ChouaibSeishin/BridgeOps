@@ -23,7 +23,7 @@ class ApprovalMigrationIT {
     @Container static final PostgreSQLContainer postgres=new PostgreSQLContainer(DockerImageName.parse("postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
     String database(){String name="approval_"+UUID.randomUUID().toString().replace("-","");new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword())).execute("CREATE DATABASE "+name);return postgres.getJdbcUrl().replace("/"+postgres.getDatabaseName(),"/"+name);}
     JdbcTemplate operator(String url){return new JdbcTemplate(new DriverManagerDataSource(url,postgres.getUsername(),postgres.getPassword()));}
-    Flyway migration(String url,String target){var c=Flyway.configure().dataSource(url,postgres.getUsername(),postgres.getPassword()).locations("classpath:db/migration");if(target!=null)c.target(target);return c.load();}
+    Flyway migration(String url,String target){var c=Flyway.configure().dataSource(url,postgres.getUsername(),postgres.getPassword()).locations("classpath:db/migration");c.target(target==null?"11":target);return c.load();}
     @Test void freshV11CreatesNoAccountsPoliciesOrRequestsAndRestrictsHistoricalWrites(){
         String url=database();assertThat(migration(url,null).migrate().migrationsExecuted).isEqualTo(11);var db=operator(url);
         for(String table:List.of("users","organizations","workflows","workflow_executions","approval_policy_versions","organization_approval_policies","approval_requests","approval_decisions","approval_signals","approval_signal_receipts","approval_events"))

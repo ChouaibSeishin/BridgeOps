@@ -69,6 +69,8 @@ public class AuthenticationConfiguration {
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/approvals","/api/v1/organizations/*/approvals/*","/api/v1/organizations/*/approval-policy").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/approvals/*/decision").authenticated();
             authorize.requestMatchers(HttpMethod.PUT,"/api/v1/organizations/*/approval-policy").authenticated();
+            authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/support/tickets","/api/v1/organizations/*/support/tickets/*","/api/v1/organizations/*/teams","/api/v1/organizations/*/teams/*","/api/v1/organizations/*/notifications","/api/v1/organizations/*/notifications/*","/api/v1/organizations/*/notifications/*/attempts").authenticated();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/demo-data").authenticated();
             authorize.anyRequest().denyAll();
         });
         http.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)

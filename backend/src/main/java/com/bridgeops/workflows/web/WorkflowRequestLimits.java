@@ -14,7 +14,7 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
     private final GraphDefinition graphs;
     public WorkflowRequestLimits(GraphDefinition graphs) { this.graphs = graphs; }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/(?:workflows|executions|approvals|approval-policy)(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH") || request.getMethod().equals("PUT"));
+        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/(?:workflows|executions|approvals|approval-policy|demo-data|integrations|support|teams|notifications|automations|webhook-endpoints)(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH") || request.getMethod().equals("PUT"));
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         if (request.getContentLengthLong() > MAX_REQUEST) { tooLarge(request, response); return; }
@@ -23,6 +23,7 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
         try {
             var body = graphs.checkRequest(bytes);
             if (body != null && body.isObject()) {
+                for(String field:java.util.List.of("confirmed","effectsAcknowledged"))if(body.has(field)&&!body.get(field).isBoolean())throw new IllegalArgumentException("Exact boolean required.");
                 for (String field : java.util.List.of("name", "description", "reason", "versionId", "decision"))
                     if (body.has(field) && !body.get(field).isString()) throw new IllegalArgumentException("String metadata required.");
                 if (body.has("delaySeconds")) {

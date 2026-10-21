@@ -363,6 +363,13 @@ export function OrganizationDetail({ user }: { user: User }) {
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
+      {permissions.includes("capability.read") && (
+        <p>
+          <Link className="button" to={`/organizations/${id}/business`}>
+            Open support operations
+          </Link>
+        </p>
+      )}
       {permissions.includes("approval.read") && (
         <p>
           <Link className="button" to={`/organizations/${id}/approvals`}>
