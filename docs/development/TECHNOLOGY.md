@@ -42,6 +42,8 @@ CI: pull requests/push run Java build, required PostgreSQL Testcontainers checks
 
 ## Authoritative sources
 
+Phase 5 connector increment uses the existing Boot 4.1.1 BOM's Apache HttpClient5 5.6.4, with no framework override. The connection manager's custom DnsResolver supplies the validated addresses actually used by the socket while retaining original-host TLS/SNI. React Flow selection is @xyflow/react 12.12.0, whose official npm peer metadata permits React/react-dom/types >=17; the existing React19 baseline is retained. The canvas increment records its lock/build/browser verification separately; installing a dependency alone does not implement a visual editor.
+
 - [Boot requirements](https://docs.spring.io/spring-boot/system-requirements.html) and [managed coordinates](https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html).
 - [Maven stable release history](https://maven.apache.org/docs/history.html) and [Central release metadata](https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml).
 - [springdoc compatibility](https://springdoc.org/#what-is-the-compatibility-matrix-of-springdoc-openapi-with-spring-boot).

@@ -363,6 +363,13 @@ export function OrganizationDetail({ user }: { user: User }) {
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
+      {permissions.includes("integration.read") && (
+        <p>
+          <Link className="button" to={`/organizations/${id}/integrations`}>
+            Open integrations
+          </Link>
+        </p>
+      )}
       {permissions.includes("capability.read") && (
         <p>
           <Link className="button" to={`/organizations/${id}/business`}>

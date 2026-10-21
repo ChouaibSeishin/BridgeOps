@@ -11,6 +11,7 @@ Prerequisites: Docker Engine/Desktop with Compose 2.24+ and PowerShell 7. Host J
 ```powershell
 ./scripts/setup-local.ps1
 ./scripts/setup-auth.ps1
+./scripts/setup-integration-secrets.ps1
 docker compose --env-file .env -f infra/compose.yaml config --quiet
 docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
 ```
@@ -18,6 +19,8 @@ docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait
 Open [BridgeOps](http://localhost:8088). Setup creates unique ignored .env database credentials and ignored signing material; it refuses to overwrite existing files. For an existing workspace, retain .env, keys and volumes; run setup-auth only if authentication material has never been configured. Setup/startup creates no account or tenant. Never commit credentials or keys. Port 8088 is localhost-only; BRIDGEOPS_PORT can be set in .env. The browser uses relative URLs through the same-origin proxy.
 
 For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade to V11.
+
+Phase 5 is in progress. Its new connection/secret features use a separate ignored key: run `./scripts/setup-integration-secrets.ps1` once if `secrets/integrations/local-v1.key` does not exist. It refuses to replace an existing key and leaves `.env`, SMTP and signing/CSRF material unchanged. Preserve this key with database backups; encrypted credentials cannot be recovered without it. Set only the exact approved public REST hosts in `REST_ALLOWED_HOSTS` when configuring an external provider. Empty means no REST destination is permitted. See [Phase 5 progress and configuration](docs/development/PHASE_5_INTEGRATIONS.md); graph-v2 business execution/webhooks are not claimed complete by connection setup.
 
 ### Provision the first account explicitly
 

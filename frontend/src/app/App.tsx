@@ -46,6 +46,10 @@ import {
   ApprovalPolicy,
 } from "../features/approvals/Approvals";
 import { BusinessWorkspace } from "../features/integrations/BusinessWorkspace";
+import {
+  Connections,
+  ConnectionDetail,
+} from "../features/integrations/Connections";
 export function App() {
   const navigate = useNavigate();
   const state = useSyncExternalStore(session.subscribe, session.snapshot);
@@ -190,6 +194,14 @@ export function App() {
               element={<Recovery reset onReset={passwordFinished} />}
             />
             <Route path="/" element={<Organizations user={state.user!} />} />
+            <Route
+              path="/organizations/:id/integrations"
+              element={<Connections user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/integrations/:connectionId"
+              element={<ConnectionDetail user={state.user!} />}
+            />
             <Route
               path="/organizations/:id/business"
               element={<BusinessWorkspace user={state.user!} />}

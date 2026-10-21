@@ -28,14 +28,18 @@ import static org.assertj.core.api.Assertions.*;
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class IntegrationBusinessIT {
     static final TestAuthMaterial keys=new TestAuthMaterial();static final Path secretDirectory=secretDirectory();
+    static class ControlledClock extends Clock {Instant now=Instant.now();public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return now;}void add(long seconds){now=now.plusSeconds(seconds);}}
+    @org.springframework.boot.test.context.TestConfiguration static class Configuration {@org.springframework.context.annotation.Bean @org.springframework.context.annotation.Primary ControlledClock controlledClock(){return new ControlledClock();}}
     static Path secretDirectory(){try{Path dir=Files.createTempDirectory("bridgeops-disposable-secret-");byte[] key=new byte[32];new java.security.SecureRandom().nextBytes(key);Path file=dir.resolve("local-v1.key");Files.write(file,key);if(Files.getFileStore(file).supportsFileAttributeView("posix"))Files.setPosixFilePermissions(file,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));Arrays.fill(key,(byte)0);return dir;}catch(Exception unavailable){throw new ExceptionInInitializerError(unavailable);}}
     @Container static final PostgreSQLContainer postgres=new PostgreSQLContainer(DockerImageName.parse("postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r){r.add("spring.datasource.url",postgres::getJdbcUrl);r.add("spring.datasource.username",()->"bridgeops_app");r.add("spring.datasource.password",()->"synthetic-runtime-fixture");r.add("spring.flyway.user",postgres::getUsername);r.add("spring.flyway.password",postgres::getPassword);r.add("bridgeops.auth.private-key",()->keys.directory.resolve("private.pem").toString());r.add("bridgeops.auth.public-key",()->keys.directory.resolve("public.pem").toString());r.add("bridgeops.auth.csrf-key",()->keys.directory.resolve("csrf.key").toString());r.add("bridgeops.integrations.secrets.directory",secretDirectory::toString);}
     @Autowired BusinessService business;@Autowired SecretStore secrets;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;@Autowired TenantAuthorization authority;@Autowired PlatformTransactionManager manager;@Autowired JdbcTemplate runtime;
+    @Autowired ConnectionService connections;@Autowired ConnectionChecks checks;@Autowired OutboundAdmission admission;
+    @Autowired ControlledClock clock;
     JdbcTemplate operator;Actor owner;UUID org;static String passwordHash;
     record Actor(UUID id,UUID family) {}
     @BeforeEach void fixture(){
-        operator=new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword()));operator.execute("TRUNCATE users,installation_state,authentication_throttles CASCADE");operator.update("INSERT INTO installation_state(singleton_id) VALUES(1)");
+        clock.now=Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);operator=new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword()));operator.execute("TRUNCATE users,installation_state,authentication_throttles CASCADE");operator.update("INSERT INTO installation_state(singleton_id) VALUES(1)");
         if(passwordHash==null)passwordHash=passwords.hash("business-disposable-password");owner=account("owner@example.invalid");operator.update("INSERT INTO user_grants VALUES(?,'organization.create',?)",owner.id(),java.sql.Timestamp.from(Instant.now()));org=organizations.create(owner.id(),owner.family(),"Business examples","business-test").id();
     }
     Actor account(String email){UUID id=UUID.randomUUID();var at=java.sql.Timestamp.from(Instant.now());operator.update("INSERT INTO users(id,email,normalized_email,password_hash,display_name,account_status,created_at,email_verified_at) VALUES(?,?,?,?,?,'ACTIVE',?,?)",id,email,email,passwordHash,"Synthetic",at,at);var grant=(Granted)sessions.authenticate(email,"business-disposable-password");return new Actor(id,grant.familyId());}
@@ -63,4 +67,34 @@ class IntegrationBusinessIT {
         var unavailable=new SecretStore(runtime,authority,Clock.systemUTC(),"","local-v1");denied(503,()->new TransactionTemplate(manager).execute(s->unavailable.put(owner.id(),owner.family(),org,"REST_CREDENTIAL",new byte[]{1})));assertThat(count("integration_secrets")).isZero();
         seed();var team=business.teams(owner.id(),owner.family(),org).getFirst();UUID other=organizations.create(owner.id(),owner.family(),"Foreign","foreign").id();assertThatThrownBy(()->operator.update("INSERT INTO team_responsibilities(organization_id,category,team_id) VALUES(?,'OTHER',?)",other,team.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
+    @Test void connectionCatalogUsesLivePermissionsAndInternalConfigurationIsStrict(){
+        assertThat(connections.definitions(owner.id(),owner.family(),org)).extracting(ConnectionService.Definition::type).containsExactly("SUPPORT","TEAMS","NOTIFICATIONS","REST");
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();var created=connections.create(owner.id(),owner.family(),org,"Local support","","SUPPORT",json.createObjectNode(),null);
+        assertThat(created.connection().health().status()).isEqualTo("NOT_CHECKED");assertThat(created.credentialConfigured()).isFalse();
+        assertThat(checks.check(owner.id(),owner.family(),org,created.connection().id(),0).health().code()).isEqualTo("INTERNAL_AVAILABLE");
+        var viewer=member("VIEWER");assertThat(connections.list(viewer.id(),viewer.family(),org,0,25).items()).hasSize(1);
+        denied(403,()->connections.configuration(viewer.id(),viewer.family(),org,created.connection().id()));denied(403,()->connections.create(viewer.id(),viewer.family(),org,"Forbidden","","SUPPORT",json.createObjectNode(),null));
+        denied(422,()->connections.create(owner.id(),owner.family(),org,"Invalid","","SUPPORT",json.readTree("{\"url\":\"https://api.example.com\"}"),null));
+    }
+    @Test void connectionUpdatesPreserveHistoryAndRejectStaleRevision(){
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();var created=connections.create(owner.id(),owner.family(),org,"Local support","","SUPPORT",json.createObjectNode(),null);UUID id=created.connection().id();
+        connections.update(owner.id(),owner.family(),org,id,0,"Updated support","",false,json.createObjectNode(),null,false);
+        denied(409,()->connections.update(owner.id(),owner.family(),org,id,0,"Lost edit","",true,json.createObjectNode(),null,false));
+        denied(409,()->checks.check(owner.id(),owner.family(),org,id,1));assertThat(count("integration_connection_versions")).isEqualTo(2);
+        assertThatThrownBy(()->runtime.update("UPDATE integration_connection_versions SET definition_json='{}'")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        UUID other=organizations.create(owner.id(),owner.family(),"Other","other-connection").id();denied(404,()->connections.get(owner.id(),owner.family(),other,id));
+    }
+    @Test void outboundAdmissionHasConcurrencyBoundsAndRecordsRelease(){
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();UUID id=connections.create(owner.id(),owner.family(),org,"Bounded connection","","SUPPORT",json.createObjectNode(),null).connection().id();
+        UUID first=admission.acquire(org,id),second=admission.acquire(org,id);denied(429,()->admission.acquire(org,id));admission.release(org,first);UUID third=admission.acquire(org,id);admission.release(org,second);admission.release(org,third);
+        for(int i=0;i<7;i++){UUID slot=admission.acquire(org,id);admission.release(org,slot);}denied(429,()->admission.acquire(org,id));
+        assertThat(operator.queryForObject("SELECT count(*) FROM integration_outbound_slots WHERE released_at IS NULL",Long.class)).isZero();assertThat(count("integration_outbound_slots")).isEqualTo(10);
+        assertThatThrownBy(()->runtime.update("UPDATE integration_outbound_slots SET lease_expires_at=lease_expires_at+interval '1 hour'")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        clock.add(61);UUID recovered=admission.acquire(org,id);admission.release(org,recovered);
+    }
+    @Test void connectionAuditFailureRollsBackConfigurationAndVersion(){
+        operator.execute("CREATE OR REPLACE FUNCTION test_demo_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='INTEGRATION_CREATED' THEN RAISE EXCEPTION 'Controlled audit failure'; END IF; RETURN NEW; END $$");operator.execute("CREATE TRIGGER test_demo_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION test_demo_audit_failure()");
+        assertThatThrownBy(()->connections.create(owner.id(),owner.family(),org,"Rolled back","","SUPPORT",tools.jackson.databind.json.JsonMapper.builder().build().createObjectNode(),null)).isInstanceOf(org.springframework.dao.DataAccessException.class);assertThat(count("integration_connections")).isZero();assertThat(count("integration_connection_versions")).isZero();
+    }
+    @Test void abandonedOutboundLeaseExpiresWithoutSleeping(){var json=tools.jackson.databind.json.JsonMapper.builder().build();UUID id=connections.create(owner.id(),owner.family(),org,"Recoverable admission","","SUPPORT",json.createObjectNode(),null).connection().id();admission.acquire(org,id);admission.acquire(org,id);denied(429,()->admission.acquire(org,id));clock.add(16);UUID recovered=admission.acquire(org,id);admission.release(org,recovered);assertThat(count("integration_operation_receipts")).isZero();}
 }

@@ -57,6 +57,7 @@ jobs:
         run: |
           ./scripts/setup-local.ps1
           ./scripts/setup-auth.ps1
+          ./scripts/setup-integration-secrets.ps1
       - name: Build and start containers
         run: docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
       - name: Same-origin API smoke

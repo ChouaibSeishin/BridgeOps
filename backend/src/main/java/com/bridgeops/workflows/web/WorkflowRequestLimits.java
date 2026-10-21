@@ -23,8 +23,8 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
         try {
             var body = graphs.checkRequest(bytes);
             if (body != null && body.isObject()) {
-                for(String field:java.util.List.of("confirmed","effectsAcknowledged"))if(body.has(field)&&!body.get(field).isBoolean())throw new IllegalArgumentException("Exact boolean required.");
-                for (String field : java.util.List.of("name", "description", "reason", "versionId", "decision"))
+                for(String field:java.util.List.of("confirmed","effectsAcknowledged","enabled","removeCredential"))if(body.has(field)&&!body.get(field).isBoolean())throw new IllegalArgumentException("Exact boolean required.");
+                for (String field : java.util.List.of("name", "description", "reason", "versionId", "decision", "type", "credential"))
                     if (body.has(field) && !body.get(field).isString()) throw new IllegalArgumentException("String metadata required.");
                 if (body.has("delaySeconds")) {
                     var delay = body.get("delaySeconds");

@@ -41,6 +41,9 @@ management:
         readiness:
           include: readinessState,db
 logging:
+  level:
+    org.apache.hc.client5.http.wire: "OFF"
+    org.apache.hc.client5.http.headers: "OFF"
   structured:
     format:
       console: ecs

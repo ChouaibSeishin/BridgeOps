@@ -28,6 +28,9 @@ services:
       SPRING_FLYWAY_USER: bridgeops_migrator
       SPRING_FLYWAY_PASSWORD: ${MIGRATION_PASSWORD:?Required migration password}
       API_DOCS_ENABLED: "false"
+      BRIDGEOPS_INTEGRATIONS_SECRETS_DIRECTORY: /run/bridgeops-integrations
+      BRIDGEOPS_INTEGRATIONS_SECRETS_ACTIVE_KEY_ID: ${INTEGRATION_SECRETS_ACTIVE_KEY_ID:-local-v1}
+      BRIDGEOPS_INTEGRATIONS_REST_ALLOWED_HOSTS: ${REST_ALLOWED_HOSTS:-}
       BRIDGEOPS_INVITATIONS_SMTP_ENABLED: ${INVITATION_SMTP_ENABLED:-false}
       BRIDGEOPS_INVITATIONS_SMTP_HOST: ${INVITATION_SMTP_HOST:-}
       BRIDGEOPS_INVITATIONS_SMTP_PORT: ${INVITATION_SMTP_PORT:-587}
@@ -50,6 +53,7 @@ services:
       BRIDGEOPS_AUTH_CSRF_KEY: /run/bridgeops-auth/csrf.key
     volumes:
       - ../secrets/auth:/run/bridgeops-auth:ro
+      - ../secrets/integrations:/run/bridgeops-integrations:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -24,7 +24,8 @@ public class SecretStore {
                 if(directory.isBlank()||!id.matches("[a-zA-Z0-9_-]{1,48}"))throw new IllegalArgumentException();
                 Path root=Path.of(directory).toAbsolutePath().normalize(),file=root.resolve(id+".key").normalize();
                 if(!file.startsWith(root)||!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)||Files.size(file)!=32)throw new IllegalArgumentException();
-                if(Files.getFileStore(file).supportsFileAttributeView("posix"))for(var permission:Files.getPosixFilePermissions(file))if(permission.name().startsWith("GROUP_")||permission.name().startsWith("OTHERS_"))throw new IllegalArgumentException();
+                // Read-only secret mounts can expose synthetic POSIX modes (not host ACLs), notably Docker Desktop.
+                if(!Files.getFileStore(file).isReadOnly()&&Files.getFileStore(file).supportsFileAttributeView("posix"))for(var permission:Files.getPosixFilePermissions(file))if(permission.name().startsWith("GROUP_")||permission.name().startsWith("OTHERS_"))throw new IllegalArgumentException();
                 return Files.readAllBytes(file);
             }catch(Exception unavailable){throw new DomainFailure(503,"SECRETS_UNAVAILABLE");}
         });

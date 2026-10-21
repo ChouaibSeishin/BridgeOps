@@ -12,7 +12,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 @RestControllerAdvice(basePackages="com.bridgeops.integrations.web")
 public class IntegrationErrors {
-    @ExceptionHandler(DomainFailure.class) public void domain(DomainFailure failure,HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,failure.status(),failure.code(),failure.getMessage());}
+    @ExceptionHandler(DomainFailure.class) public void domain(DomainFailure failure,HttpServletRequest request,HttpServletResponse response)throws IOException{if(failure.status()==429)response.setHeader("Retry-After","60");ApiErrors.write(request,response,failure.status(),failure.code(),failure.getMessage());}
     @ExceptionHandler({HttpMessageNotReadableException.class,MethodArgumentNotValidException.class,MethodArgumentTypeMismatchException.class,org.springframework.web.bind.ServletRequestBindingException.class,IllegalArgumentException.class})
     public void invalid(HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,400,"INVALID_REQUEST","Request is invalid.");}
     @ExceptionHandler(DataIntegrityViolationException.class) public void conflict(HttpServletRequest request,HttpServletResponse response)throws IOException{ApiErrors.write(request,response,409,"RESOURCE_CONFLICT","Resource conflicts with existing state.");}
