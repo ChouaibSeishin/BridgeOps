@@ -1,0 +1,130 @@
+package com.bridgeops.integrations;
+
+import com.bridgeops.identity.application.*;
+import com.bridgeops.identity.domain.SessionOutcome.Granted;
+import com.bridgeops.integrations.application.*;
+import com.bridgeops.organizations.application.*;
+import com.bridgeops.shared.web.DomainFailure;
+import com.bridgeops.support.TestAuthMaterial;
+import com.bridgeops.workflows.application.WorkflowService;
+import com.bridgeops.workflows.domain.GraphDefinition;
+import com.bridgeops.workflows.GraphV2DefinitionTest;
+import jakarta.servlet.http.Cookie;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.test.context.*;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.junit.jupiter.*;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest(properties={"bridgeops.auth.enabled=true","bridgeops.auth.origin=https://bridgeops.invalid","bridgeops.auth.issuer=automation-test","bridgeops.auth.key-id=automation-test","bridgeops.executions.worker.enabled=false"})
+@AutoConfigureMockMvc
+@Testcontainers
+class AutomationIT {
+    static final TestAuthMaterial keys = new TestAuthMaterial();
+    @Container static final PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873").asCompatibleSubstituteFor("postgres")).withInitScript("organization-runtime.sql");
+    @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("spring.datasource.url", postgres::getJdbcUrl); r.add("spring.datasource.username", () -> "bridgeops_app"); r.add("spring.datasource.password", () -> "synthetic-runtime-fixture"); r.add("spring.flyway.user", postgres::getUsername); r.add("spring.flyway.password", postgres::getPassword); r.add("bridgeops.auth.private-key", () -> keys.directory.resolve("private.pem").toString()); r.add("bridgeops.auth.public-key", () -> keys.directory.resolve("public.pem").toString()); r.add("bridgeops.auth.csrf-key", () -> keys.directory.resolve("csrf.key").toString()); }
+    @Autowired AutomationAuthority principals; @Autowired AutomationConfiguration configuration; @Autowired WorkflowService workflows; @Autowired ConnectionService connections; @Autowired GraphDefinition graphs;
+    @Autowired OrganizationService organizations; @Autowired AccountPasswords passwords; @Autowired PasswordSessionService sessions; @Autowired AccessTokens tokens; @Autowired JdbcTemplate runtime; @Autowired PlatformTransactionManager manager; @Autowired MockMvc mvc;
+    record Actor(UUID id, UUID family, String access, Cookie refresh, Cookie csrf) { @Override public String toString() { return "Actor[REDACTED]"; } }
+    JdbcTemplate operator; Actor owner; UUID org, workflow, version; static String passwordHash;
+    @BeforeEach void fixture() throws Exception {
+        operator = new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())); operator.execute("TRUNCATE users,installation_state,authentication_throttles CASCADE"); operator.update("INSERT INTO installation_state(singleton_id) VALUES(1)");
+        if (passwordHash == null) passwordHash = passwords.hash("automation-disposable-password"); owner = account("owner@example.invalid"); operator.update("INSERT INTO user_grants VALUES(?,'organization.create',?)", owner.id(), java.sql.Timestamp.from(Instant.now())); org = organizations.create(owner.id(), owner.family(), "Automation fixtures", "automation-fixtures").id(); publish(graphs.parse(GraphV2DefinitionTest.GRAPH.replace("manualTrigger", "webhookTrigger")));
+    }
+    Actor account(String email) throws Exception { UUID id = UUID.randomUUID(); var at = java.sql.Timestamp.from(Instant.now()); operator.update("INSERT INTO users(id,email,normalized_email,password_hash,display_name,account_status,created_at,email_verified_at) VALUES(?,?,?,?,?,'ACTIVE',?,?)", id, email, email, passwordHash, "Synthetic", at, at); var grant = (Granted) sessions.authenticate(email, "automation-disposable-password"); var refresh = new Cookie("__Host-bridgeops-refresh", grant.refreshToken()); var csrf = mvc.perform(get("/api/v1/auth/csrf").cookie(refresh)).andExpect(status().isOk()).andReturn().getResponse().getCookie("__Host-bridgeops-csrf"); return new Actor(id, grant.familyId(), tokens.issue(grant).value(), refresh, csrf); }
+    Actor member(String role) throws Exception { var actor = account(role.toLowerCase(Locale.ROOT) + "@example.invalid"); UUID membership = UUID.randomUUID(); operator.update("INSERT INTO organization_memberships(id,organization_id,user_id,status,joined_at) VALUES(?,?,?,'ACTIVE',?)", membership, org, actor.id(), java.sql.Timestamp.from(Instant.now())); operator.update("INSERT INTO membership_roles SELECT ?,?,id FROM roles WHERE organization_id=? AND name=?", org, membership, org, role); return actor; }
+    void publish(JsonNode graph) { workflow = workflows.create(owner.id(), owner.family(), org, "Pinned webhook definition", "", graph).workflow().id(); version = workflows.publish(owner.id(), owner.family(), org, workflow, 0).version().id(); }
+    AutomationAuthority.Principal create() { return configuration.create(owner.id(), owner.family(), org, "Triage authority", workflow, version); }
+    String base() { return "/api/v1/organizations/" + org + "/automations"; }
+    String body() { return "{\"name\":\"Triage authority\",\"workflowId\":\"" + workflow + "\",\"versionId\":\"" + version + "\"}"; }
+    org.springframework.test.web.servlet.ResultActions send(Actor actor, MockHttpServletRequestBuilder request) throws Exception { return mvc.perform(request.header("Authorization", "Bearer " + actor.access()).cookie(actor.refresh(), actor.csrf()).header("X-CSRF-Token", actor.csrf().getValue()).header("Origin", "https://bridgeops.invalid").contentType("application/json")); }
+    void denied(int status, Runnable action) { assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainFailure.class, e -> assertThat(e.status()).isEqualTo(status)); }
+    long count(String table) { return operator.queryForObject("SELECT count(*) FROM " + table, Long.class); }
+    void trusted(AutomationAuthority.Principal p, AutomationAuthority.Grant grant) { new TransactionTemplate(manager).executeWithoutResult(tx -> principals.operation(org, p.id(), p.workflowId(), p.versionId(), p.definitionHash(), grant)); }
+    @AfterEach void dropAuditFixture() { operator.execute("DROP TRIGGER IF EXISTS test_automation_audit ON organization_audit_events"); }
+
+    @Test void derivesExactGrantsWithoutInventingUserOrStartingExecution() {
+        var p = create(); assertThat(p.actorType()).isEqualTo("AUTOMATION"); assertThat(p.createdBy()).isEqualTo(owner.id()); assertThat(p.versionId()).isEqualTo(version);
+        assertThat(p.grants()).containsExactly(new AutomationAuthority.Grant("empty", null, null, "synthetic.record", "WRITE"), new AutomationAuthority.Grant("positive", null, null, "synthetic.record", "WRITE"));
+        assertThat(count("users")).isEqualTo(1); assertThat(count("workflow_executions")).isZero(); assertThat(count("execution_work_items")).isZero(); assertThat(count("approval_requests")).isZero(); assertThat(count("integration_secrets")).isZero();
+        assertThat(operator.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='AUTOMATION_CREATED' AND actor_id=?", Long.class, owner.id())).isEqualTo(1);
+    }
+    @Test void buildersOperatorsViewersAndApproversCannotManufactureRunAuthority() throws Exception {
+        for (String role : List.of("BUILDER", "OPERATOR", "VIEWER", "APPROVER")) { var actor = member(role); denied(403, () -> configuration.create(actor.id(), actor.family(), org, "Denied", workflow, version)); }
+        assertThat(count("automation_principals")).isZero(); var admin = member("ADMIN"); assertThat(configuration.create(admin.id(), admin.family(), org, "Admin scoped", workflow, version).status()).isEqualTo("ACTIVE");
+    }
+    @Test void scopeChecksEveryNodeOperationClassificationAndPinnedVersion() {
+        var p = create(); trusted(p, p.grants().getFirst());
+        for (var denied : List.of(new AutomationAuthority.Grant("missing", null, null, "synthetic.record", "WRITE"), new AutomationAuthority.Grant("empty", null, null, "synthetic.record", "READ"), new AutomationAuthority.Grant("empty", null, null, "synthetic.other", "WRITE"))) denied(403, () -> trusted(p, denied));
+        denied(403, () -> new TransactionTemplate(manager).executeWithoutResult(tx -> principals.worker(org, p.id(), workflow, UUID.randomUUID(), p.definitionHash())));
+        denied(403, () -> new TransactionTemplate(manager).executeWithoutResult(tx -> principals.worker(org, p.id(), workflow, version, "a".repeat(64))));
+    }
+    @Test void revocationIsTerminalAndPreventsFurtherTrustedAuthority() {
+        var p = create(); var revoked = principals.revoke(owner.id(), owner.family(), org, p.id(), 0); assertThat(revoked.status()).isEqualTo("REVOKED"); assertThat(revoked.revision()).isEqualTo(1); assertThat(revoked.grants()).isEqualTo(p.grants());
+        denied(403, () -> trusted(p, p.grants().getFirst())); denied(409, () -> principals.revoke(owner.id(), owner.family(), org, p.id(), 0));
+        assertThatThrownBy(() -> operator.update("UPDATE automation_principals SET status='ACTIVE',revision=0,revoked_at=NULL,revoked_by=NULL WHERE id=?", p.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+    @Test void creatorSessionIsNotBorrowedAsWorkerIdentity() { var p = create(); sessions.revokeFamily(owner.id(), owner.family()); trusted(p, p.grants().getFirst()); denied(401, () -> configuration.create(owner.id(), owner.family(), org, "Expired session", workflow, version)); }
+    @Test void readersHaveLiveMembershipAndForeignScopesAreConcealed() throws Exception {
+        var p = create(); var viewer = member("VIEWER"); assertThat(principals.list(viewer.id(), viewer.family(), org, 0, 1).items()).containsExactly(p);
+        UUID foreign = organizations.create(owner.id(), owner.family(), "Other tenant", "other-automation").id(); denied(404, () -> principals.get(owner.id(), owner.family(), foreign, p.id()));
+        var outsider = account("outsider@example.invalid"); denied(404, () -> principals.get(outsider.id(), outsider.family(), org, p.id()));
+        operator.update("UPDATE organization_memberships SET status='REMOVED',revision=revision+1 WHERE organization_id=? AND user_id=?", org, viewer.id()); denied(404, () -> principals.get(viewer.id(), viewer.family(), org, p.id()));
+    }
+    @Test void internalConnectionGrantPinsRevisionAndCannotExpandToChangedOrForeignConnection() {
+        var connection = connections.create(owner.id(), owner.family(), org, "Support", "", "SUPPORT", graphs.parse("{}"), null);
+        var graph = (ObjectNode) graphs.parse(GraphV2DefinitionTest.GRAPH.replace("manualTrigger", "webhookTrigger"));
+        for (var n : graph.path("nodes")) if (n.path("id").asString().equals("copy")) { var node = (ObjectNode) n; node.put("type", "capabilityAction"); node.set("config", graphs.parse("{\"integrationId\":\"" + connection.connection().id() + "\",\"revision\":0,\"operation\":\"support.list\"}")); node.set("inputs", graphs.parse("{\"limit\":{\"literal\":50},\"priorities\":{\"literal\":[\"HIGH\",\"URGENT\"]},\"statuses\":{\"literal\":[\"OPEN\",\"IN_PROGRESS\"]}}")); }
+        publish(graph); var p = create(); assertThat(p.grants()).contains(new AutomationAuthority.Grant("copy", connection.connection().id(), 0L, "support.list", "READ"));
+        trusted(p, new AutomationAuthority.Grant("copy", connection.connection().id(), 0L, "support.list", "READ")); denied(403, () -> trusted(p, new AutomationAuthority.Grant("copy", connection.connection().id(), 1L, "support.list", "READ")));
+        connections.update(owner.id(), owner.family(), org, connection.connection().id(), 0, "Support", "", false, graphs.parse("{}"), null, false); denied(409, this::create);
+    }
+    @Test void manualOrArchivedVersionsCannotAcquireWebhookAuthority() {
+        publish(graphs.parse(GraphV2DefinitionTest.GRAPH)); denied(422, this::create);
+        publish(graphs.parse(GraphV2DefinitionTest.GRAPH.replace("manualTrigger", "webhookTrigger"))); workflows.archive(owner.id(), owner.family(), org, workflow, 1); denied(409, this::create); assertThat(count("automation_principals")).isZero();
+    }
+    @Test void immutableGrantAndIdentityColumnsRetainDatabasePrivilegeBoundary() {
+        var p = create(); for (String table : List.of("automation_operation_grants")) for (String privilege : List.of("UPDATE", "DELETE", "TRUNCATE")) assertThat(operator.queryForObject("SELECT has_table_privilege('bridgeops_app',?,?)", Boolean.class, table, privilege)).isFalse();
+        assertThatThrownBy(() -> runtime.update("UPDATE automation_principals SET created_by=? WHERE id=?", UUID.randomUUID(), p.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThatThrownBy(() -> operator.update("UPDATE automation_operation_grants SET operation='other' WHERE principal_id=?", p.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+    @Test void auditFailureRollsBackPrincipalAndGrantCreationAndRevocation() {
+        operator.execute("CREATE OR REPLACE FUNCTION test_automation_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('AUTOMATION_CREATED','AUTOMATION_REVOKED') THEN RAISE EXCEPTION 'Controlled audit failure'; END IF; RETURN NEW; END $$"); operator.execute("CREATE TRIGGER test_automation_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION test_automation_audit_failure()");
+        assertThatThrownBy(this::create).isInstanceOf(org.springframework.dao.DataAccessException.class); assertThat(count("automation_principals")).isZero(); assertThat(count("automation_operation_grants")).isZero();
+        operator.execute("DROP TRIGGER test_automation_audit ON organization_audit_events"); var p = create(); operator.execute("CREATE TRIGGER test_automation_audit BEFORE INSERT ON organization_audit_events FOR EACH ROW EXECUTE FUNCTION test_automation_audit_failure()");
+        assertThatThrownBy(() -> principals.revoke(owner.id(), owner.family(), org, p.id(), 0)).isInstanceOf(org.springframework.dao.DataAccessException.class); assertThat(principals.get(owner.id(), owner.family(), org, p.id()).status()).isEqualTo("ACTIVE");
+    }
+    @Test void concurrentRevocationsHaveOneCommittedLifecycleResult() throws Exception {
+        var p = create(); java.util.function.Supplier<Integer> revoke = () -> { try { principals.revoke(owner.id(), owner.family(), org, p.id(), 0); return 200; } catch (DomainFailure conflict) { return conflict.status(); } };
+        try (var pool = Executors.newFixedThreadPool(2)) { var a = pool.submit(revoke::get); var b = pool.submit(revoke::get); assertThat(List.of(a.get(15, TimeUnit.SECONDS), b.get(15, TimeUnit.SECONDS))).containsExactlyInAnyOrder(200, 409); }
+        assertThat(operator.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='AUTOMATION_REVOKED'", Long.class)).isEqualTo(1);
+    }
+    @Test void authenticatedHttpLifecycleKeepsExactOriginCsrfStrictBodiesAndRoleChecks() throws Exception {
+        mvc.perform(post(base()).contentType("application/json").content(body())).andExpect(status().isForbidden());
+        mvc.perform(post(base()).header("Authorization", "Bearer " + owner.access()).cookie(owner.refresh(), owner.csrf()).header("X-CSRF-Token", owner.csrf().getValue()).header("Origin", "https://evil.invalid").contentType("application/json").content(body())).andExpect(status().isForbidden());
+        send(owner, post(base()).content(body().replace("\"name\":", "\"grants\":[],\"name\":"))).andExpect(status().isBadRequest());
+        var created = send(owner, post(base()).content(body())).andExpect(status().isCreated()).andExpect(jsonPath("$.actorType").value("AUTOMATION")).andReturn(); UUID id = UUID.fromString(graphs.parse(created.getResponse().getContentAsString()).path("id").asString());
+        send(owner, get(base() + "/" + id)).andExpect(status().isOk()).andExpect(jsonPath("$.grants.length()").value(2));
+        var builder = member("BUILDER"); send(builder, post(base() + "/" + id + "/revoke").content("{\"expectedRevision\":0}")).andExpect(status().isForbidden());
+        send(owner, post(base() + "/" + id + "/revoke").content("{\"expectedRevision\":\"0\"}")).andExpect(status().isBadRequest());
+        send(owner, post(base() + "/" + id + "/revoke").content("{\"expectedRevision\":0}")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REVOKED"));
+        send(owner, get(base()).param("size", "101")).andExpect(status().isBadRequest());
+    }
+}

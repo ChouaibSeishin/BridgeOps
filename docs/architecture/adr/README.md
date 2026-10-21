@@ -16,3 +16,4 @@ Records 0001–0012 retain the reviewed architecture; 0013–0014 record accepte
 - [Bounded batch capability for triage](0012-bounded-triage.md)
 - [Offline initial account and tenant onboarding](0014-offline-bootstrap.md)
 - [Released compatible stack](0013-released-stack.md)
+- [Scoped automation and separation of human decisions](0015-scoped-automation.md)
