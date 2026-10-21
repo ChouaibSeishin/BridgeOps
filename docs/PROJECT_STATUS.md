@@ -1,6 +1,10 @@
 # Project status
 
-Updated 2026-10-19 UTC. **Phase 4 real human approval processing is complete and verified.** Publication stores an immutable definition; an explicit start executes supported internal capabilities. Integrations, webhooks, AI and MCP remain later phases.
+Updated 2026-10-21 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
+
+## Current Phase 5 work
+
+Preflight verified matching local/fetched master 9021e5ef6127d319c166ac5732b6f052ea07e95e, successful corresponding CI, healthy Compose and V11. Current local user data is two accounts/memberships, one organization, five workflows, six versions, one execution and one approval, with consumed bootstrap. All existing table/environment/key/volume fingerprints are captured privately. Existing SMTP and local IDE files are preserved. The [Phase 5 contract](development/PHASE_5_INTEGRATIONS.md) reconciles the previously proposed SecretStore, graph-v2 evolution, automation actor identity, exact batch approval and actual-connection SSRF safeguards. No Phase 5 completion or external connectivity is claimed.
 
 ## Verified Phase 4 delivery
 
