@@ -10,6 +10,14 @@ import tools.jackson.databind.JsonNode;
 public final class ExecutionPlan {
     public record Node(String id,String type,String message,String argumentHash,String prompt) {}
     private ExecutionPlan() {}
+    /** Separate v2 entry preserves the legacy sequential parser and its schema boundary. */
+    public static List<Node> runtime(JsonNode graph,WorkflowDefinitions definitions){
+        if(graph.path("schemaVersion").asInt()==1)return from(graph,definitions);
+        if(!definitions.valid(graph))throw new DomainFailure(422,"INVALID_WORKFLOW");
+        var nodes=definitions.orderedV2(graph);
+        if(nodes.stream().anyMatch(n->!Set.of("manualTrigger","syntheticAction","approval","condition","transform","delay","end").contains(n.path("type").asString())))throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");
+        return nodes.stream().map(n->new Node(n.path("id").asString(),n.path("type").asString(),n.path("config").path("message").asString(""),hash(definitions.stableValue(n)),n.path("config").path("prompt").asString(""))).toList();
+    }
     public static List<Node> from(JsonNode graph,WorkflowDefinitions definitions) {
         if(!definitions.valid(graph))throw new DomainFailure(422,"INVALID_WORKFLOW");
         if(graph.path("schemaVersion").asInt()!=1)throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_SCHEMA");

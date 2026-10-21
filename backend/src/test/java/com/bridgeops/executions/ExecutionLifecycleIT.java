@@ -272,6 +272,64 @@ class ExecutionLifecycleIT {
         for(var tenant:claims.stream().map(ExecutionStore.Claim::organization).distinct().toList())assertThat(claims.stream().filter(c->c.organization().equals(tenant)).count()).isLessThanOrEqualTo(2);
         worker.dispatch(claims.getFirst());assertThat(claim()).isNotNull();
     }
+    void publishV2(String graph){workflow=workflows.create(owner.id(),owner.family(),org,"Bounded DAG","",graphs.parse(graph)).workflow().id();version=workflows.publish(owner.id(),owner.family(),org,workflow,0).version().id();}
+    Submission startV2(String input,String key){return executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse(input),0,key,true);}
+    String v2(){return com.bridgeops.workflows.GraphV2DefinitionTest.GRAPH;}
+    String delayV2(int seconds){return v2().replace("\"type\":\"syntheticAction\",\"typeVersion\":1,\"config\":{\"operation\":\"record\",\"message\":\"Work exists\"}","\"type\":\"delay\",\"typeVersion\":1,\"config\":{\"seconds\":"+seconds+"}");}
+    @Test void v2ChoosesOnlyOneBranchAndPersistsInputsRoutesOutputsAndSkippedState(){
+        publishV2(v2());
+        for(int count:new int[]{1,0}){
+            var e=startV2("{\"count\":"+count+"}","dag-branch-"+count).execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);
+            var steps=executions.steps(owner.id(),owner.family(),org,e.id());String selected=count==1?"positive":"empty",skipped=count==1?"empty":"positive";
+            assertThat(steps.stream().filter(s->s.nodeId().equals(selected)).findFirst().orElseThrow().output().toString()).contains("recorded");
+            assertThat(steps.stream().filter(s->s.nodeId().equals(skipped)).findFirst().orElseThrow()).satisfies(s->{assertThat(s.status()).isEqualTo("SKIPPED");assertThat(s.attemptCount()).isZero();assertThat(s.errorCode()).isEqualTo("BRANCH_NOT_SELECTED");});
+            assertThat(operator.queryForObject("SELECT next_node_id FROM execution_step_routes WHERE organization_id=? AND execution_id=? AND node_id='choose'",String.class,org,e.id())).isEqualTo(selected);
+            assertThat(operator.queryForObject("SELECT count(*) FROM execution_step_inputs WHERE execution_id=?",Long.class,e.id())).isEqualTo(5);
+            assertThat(executions.attempts(owner.id(),owner.family(),org,e.id(),0,100).totalElements()).isEqualTo(5);assertThat(executions.events(owner.id(),owner.family(),org,e.id(),0,100).items()).extracting(Event::code).contains("BRANCH_SKIPPED","EXECUTION_SUCCEEDED");
+        }
+        assertThat(count("synthetic_records")).isEqualTo(2);
+    }
+    @Test void v2RequiresAcknowledgementAndCanonicalTypedInputBeforeCreatingDurableWork(){
+        publishV2(v2().replace("\"count\":\"INTEGER\"","\"count\":\"INTEGER\",\"flag\":\"BOOLEAN\""));
+        denied(422,()->executions.start(owner.id(),owner.family(),org,workflow,version,graphs.parse("{\"count\":1,\"flag\":true}"),0,"dag-ack-key",false));assertThat(count("workflow_executions")).isZero();assertThat(count("execution_work_items")).isZero();
+        var a=startV2("{\"count\":1,\"flag\":true}","dag-input-key");var b=startV2("{\"flag\":true,\"count\":1}","dag-input-key");assertThat(b.replay()).isTrue();assertThat(b.execution().id()).isEqualTo(a.execution().id());denied(409,()->startV2("{\"flag\":true,\"count\":0}","dag-input-key"));
+        denied(422,()->startV2("{\"flag\":true,\"count\":\"1\"}","dag-input-other"));assertThat(count("workflow_executions")).isEqualTo(1);
+    }
+    @Test void concurrentV2StartSubmissionsCreateOneExecutionAndOneQueueItem()throws Exception{
+        publishV2(v2());try(var pool=Executors.newFixedThreadPool(2)){var a=pool.submit(()->startV2("{\"count\":1}","dag-concurrent"));var b=pool.submit(()->startV2("{\"count\":1}","dag-concurrent"));var x=a.get(15,TimeUnit.SECONDS);var y=b.get(15,TimeUnit.SECONDS);assertThat(x.execution().id()).isEqualTo(y.execution().id());assertThat(List.of(x.replay(),y.replay())).containsExactlyInAnyOrder(false,true);}assertThat(count("workflow_executions")).isEqualTo(1);assertThat(count("execution_work_items")).isEqualTo(1);
+    }
+    @Test void v2DelayIsPersistedReleasesLeaseAndResumesAfterReconstructionWithoutResettingDeadline(){
+        publishV2(delayV2(10));var e=startV2("{\"count\":1}","dag-delay-key").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_DELAY);assertThat(claim()).isNull();assertThat(operator.queryForObject("SELECT lease_owner IS NULL FROM execution_work_items WHERE execution_id=?",Boolean.class,e.id())).isTrue();assertThat(count("execution_step_delays")).isEqualTo(1);
+        assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s->s.nodeId().equals("empty")).findFirst().orElseThrow().status()).isEqualTo("SKIPPED");
+        var restarted=new ExecutionRuntime(store,transactions,workerAuthority,snapshots,definitions,executions,executionAudit,clock,randomness,approvals);var restartedWorker=new ExecutionWorker(restarted,capability,4,2,30,1000);clock.add(11);
+        for(int i=0;i<20;i++){restarted.reconcile();var c=restarted.claim(UUID.randomUUID(),4,2,30);if(c==null)break;restartedWorker.dispatch(c);}
+        assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(get(e.id()).deadlineAt()).isEqualTo(e.deadlineAt());assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s->s.nodeId().equals("positive")).findFirst().orElseThrow().attemptCount()).isEqualTo(1);assertThat(count("synthetic_records")).isZero();
+    }
+    @Test void cancellingV2ScheduledDelayRecordsAttemptAndNeverDispatchesAfterDueTime(){
+        publishV2(delayV2(10));var e=startV2("{\"count\":1}","dag-delay-cancel").execution();drain();var waiting=get(e.id());executions.cancel(owner.id(),owner.family(),org,e.id(),waiting.revision(),"Cancel scheduled wait");clock.add(11);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.CANCELLED);assertThat(count("synthetic_records")).isZero();assertThat(executions.attempts(owner.id(),owner.family(),org,e.id(),0,100).items()).anyMatch(a->a.nodeId().equals("positive")&&a.outcome().equals("CANCELLED"));assertThat(claim()).isNull();
+    }
+    @Test void v2AbsoluteDeadlineExpiresDuringPersistedWait(){
+        publishV2(delayV2(3600));var e=startV2("{\"count\":1}","dag-delay-deadline").execution();drain();clock.add(86401);runtime.reconcile();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.FAILED);assertThat(get(e.id()).errorCode()).isEqualTo("DEADLINE_EXCEEDED");assertThat(get(e.id()).deadlineAt()).isEqualTo(e.deadlineAt());assertThat(claim()).isNull();assertThat(count("synthetic_records")).isZero();
+    }
+    @Test void v2TypeMismatchIsPermanentAndRetainsEarlierOutputs(){
+        publishV2(v2().replace("\"count\":\"INTEGER\"","\"count\":\"STRING\""));var e=startV2("{\"count\":\"one\"}","dag-condition-type").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.FAILED);assertThat(get(e.id()).errorCode()).isEqualTo("CONDITION_TYPE_MISMATCH");assertThat(get(e.id()).retryEligible()).isFalse();
+        assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s->Set.of("start","copy").contains(s.nodeId())).toList()).allMatch(s->s.status().equals("SUCCEEDED"));assertThat(executions.attempts(owner.id(),owner.family(),org,e.id(),0,100).items()).anyMatch(a->a.nodeId().equals("choose")&&a.outcome().equals("PERMANENT_FAILURE"));assertThat(count("synthetic_records")).isZero();
+    }
+    @Test void v2LeaseRecoveryRetainsPreparedInputsAndRejectsStaleCompletion(){
+        publishV2(v2());var e=startV2("{\"count\":1}","dag-fenced-recovery").execution();var old=claim();var dispatch=runtime.prepare(old);clock.add(31);runtime.reconcile();var fresh=claim();assertThat(fresh.token()).isGreaterThan(old.token());assertThat(runtime.complete(dispatch)).isFalse();worker.dispatch(fresh);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(operator.queryForObject("SELECT count(*) FROM execution_step_inputs WHERE execution_id=? AND node_id='start'",Long.class,e.id())).isEqualTo(1);assertThat(count("synthetic_records")).isEqualTo(1);
+    }
+    @Test void v2EligibleManualRetryRetainsOriginalTypedInputAndLogicalKeys(){
+        publishV2(v2());failure("positive",SyntheticCapability.FailureKind.TRANSIENT,3);var e=startV2("{\"count\":1}","dag-manual-retry").execution();drain();clock.add(3);drain();clock.add(3);drain();var failed=get(e.id());assertThat(failed.retryEligible()).isTrue();denied(422,()->executions.retry(owner.id(),owner.family(),org,e.id(),failed.revision(),"Retry exact input","dag-retry-ack"));
+        var retry=executions.retry(owner.id(),owner.family(),org,e.id(),failed.revision(),"Retry exact input","dag-retry-new",true).execution();drain();assertThat(get(retry.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(get(retry.id()).retryOfExecutionId()).isEqualTo(e.id());assertThat(store.get(org,retry.id(),false).input()).isEqualTo("{\"count\":1}");assertThat(store.steps(org,retry.id()).stream().map(ExecutionStore.Step::operation).toList()).isEqualTo(store.steps(org,e.id()).stream().map(ExecutionStore.Step::operation).toList());assertThat(count("synthetic_records")).isEqualTo(1);
+    }
+    @Test void v2NestedBranchesSkipOnlyUnselectedArmsAndKeepSharedMergeReachable(){
+        var graph=(tools.jackson.databind.node.ObjectNode)graphs.parse(v2());var nodes=(tools.jackson.databind.node.ArrayNode)graph.path("nodes");var edges=(tools.jackson.databind.node.ArrayNode)graph.path("edges");
+        nodes.add(graphs.parse("{\"id\":\"nested\",\"type\":\"condition\",\"typeVersion\":1,\"config\":{\"operator\":\"EQ\",\"compare\":1},\"inputs\":{\"value\":{\"from\":\"copy\",\"path\":\"count\"}}}"));
+        for(String id:List.of("leftResult","rightResult"))nodes.add(graphs.parse("{\"id\":\""+id+"\",\"type\":\"transform\",\"typeVersion\":1,\"config\":{},\"inputs\":{\"message\":{\"from\":\"positive\",\"path\":\"message\"}}}"));
+        for(var edge:edges)if(edge.path("source").asString().equals("positive"))((tools.jackson.databind.node.ObjectNode)edge).put("target","nested");
+        edges.add(graphs.parse("{\"source\":\"nested\",\"target\":\"leftResult\",\"branch\":\"true\"}"));edges.add(graphs.parse("{\"source\":\"nested\",\"target\":\"rightResult\",\"branch\":\"false\"}"));for(String id:List.of("leftResult","rightResult"))edges.add(graphs.parse("{\"source\":\""+id+"\",\"target\":\"finish\"}"));
+        publishV2(graph.toString());for(int count:new int[]{1,0}){var e=startV2("{\"count\":"+count+"}","dag-nested-"+count).execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);var steps=executions.steps(owner.id(),owner.family(),org,e.id());assertThat(steps.stream().filter(s->s.nodeId().equals("finish")).findFirst().orElseThrow().status()).isEqualTo("SUCCEEDED");if(count==1){assertThat(steps.stream().filter(s->s.nodeId().equals("leftResult")).findFirst().orElseThrow().output().toString()).contains("Work exists");assertThat(steps.stream().filter(s->Set.of("empty","rightResult").contains(s.nodeId())).toList()).allMatch(s->s.status().equals("SKIPPED"));}else assertThat(steps.stream().filter(s->Set.of("positive","nested","leftResult","rightResult").contains(s.nodeId())).toList()).hasSize(4).allMatch(s->s.status().equals("SKIPPED")&&s.attemptCount()==0);}
+    }
     @Test void changedArgumentsForAnExistingOperationReceiptFailForReconciliation(){
         var e=start("receipt-argument-key").execution();var step=store.steps(org,e.id()).stream().filter(s1->s1.node().equals("first")).findFirst().orElseThrow();
         operator.update("INSERT INTO synthetic_records(organization_id,logical_operation_id,message,recorded_at) VALUES(?,?,?,?)",org,step.operation(),"Controlled prior effect",java.sql.Timestamp.from(clock.instant()));

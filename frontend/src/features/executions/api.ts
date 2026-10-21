@@ -79,10 +79,11 @@ export const executionApi = {
     versionId: string,
     delaySeconds: number,
     key: string,
+    input: Record<string, unknown> = {},
   ) =>
     session.request<Execution>(
       `/api/v1/organizations/${encodeURIComponent(org)}/workflows/${encodeURIComponent(workflow)}/executions`,
-      post({ versionId, input: {}, delaySeconds }, key),
+      post({ versionId, input, delaySeconds, effectsAcknowledged: true }, key),
     ),
   list: (org: string, page: number, workflow: string, status: string) =>
     session.request<Page<Execution>>(
@@ -113,11 +114,15 @@ export const executionApi = {
   ) =>
     session.request<Execution>(
       `${item(org, id)}/retry`,
-      post({ expectedRevision, reason }, key),
+      post({ expectedRevision, reason, effectsAcknowledged: true }, key),
     ),
 };
 export function executionFailure(error: unknown): string {
   if (error instanceof HttpFailure) {
+    if (error.code === "EFFECTS_ACKNOWLEDGEMENT_REQUIRED")
+      return "Confirm the published execution's effects before starting. No execution was created.";
+    if (error.code === "INVALID_TRIGGER_INPUT")
+      return "Provide exactly the published trigger's typed input fields. No execution was created.";
     if (error.code === "INVALID_APPROVAL_TARGET")
       return "Each approval gate must immediately protect one supported internal record action. No execution was created.";
     if (error.code === "UNSUPPORTED_RUNTIME_NODE")

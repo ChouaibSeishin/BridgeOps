@@ -27,30 +27,40 @@ public class ExecutionService {
     }
     @Transactional(timeout=10)
     public Submission start(UUID actor,UUID family,UUID org,UUID workflow,UUID version,JsonNode input,int delay,String key){
+        return start(actor,family,org,workflow,version,input,delay,key,false);
+    }
+    @Transactional(timeout=10)
+    public Submission start(UUID actor,UUID family,UUID org,UUID workflow,UUID version,JsonNode input,int delay,String key,boolean effectsAcknowledged){
         authority.write(actor,family,org,"execution.run");
         var draft=workflows.get(actor,family,org,workflow);
         if(!draft.workflow().status().equals("ACTIVE"))throw new DomainFailure(409,"WORKFLOW_ARCHIVED");
         UUID pinned=version==null?draft.workflow().currentPublishedVersionId():version;
         if(pinned==null)throw new DomainFailure(422,"WORKFLOW_NOT_PUBLISHED");
-        return submit(actor,family,org,workflow,pinned,input,delay,key,null);
+        return submit(actor,family,org,workflow,pinned,input,delay,key,null,effectsAcknowledged);
     }
-    private Submission submit(UUID actor,UUID family,UUID org,UUID workflow,UUID version,JsonNode input,int delay,String key,Execution retry){
+    private Submission submit(UUID actor,UUID family,UUID org,UUID workflow,UUID version,JsonNode input,int delay,String key,Execution retry,boolean effectsAcknowledged){
         key(key);if(delay<0||delay>3600)throw new DomainFailure(400,"INVALID_REQUEST");
         var snapshot=workflows.version(actor,family,org,workflow,version);
+        boolean v2=snapshot.version().schemaVersion()==2;
+        if(v2&&!effectsAcknowledged)throw new DomainFailure(422,"EFFECTS_ACKNOWLEDGEMENT_REQUIRED");
+        if(v2)input=graphs.triggerV2(snapshot.definition(),input);
+        String canonicalInput=v2?graphs.stableValue(input):String.valueOf(input);
         String source=retry==null?"MANUAL":"RETRY";
-        String fingerprint=ExecutionPlan.hash(version+"\n"+snapshot.version().definitionHash()+"\n"+String.valueOf(input)+"\n"+delay+"\n"+(retry==null?"":retry.id()));
+        String fingerprint=ExecutionPlan.hash(version+"\n"+snapshot.version().definitionHash()+"\n"+canonicalInput+"\n"+delay+"\n"+(retry==null?"":retry.id()));
         var existing=store.replay(org,workflow,source,key);
         if(existing.isPresent()){
             if(!existing.get().fingerprint().equals(fingerprint))throw new DomainFailure(409,"IDEMPOTENCY_CONFLICT");
             return new Submission(summary(existing.get()),true);
         }
-        if(input==null||!input.isObject()||!input.isEmpty())throw new DomainFailure(422,"UNSUPPORTED_TRIGGER_INPUT");
-        var plan=ExecutionPlan.from(snapshot.definition(),graphs);UUID id=UUID.randomUUID();Instant now=clock.instant();
-        store.insert(id,org,workflow,version,snapshot.version().definitionHash(),actor,source,key,fingerprint,retry==null?null:retry.id(),now,now.plusSeconds(delay));
+        if(!v2&&(input==null||!input.isObject()||!input.isEmpty()))throw new DomainFailure(422,"UNSUPPORTED_TRIGGER_INPUT");
+        var plan=ExecutionPlan.runtime(snapshot.definition(),graphs);UUID id=UUID.randomUUID();Instant now=clock.instant();
+        if(v2)store.insertV2(id,org,workflow,version,snapshot.version().definitionHash(),actor,source,canonicalInput,key,fingerprint,retry==null?null:retry.id(),now,now.plusSeconds(delay));
+        else store.insert(id,org,workflow,version,snapshot.version().definitionHash(),actor,source,key,fingerprint,retry==null?null:retry.id(),now,now.plusSeconds(delay));
         Map<String,ExecutionStore.Step> old=new HashMap<>();if(retry!=null)for(var step:store.steps(org,retry.id()))old.put(step.node(),step);
         for(int i=0;i<plan.size();i++){
             var node=plan.get(i);var original=old.get(node.id());
-            store.insertStep(org,id,node.id(),i,node.type(),original==null?UUID.randomUUID():original.operation(),node.argumentHash());
+            if(v2)store.insertStepV2(org,id,node.id(),i,node.type(),original==null?UUID.randomUUID():original.operation(),node.argumentHash());
+            else store.insertStep(org,id,node.id(),i,node.type(),original==null?UUID.randomUUID():original.operation(),node.argumentHash());
         }
         var execution=store.get(org,id,false);store.event(execution,"EXECUTION_QUEUED",null,now);
         audit.write(org,actor,retry==null?ExecutionAudit.Action.EXECUTION_STARTED:ExecutionAudit.Action.EXECUTION_RETRIED,id,0,version,execution.hash(),now);
@@ -67,11 +77,15 @@ public class ExecutionService {
     }
     @Transactional(timeout=10)
     public Submission retry(UUID actor,UUID family,UUID org,UUID id,long revision,String reason,String key){
+        return retry(actor,family,org,id,revision,reason,key,false);
+    }
+    @Transactional(timeout=10)
+    public Submission retry(UUID actor,UUID family,UUID org,UUID id,long revision,String reason,String key,boolean effectsAcknowledged){
         authority.write(actor,family,org,"execution.retry");authority.write(actor,family,org,"execution.run");reason(reason);
         var e=store.get(org,id,true);revision(e,revision);
         if(!eligible(e))throw new DomainFailure(409,"RETRY_INELIGIBLE");
         var workflow=workflows.get(actor,family,org,e.workflow());if(!workflow.workflow().status().equals("ACTIVE"))throw new DomainFailure(409,"WORKFLOW_ARCHIVED");
-        return submit(actor,family,org,e.workflow(),e.version(),graphs.parse("{}"),0,key,e);
+        return submit(actor,family,org,e.workflow(),e.version(),graphs.parse(e.input()),0,key,e,effectsAcknowledged);
     }
     @Transactional(readOnly=true,timeout=5)
     public Summary get(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"execution.read");return summary(store.get(org,id,false));}
@@ -98,7 +112,7 @@ public class ExecutionService {
         long total=store.jdbc().queryForObject("SELECT count(*) FROM execution_events WHERE organization_id=? AND execution_id=?",Long.class,org,id);return page(items,page,size,total);
     }
     void terminateSteps(Execution e,String outcome,Instant now){
-        for(var step:store.steps(e.organization(),e.id()))if(step.state().equals("RUNNING")){
+        for(var step:store.steps(e.organization(),e.id()))if(Set.of("RUNNING","WAITING_FOR_DELAY").contains(step.state())&&step.attempts()>0){
             store.jdbc().update("INSERT INTO execution_attempts(id,organization_id,execution_id,node_id,attempt_number,started_at,completed_at,outcome,error_code) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",UUID.randomUUID(),e.organization(),e.id(),step.node(),step.attempts(),time(step.started()),time(now),outcome,outcome);
         }
         store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=CASE WHEN status='PENDING' THEN 'NOT_DISPATCHED' ELSE ? END WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());

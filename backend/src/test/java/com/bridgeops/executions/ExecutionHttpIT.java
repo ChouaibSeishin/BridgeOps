@@ -74,6 +74,14 @@ class ExecutionHttpIT {
         String path=path(create());send(owner,post(path+"/publish").content(revision(0))).andExpect(status().isCreated());return path+"/executions";
     }
     String executionBase(){return "/api/v1/organizations/"+organization+"/executions";}
+    @Test void v2HttpStartRequiresExactAcknowledgementBeforeAnyExecutionOrQueueRow()throws Exception{
+        var graph=json.readTree(com.bridgeops.workflows.GraphV2DefinitionTest.GRAPH);var created=read(send(owner,post(base()).content(body(Map.of("name","Bounded DAG","description","","definition",graph)))).andExpect(status().isCreated()).andReturn());String path=path(created);send(owner,post(path+"/publish").content(revision(0))).andExpect(status().isCreated());
+        for(Object acknowledged:List.of(false,"true",1)){
+            var request=Map.of("input",Map.of("count",1),"effectsAcknowledged",acknowledged);start(path+"/executions","dag-http-ack",body(request)).andExpect(acknowledged instanceof Boolean?status().isUnprocessableContent():status().isBadRequest());
+        }
+        start(path+"/executions","dag-http-ack",body(Map.of("input",Map.of("count",1)))).andExpect(status().isUnprocessableContent());assertThat(operator.queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isZero();assertThat(operator.queryForObject("SELECT count(*) FROM execution_work_items",Long.class)).isZero();
+        var accepted=start(path+"/executions","dag-http-ack",body(Map.of("input",Map.of("count",1),"effectsAcknowledged",true))).andExpect(status().isAccepted()).andExpect(header().exists("Location")).andReturn();var id=read(accepted).path("id").asString();drain();send(owner,get(executionBase()+"/"+id)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUCCEEDED"));
+    }
     ResultActions start(String path,String key,String input)throws Exception{return send(owner,post(path).header("Idempotency-Key",key).content(input));}
     void drain(){var worker=new com.bridgeops.executions.application.ExecutionWorker(runtime,capability,4,2,30,1000);for(int i=0;i<20;i++){var c=runtime.claim(UUID.randomUUID(),4,2,30);if(c==null)return;worker.dispatch(c);}throw new AssertionError("Worker did not quiesce");}
     @Test void acceptsPersistsReturnsLocationAndTerminalReplayIs200()throws Exception{

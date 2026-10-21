@@ -25,8 +25,12 @@ Every increment includes validation, backend authorization, migrations, safe err
 
 Phase 1D, Phase 2 and Phase 3 are complete. Phase 3 runs immutable published linear manual-trigger/internal-record/end chains through PostgreSQL durable work, fenced recovery, receipts, attempts, retries, deadlines and cancellation. Tenant-authorized APIs and persisted browser monitoring are verified. All 206 backend/integration/browser tests and 54 frontend tests passed, along with container/same-origin, fresh/V9 migration, preservation, dependency/secret scans and [corresponding implementation CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39070309725). [Evidence and limitations](../PROJECT_STATUS.md). Existing account, consumed marker, environment, keys, tenant, saved definitions and volume remain preserved.
 
-## Current Phase 4 checkpoint
+## Historical Phase 4 checkpoint
 
 Phase 4 is complete and verified: distinct-human decisions, bounded immutable policies, exact intent, central capability enforcement, durable waiting/signals/receipts, expiry/cancellation/recovery and authenticated inbox/detail/policy UI. All 265 backend/PostgreSQL/browser tests and 68 frontend tests passed with no failures/errors/skips. Fresh/V10 migrations, preserved-data V11 production upgrade, security smoke, production build, dependency/secret scans and [corresponding implementation CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314) passed. Exact contracts/evidence are in the [approval guide](../development/PHASE_4_APPROVALS.md) and project status; preceding Phase 3 counts are historical.
 
-Next: controlled external integrations/webhooks in Phase 5, then AI/MCP in Phase 6. Draft TEST snapshots and richer graphs remain deferred. Internal record approval is the current end-to-end slice; external support triage depends on Phase 5.
+## Current Phase 5 work
+
+Controlled integrations and business automation remain in progress. Verified increments add encrypted secrets, opt-in persisted support/team/notification examples and reads, controlled REST connection configuration/health with safe DNS/TLS, separate graph-v2 publication/mappings, and scoped automation identities/grants. The durable v2 manual core adds chosen-path routing, prepared inputs, persisted delays and edge-based record approvals; its verification evidence is tracked in the [Phase 5 guide](../development/PHASE_5_INTEGRATIONS.md).
+
+The remaining critical path is protected business effects and exact batch/external/automation approval, actual automation execution identity, signed durable webhooks, the visual canvas, opt-in triage template and complete business/browser/release verification. AI/MCP remain Phase 6; external notification delivery, schedules and arbitrary expressions are outside Phase 5. No draft TEST snapshot or dry-run mode is claimed.

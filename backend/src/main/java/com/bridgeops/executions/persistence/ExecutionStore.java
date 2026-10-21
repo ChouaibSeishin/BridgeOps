@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 public class ExecutionStore {
     public record Execution(UUID id, UUID organization, UUID workflow, UUID version, String hash, UUID actor,
         String source, ExecutionState state, long revision, int position, Instant created, Instant started,
-        Instant completed, Instant deadline, Instant notBefore, String error, UUID retryOf, String fingerprint) {}
+        Instant completed, Instant deadline, Instant notBefore, String error, UUID retryOf, String fingerprint, String input) {}
     public record Step(String node, int position, String type, UUID operation, String argumentHash, String state,
         int attempts, Instant started, Instant completed, String output, String error) {}
     public record Claim(UUID organization, UUID execution, UUID owner, long token) {}
@@ -39,6 +39,11 @@ public class ExecutionStore {
     public void insertStep(UUID org,UUID execution,String node,int position,String type,UUID operation,String hash){
         jdbc.update("INSERT INTO execution_steps(organization_id,execution_id,node_id,position,node_type,logical_operation_id,argument_hash) VALUES(?,?,?,?,?,?,?)",org,execution,node,position,type,operation,hash);
     }
+    public void insertV2(UUID id,UUID org,UUID workflow,UUID version,String hash,UUID actor,String source,String input,String key,String fingerprint,UUID retry,Instant now,Instant notBefore){
+        jdbc.update("INSERT INTO workflow_executions(id,organization_id,workflow_id,workflow_version_id,definition_hash,requested_by,trigger_source,graph_schema_version,input_json,idempotency_key,request_fingerprint,retry_of_execution_id,status,created_at,deadline_at,not_before) VALUES(?,?,?,?,?,?,?,2,?,?,?,?,'QUEUED',?,?,?)",id,org,workflow,version,hash,actor,source,input,key,fingerprint,retry,time(now),time(now.plusSeconds(86400)),time(notBefore));
+        jdbc.update("INSERT INTO execution_work_items(organization_id,execution_id,due_at,state) VALUES(?,?,?,'READY')",org,id,time(now));
+    }
+    public void insertStepV2(UUID org,UUID execution,String node,int position,String type,UUID operation,String hash){jdbc.update("INSERT INTO execution_steps(organization_id,execution_id,node_id,position,node_type,logical_operation_id,argument_hash,graph_schema_version) VALUES(?,?,?,?,?,?,?,2)",org,execution,node,position,type,operation,hash);}
     public List<Step> steps(UUID org,UUID execution){return jdbc.query("SELECT * FROM execution_steps WHERE organization_id=? AND execution_id=? ORDER BY position",this::step,org,execution);}
     public Instant due(UUID org,UUID execution){return jdbc.queryForObject("SELECT due_at FROM execution_work_items WHERE organization_id=? AND execution_id=?",Timestamp.class,org,execution).toInstant();}
     public void event(Execution e,String code,String node,Instant now){
@@ -63,7 +68,7 @@ public class ExecutionStore {
     public void park(Claim c,Instant due){if(jdbc.update("UPDATE execution_work_items SET state='WAITING',due_at=?,lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1 WHERE organization_id=? AND execution_id=? AND state='CLAIMED' AND lease_owner=? AND fencing_token=?",time(due),c.organization(),c.execution(),c.owner(),c.token())!=1)throw new IllegalStateException("Lost execution ownership.");}
     public void resume(Execution e,Instant due){if(jdbc.update("UPDATE execution_work_items SET state='READY',due_at=?,lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1 WHERE organization_id=? AND execution_id=? AND state='WAITING'",time(due),e.organization(),e.id())!=1)throw new IllegalStateException("Execution is not parked.");}
     private Execution execution(ResultSet r,int index)throws SQLException {
-        return new Execution(r.getObject("id",UUID.class),r.getObject("organization_id",UUID.class),r.getObject("workflow_id",UUID.class),r.getObject("workflow_version_id",UUID.class),r.getString("definition_hash"),r.getObject("requested_by",UUID.class),r.getString("trigger_source"),ExecutionState.valueOf(r.getString("status")),r.getLong("revision"),r.getInt("current_position"),instant(r,"created_at"),instant(r,"started_at"),instant(r,"completed_at"),instant(r,"deadline_at"),instant(r,"not_before"),r.getString("error_code"),r.getObject("retry_of_execution_id",UUID.class),r.getString("request_fingerprint"));
+        return new Execution(r.getObject("id",UUID.class),r.getObject("organization_id",UUID.class),r.getObject("workflow_id",UUID.class),r.getObject("workflow_version_id",UUID.class),r.getString("definition_hash"),r.getObject("requested_by",UUID.class),r.getString("trigger_source"),ExecutionState.valueOf(r.getString("status")),r.getLong("revision"),r.getInt("current_position"),instant(r,"created_at"),instant(r,"started_at"),instant(r,"completed_at"),instant(r,"deadline_at"),instant(r,"not_before"),r.getString("error_code"),r.getObject("retry_of_execution_id",UUID.class),r.getString("request_fingerprint"),r.getString("input_json"));
     }
     private Step step(ResultSet r,int index)throws SQLException {
         return new Step(r.getString("node_id"),r.getInt("position"),r.getString("node_type"),r.getObject("logical_operation_id",UUID.class),r.getString("argument_hash"),r.getString("status"),r.getInt("attempt_count"),instant(r,"attempt_started_at"),instant(r,"completed_at"),r.getString("output_json"),r.getString("error_code"));

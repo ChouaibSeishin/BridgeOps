@@ -2,6 +2,23 @@ import { afterEach, it, expect, vi } from "vitest";
 import { executionApi } from "./api";
 import { session } from "../../lib/session";
 afterEach(() => vi.restoreAllMocks());
+it("sends explicit v2 trigger fields and acknowledged effects with the pinned version", async () => {
+  const request = vi.spyOn(session, "request").mockResolvedValue({});
+  await executionApi.start("org", "workflow", "v2", 0, "typed-key", {
+    count: 2,
+  });
+  expect(request).toHaveBeenCalledWith(
+    "/api/v1/organizations/org/workflows/workflow/executions",
+    expect.objectContaining({
+      body: JSON.stringify({
+        versionId: "v2",
+        input: { count: 2 },
+        delaySeconds: 0,
+        effectsAcknowledged: true,
+      }),
+    }),
+  );
+});
 it("pins the exact version and empty input with a stable request header", async () => {
   const request = vi.spyOn(session, "request").mockResolvedValue({});
   await executionApi.start("org", "workflow", "version", 60, "stable-key");
@@ -17,6 +34,7 @@ it("pins the exact version and empty input with a stable request header", async 
         versionId: "version",
         input: {},
         delaySeconds: 60,
+        effectsAcknowledged: true,
       }),
     },
   );
@@ -44,6 +62,11 @@ it("sends current revisions and explicit retry linkage requests without graph mu
         "Content-Type": "application/json",
         "Idempotency-Key": "retry-key",
       },
+      body: JSON.stringify({
+        expectedRevision: 9,
+        reason: "Retry eligible failure",
+        effectsAcknowledged: true,
+      }),
     }),
   );
 });
