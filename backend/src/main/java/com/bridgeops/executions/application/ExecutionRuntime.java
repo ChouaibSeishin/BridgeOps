@@ -82,7 +82,7 @@ public class ExecutionRuntime {
             }
         }
         if(node.type().equals("approval")||node.type().equals("syntheticAction")){
-            var gate=approvals.check(seed(e,plan,e.position(),snapshot.graph()),explicit(e,plan,e.position(),snapshot.graph()),actors);
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false);
             if(handleGate(e,c,node,gate,now))return null;
             if(node.type().equals("approval")){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
         }
@@ -103,7 +103,7 @@ public class ExecutionRuntime {
         String output="{}";
         if(step.type().equals("syntheticAction")){
             if(!dispatch.node().equals(plan.get(e.position()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
-            var gate=approvals.check(seed(e,plan,e.position(),snapshot.graph()),explicit(e,plan,e.position(),snapshot.graph()),actors);
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false);
             if(handleGate(e,c,dispatch.node(),gate,now))return false;
             var receipts=jdbc.queryForList("SELECT argument_hash,result_json FROM execution_operation_receipts WHERE organization_id=? AND capability='synthetic.record' AND logical_operation_id=? AND item_id=?",e.organization(),step.operation(),step.node());
             if(!receipts.isEmpty()){
@@ -191,10 +191,15 @@ public class ExecutionRuntime {
         return count;
     }
     private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
+    private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume){
+        try{var intent=seed(e,plan,e.position(),graph);return resume?approvals.resumeCheck(intent,actors):approvals.check(intent,explicit(e,plan,e.position(),graph),actors);}
+        catch(DomainFailure failure){if(!failure.code().equals("OPERATION_INTENT_MISMATCH"))throw failure;return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,failure.code(),false);}
+    }
     private boolean explicit(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){return data.gate(e,graph,plan,position).type().equals("approval");}
     private ApprovalRuntime.Seed seed(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){
         var action=data.action(graph,plan,position);var gate=data.gate(e,graph,plan,position);
         var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();
+        if(data.v2(graph))data.prepareRecord(e,step,action.message());
         return new ApprovalRuntime.Seed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),gate.type().equals("approval")?gate.prompt():"Review the exact internal record operation",action.message(),e.deadline());
     }
     private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){
@@ -221,7 +226,7 @@ public class ExecutionRuntime {
             try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=consumeApprovalSignal(e,signal);continue;}
             var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);
             if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=consumeApprovalSignal(e,signal);continue;}
-            var gate=approvals.resumeCheck(seed(e,plan,e.position(),snapshot.graph()),actors);
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,true);
             if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS)continue;
             if(!signal.outcome().equals("APPROVED")||gate.result()!=ApprovalRuntime.Result.ALLOW){fail(e,gate.error()==null?"APPROVAL_"+signal.outcome():gate.error(),now);changed|=consumeApprovalSignal(e,signal);continue;}
             changed|=consumeApprovalSignal(e,signal);

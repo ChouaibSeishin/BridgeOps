@@ -158,6 +158,8 @@ Flyway owns schema; JPA uses ddl-auto=validate. Test migration from empty and pr
 
 ## Installation provisioning clarification
 
+Phase 5 V17 adds execution_operation_bindings and execution_operation_inputs. Actual normalized argument hashes are distinct from static blueprint hashes and mapped-input snapshots. One tenant/logical-operation binding survives transport attempts and eligible linked manual retries; execution-specific prepared-intent IDs retain both the exact binding and tenant-qualified pinned step context. Connection references include the immutable revision. These tables are append-only with runtime SELECT/INSERT only. Existing execution, approval and receipt bytes are unchanged; schema-2 approval binding and business dispatch remain subsequent increments.
+
 Phase 1 introduces a singleton installation_state record with bootstrap_consumed_at and initial_user_id, plus account-level user_grants for organization.create. Offline bootstrap locks the singleton row and atomically creates exactly one verified account and consumes the marker. It creates no organization. Organization creation is an authenticated transaction that checks the account grant and creates Owner membership. Invite acceptance creates no installation-wide grants. This boundary is now implemented by V4/V5/V7; actual verification is recorded in PROJECT_STATUS.md.
 
 Approval uniqueness means one decision-maker per request, distinct from the requester; it does not mean two approvers.

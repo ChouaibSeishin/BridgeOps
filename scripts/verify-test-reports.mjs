@@ -4,6 +4,7 @@ const directories = ["backend/target/surefire-reports", "backend/target/failsafe
 const required = ["BrowserJourneyIT", "ExecutionLifecycleIT", "ExecutionHttpIT", "ExecutionMigrationIT", "ExecutionOutageIT", "ApprovalBrowserIT", "ApprovalLifecycleIT", "ApprovalHttpIT", "ApprovalMigrationIT", "ApprovalContractsTest", "ApprovalBoundariesTest", "IntegrationSecurityTest", "RestOperationTest", "RestTransportTest", "IntegrationBusinessIT", "IntegrationHttpIT", "IntegrationMigrationIT", "OutboundMigrationIT", "GraphV2DefinitionTest", "WorkflowGraphMigrationIT", "AutomationIT", "AutomationMigrationIT"];
 const found = new Set();
 required.push("GraphDataMigrationIT");
+required.push("OperationApprovalIntentTest", "OperationInputMigrationIT");
 const totals = { reports: 0, tests: 0, failures: 0, errors: 0, skipped: 0 };
 for (const directory of directories) {
   const files = (await readdir(directory)).filter(name => /^TEST-.*\.xml$/.test(name));
