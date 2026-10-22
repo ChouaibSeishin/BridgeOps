@@ -60,6 +60,10 @@ class ExecutionLifecycleIT {
     @Autowired com.bridgeops.audit.application.ExecutionAudit executionAudit;
     @Autowired ExecutionRandom randomness;
     @Autowired com.bridgeops.approvals.application.ApprovalRuntime approvals;
+    @Autowired com.bridgeops.approvals.application.ApprovalService approvalCommands;
+    @Autowired com.bridgeops.integrations.application.ConnectionService connections;
+    @Autowired com.bridgeops.integrations.application.BusinessService business;
+    @Autowired CapabilityDispatch capabilityGateway;
     @Autowired MutableClock clock;@Autowired ControlledCapability capability;@Autowired JdbcTemplate runtimeDb;
     JdbcTemplate operator;Actor owner;UUID org,workflow,version;ExecutionWorker worker;static String passwordHash;
     record Actor(UUID id,UUID family) {}
@@ -337,6 +341,62 @@ class ExecutionLifecycleIT {
         var prepared=operator.queryForMap("SELECT i.id,b.arguments_json,b.argument_hash,i.blueprint_hash FROM execution_operation_inputs i JOIN execution_operation_bindings b USING(organization_id,logical_operation_id) WHERE i.execution_id=?",e.id());
         assertThat(prepared.get("arguments_json")).isEqualTo("{\"message\":\"Work exists\"}");assertThat(prepared.get("argument_hash")).isNotEqualTo(prepared.get("blueprint_hash"));assertThat(count("synthetic_records")).isZero();
         assertThat(runtime.complete(dispatch)).isTrue();clock.add(31);runtime.reconcile();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(count("synthetic_records")).isEqualTo(1);assertThat(count("execution_operation_bindings")).isEqualTo(1);assertThat(operator.queryForObject("SELECT id FROM execution_operation_inputs WHERE execution_id=?",UUID.class,e.id())).isEqualTo(prepared.get("id"));
+    }
+    UUID supportConnection,teamConnection;
+    void capabilityConnections(){business.demo(owner.id(),owner.family(),org,true);supportConnection=connections.create(owner.id(),owner.family(),org,"Support read scope","","SUPPORT",graphs.parse("{}"),null).connection().id();teamConnection=connections.create(owner.id(),owner.family(),org,"Team read scope","","TEAMS",graphs.parse("{}"),null).connection().id();}
+    String capabilityGraph(boolean approval){
+        String graph="""
+          {"schemaVersion":2,"nodes":[
+           {"id":"finish","type":"end","typeVersion":1,"config":{},"inputs":{}},
+           {"id":"resolve","type":"capabilityAction","typeVersion":1,"config":{"integrationId":"%s","revision":0,"operation":"teams.resolve"},"inputs":{"tickets":{"from":"read","path":"tickets"}}},
+           {"id":"record","type":"syntheticAction","typeVersion":1,"config":{"operation":"record","message":"Prepared actual ticket plan"},"inputs":{}},
+           {"id":"read","type":"capabilityAction","typeVersion":1,"config":{"integrationId":"%s","revision":0,"operation":"support.list"},"inputs":{"limit":{"literal":50},"priorities":{"literal":["HIGH","URGENT"]},"statuses":{"literal":["OPEN","IN_PROGRESS"]}}},
+           {"id":"start","type":"manualTrigger","typeVersion":1,"config":{"inputFields":{}},"inputs":{}}
+          ],"edges":[{"source":"resolve","target":"record"},{"source":"start","target":"read"},{"source":"record","target":"finish"},{"source":"read","target":"resolve"}]}
+          """.formatted(teamConnection,supportConnection);
+        if(!approval)return graph;var root=(tools.jackson.databind.node.ObjectNode)graphs.parse(graph);((tools.jackson.databind.node.ArrayNode)root.path("nodes")).add(graphs.parse("{\"id\":\"review\",\"type\":\"approval\",\"typeVersion\":1,\"config\":{\"prompt\":\"Review exact ticket snapshots\"},\"inputs\":{}}"));for(var edge:root.path("edges"))if(edge.path("source").asString().equals("read"))((tools.jackson.databind.node.ObjectNode)edge).put("target","review");((tools.jackson.databind.node.ArrayNode)root.path("edges")).add(graphs.parse("{\"source\":\"review\",\"target\":\"resolve\"}"));return root.toString();
+    }
+    CapabilityDispatch.Work capabilityWork(ExecutionStore.Claim claim){return new CapabilityDispatch.Work(org,claim.execution(),claim.owner(),claim.token(),Set.of(owner.id()));}
+    @Test void capabilityReadsExecuteInEdgeOrderAndPersistExactPlansReceiptsAndResults(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-read-plan").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);
+        var steps=executions.steps(owner.id(),owner.family(),org,e.id());assertThat(steps).extracting(Step::nodeId).containsExactly("start","read","resolve","record","finish");assertThat(steps).allMatch(s->s.status().equals("SUCCEEDED"));
+        var plan=steps.stream().filter(s->s.nodeId().equals("resolve")).findFirst().orElseThrow().output().toString();assertThat(plan).contains("\"expectedRevision\":0","\"currentTeamId\":null","\"targetTeamId\"");assertThat(count("integration_operation_receipts")).isEqualTo(2);assertThat(count("execution_operation_bindings")).isEqualTo(3);assertThat(operator.queryForObject("SELECT count(*) FROM support_tickets WHERE assigned_team_id IS NOT NULL",Long.class)).isZero();
+    }
+    @Test void capabilityExplicitReadApprovalUsesTheSameExactPreparedOperationAndDistinctHuman(){
+        capabilityConnections();var decider=member("APPROVER");publishV2(capabilityGraph(true));var e=startV2("{}","capability-approved-read").execution();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.WAITING_FOR_APPROVAL);assertThat(count("integration_operation_receipts")).isEqualTo(1);
+        var request=approvalCommands.get(owner.id(),owner.family(),org,get(e.id()).approvalId());assertThat(request.capability()).isEqualTo("teams");assertThat(request.operation()).isEqualTo("resolve");assertThat(request.classification()).isEqualTo("READ");assertThat(request.intentSchemaVersion()).isEqualTo(2);assertThat(request.connection().id()).isEqualTo(teamConnection);assertThat(request.arguments().path("tickets").size()).isEqualTo(2);
+        denied(403,()->approvalCommands.decide(owner.id(),owner.family(),org,request.id(),0,"APPROVE","Cannot self approve"));approvalCommands.decide(decider.id(),decider.family(),org,request.id(),0,"APPROVE","Review exact read scope");drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(count("integration_operation_receipts")).isEqualTo(2);
+    }
+    @Test void capabilityNonCanonicalConnectionIdentityIsRejectedBeforePublicationAndWork(){
+        capabilityConnections();String invalid=capabilityGraph(false).replace(supportConnection.toString(),"AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA");
+        assertThatThrownBy(()->publishV2(invalid)).isInstanceOfSatisfying(com.bridgeops.workflows.application.InvalidDefinition.class,e->assertThat(e.validation().errors()).extracting(com.bridgeops.workflows.domain.GraphDefinition.Error::code).contains("CONNECTION_REFERENCE"));assertThat(count("workflow_executions")).isZero();assertThat(count("execution_work_items")).isZero();assertThat(count("integration_operation_receipts")).isZero();
+    }
+    @Test void capabilityStaleTicketSnapshotFailsPermanentlyAndRetainsTheCompletedRead(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-stale-snapshot").execution();worker.dispatch(claim());worker.dispatch(claim());operator.update("UPDATE support_tickets SET revision=revision+1 WHERE priority IN ('HIGH','URGENT') AND status='OPEN'");drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.FAILED);assertThat(get(e.id()).errorCode()).isEqualTo("STALE_TICKET_PLAN");assertThat(get(e.id()).retryEligible()).isFalse();
+        var steps=executions.steps(owner.id(),owner.family(),org,e.id());assertThat(steps.stream().filter(s->s.nodeId().equals("read")).findFirst().orElseThrow().status()).isEqualTo("SUCCEEDED");assertThat(steps.stream().filter(s->s.nodeId().equals("resolve")).findFirst().orElseThrow().status()).isEqualTo("FAILED");assertThat(count("integration_operation_receipts")).isEqualTo(1);assertThat(count("synthetic_records")).isZero();
+    }
+    @Test void capabilityConnectionChangesCannotReuseAnApprovedOldRevision(){
+        capabilityConnections();var decider=member("APPROVER");publishV2(capabilityGraph(true));var e=startV2("{}","capability-stale-connection").execution();drain();var r=approvalCommands.get(owner.id(),owner.family(),org,get(e.id()).approvalId());approvalCommands.decide(decider.id(),decider.family(),org,r.id(),0,"APPROVE","Exact revision");connections.update(owner.id(),owner.family(),org,teamConnection,0,"Team changed","",true,graphs.parse("{}"),null,false);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.FAILED);assertThat(get(e.id()).errorCode()).isEqualTo("STALE_CONNECTION");assertThat(count("integration_operation_receipts")).isEqualTo(1);assertThat(count("synthetic_records")).isZero();assertThat(claim()).isNull();
+    }
+    @Test void capabilityDisabledConnectionAndInvalidArgumentsNeverDispatchAnOperation(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-disabled").execution();connections.update(owner.id(),owner.family(),org,supportConnection,0,"Disabled support","",false,graphs.parse("{}"),null,false);drain();assertThat(get(e.id()).errorCode()).isEqualTo("INTEGRATION_DISABLED");assertThat(count("integration_operation_receipts")).isZero();assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s->s.nodeId().equals("read")).findFirst().orElseThrow().status()).isEqualTo("FAILED");
+        supportConnection=connections.create(owner.id(),owner.family(),org,"New read scope","","SUPPORT",graphs.parse("{}"),null).connection().id();publishV2(capabilityGraph(false).replace("[\"OPEN\",\"IN_PROGRESS\"]","[\"INVALID\"]"));var bad=startV2("{}","capability-bad-input").execution();drain();assertThat(get(bad.id()).errorCode()).isEqualTo("INVALID_CAPABILITY_INPUT");assertThat(count("integration_operation_receipts")).isZero();
+    }
+    @Test void capabilityGatewayRejectsForgedLeaseNodeActorSetAndCancelledWork(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-forged-work").execution();worker.dispatch(claim());var claim=claim();var dispatch=runtime.prepare(claim);assertThat(dispatch.node().id()).isEqualTo("read");var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);var work=capabilityWork(claim);
+        denied(409,()->tx.execute(s->capabilityGateway.perform(new CapabilityDispatch.Work(org,e.id(),claim.owner(),claim.token()+1,work.actors()),"read")));denied(409,()->tx.execute(s->capabilityGateway.perform(work,"resolve")));denied(409,()->tx.execute(s->capabilityGateway.perform(new CapabilityDispatch.Work(org,e.id(),claim.owner(),claim.token(),Set.of(UUID.randomUUID())),"read")));
+        executions.cancel(owner.id(),owner.family(),org,e.id(),get(e.id()).revision(),"Stop before read");denied(409,()->tx.execute(s->capabilityGateway.perform(work,"read")));assertThat(runtime.complete(dispatch)).isFalse();assertThat(count("integration_operation_receipts")).isZero();
+    }
+    @Test void capabilityCommittedReceiptIsReusedBeforeNormalStepCompletion(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-receipt-recovery").execution();worker.dispatch(claim());var claim=claim();var dispatch=runtime.prepare(claim);var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);var work=capabilityWork(claim);
+        var first=tx.execute(s->capabilityGateway.perform(work,"read"));var repeated=tx.execute(s->capabilityGateway.perform(work,"read"));assertThat(first.reused()).isFalse();assertThat(repeated.reused()).isTrue();assertThat(repeated.output()).isEqualTo(first.output());assertThat(count("integration_operation_receipts")).isEqualTo(1);assertThat(runtime.complete(dispatch)).isTrue();runtime.acknowledge(claim);drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(count("integration_operation_receipts")).isEqualTo(2);assertThat(executions.events(owner.id(),owner.family(),org,e.id(),0,100).items()).extracting(Event::code).contains("RECEIPT_REUSED");
+    }
+    @Test void capabilityReadReceiptAndStepResultRollbackTogetherWhenTimelineWriteFails(){
+        capabilityConnections();publishV2(capabilityGraph(false));var e=startV2("{}","capability-atomic-result").execution();worker.dispatch(claim());
+        operator.execute("CREATE FUNCTION reject_capability_result() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.node_id='read' AND NEW.code='STEP_SUCCEEDED' THEN RAISE EXCEPTION 'Controlled timeline failure'; END IF; RETURN NEW; END $$");operator.execute("CREATE TRIGGER reject_capability_result BEFORE INSERT ON execution_events FOR EACH ROW EXECUTE FUNCTION reject_capability_result()");
+        try{worker.dispatch(claim());assertThat(count("integration_operation_receipts")).isZero();assertThat(executions.steps(owner.id(),owner.family(),org,e.id()).stream().filter(s->s.nodeId().equals("read")).findFirst().orElseThrow().output()).isNull();}
+        finally{operator.execute("DROP TRIGGER reject_capability_result ON execution_events");operator.execute("DROP FUNCTION reject_capability_result()");}
+        clock.add(31);runtime.reconcile();drain();assertThat(get(e.id()).status()).isEqualTo(ExecutionState.SUCCEEDED);assertThat(count("integration_operation_receipts")).isEqualTo(2);
     }
     @Test void changedArgumentsForAnExistingOperationReceiptFailForReconciliation(){
         var e=start("receipt-argument-key").execution();var step=store.steps(org,e.id()).stream().filter(s1->s1.node().equals("first")).findFirst().orElseThrow();

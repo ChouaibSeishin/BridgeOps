@@ -6,6 +6,7 @@ const found = new Set();
 required.push("GraphDataMigrationIT");
 required.push("OperationApprovalIntentTest", "OperationInputMigrationIT");
 required.push("OperationApprovalGateTest");
+required.push("InternalOperationTest");
 const totals = { reports: 0, tests: 0, failures: 0, errors: 0, skipped: 0 };
 for (const directory of directories) {
   const files = (await readdir(directory)).filter(name => /^TEST-.*\.xml$/.test(name));

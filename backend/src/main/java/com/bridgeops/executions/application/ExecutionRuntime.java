@@ -25,11 +25,18 @@ public class ExecutionRuntime {
     private final ExecutionService service;private final ExecutionAudit audit;private final Clock clock;private final RetryPolicy retries;
     private final ApprovalRuntime approvals;
     private final ExecutionGraphData data;
+    private final CapabilityDispatch capabilities;
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals){
+        this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,null);
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
+        WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities){
         this.store=store;this.jdbc=store.jdbc();this.tx=new TransactionTemplate(manager);tx.setTimeout(10);
         this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.service=service;this.audit=audit;this.clock=clock;this.retries=new RetryPolicy(randomness::sample);this.approvals=approvals;
         this.data=new ExecutionGraphData(store,graphs,clock);
+        this.capabilities=capabilities;
     }
     public Claim claim(UUID owner,int globalLimit,int tenantLimit,int leaseSeconds){
         if(globalLimit<1||globalLimit>16||tenantLimit<1||tenantLimit>globalLimit||leaseSeconds<5||leaseSeconds>120)throw new IllegalArgumentException("Invalid worker bounds.");
@@ -81,8 +88,8 @@ public class ExecutionRuntime {
                 }
             }
         }
-        if(node.type().equals("approval")||node.type().equals("syntheticAction")){
-            var gate=checkedGate(e,plan,snapshot.graph(),actors,false);
+        if(node.type().equals("approval")||node.type().equals("syntheticAction")||node.type().equals("capabilityAction")){
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);
             if(handleGate(e,c,node,gate,now))return null;
             if(node.type().equals("approval")){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
         }
@@ -103,7 +110,7 @@ public class ExecutionRuntime {
         String output="{}";
         if(step.type().equals("syntheticAction")){
             if(!dispatch.node().equals(plan.get(e.position()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
-            var gate=checkedGate(e,plan,snapshot.graph(),actors,false);
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);
             if(handleGate(e,c,dispatch.node(),gate,now))return false;
             var receipts=jdbc.queryForList("SELECT argument_hash,result_json FROM execution_operation_receipts WHERE organization_id=? AND capability='synthetic.record' AND logical_operation_id=? AND item_id=?",e.organization(),step.operation(),step.node());
             if(!receipts.isEmpty()){
@@ -116,6 +123,10 @@ public class ExecutionRuntime {
                 jdbc.update("INSERT INTO execution_operation_receipts(organization_id,logical_operation_id,capability,item_id,argument_hash,result_json,committed_at) VALUES(?,?,'synthetic.record',?,?,?,?)",e.organization(),step.operation(),step.node(),step.argumentHash(),output,time(now));
                 store.event(e,"RECORD_COMMITTED",step.node(),now);
             }
+        }else if(step.type().equals("capabilityAction")){
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);if(handleGate(e,c,dispatch.node(),gate,now))return false;
+            try{var result=capabilities.perform(work(c,actors),step.node());output=result.output();if(result.reused())store.event(e,"RECEIPT_REUSED",step.node(),now);if(result.failed()){failCapability(e,step,output,result.code(),now);return false;}}
+            catch(DomainFailure invalid){if(invalid.status()==403)throw invalid;failCapability(e,step,null,invalid.code(),now);return false;}
         }else if(v2){
             try{output=data.output(e,snapshot.graph(),step);}
             catch(DomainFailure invalid){attempt(e,step,"PERMANENT_FAILURE",invalid.code(),now);jdbc.update("UPDATE execution_steps SET status='FAILED',completed_at=?,error_code=? WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),invalid.code(),e.organization(),e.id(),step.node());fail(e,invalid.code(),now);return false;}
@@ -148,6 +159,11 @@ public class ExecutionRuntime {
         }else fail(e,kind==SyntheticCapability.FailureKind.TRANSIENT?"TRANSIENT_EXHAUSTED":code,now);
     });}
     public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockContext(c);var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
+    private void failCapability(Execution e,Step step,String output,String code,Instant now){
+        if(step.state().equals("RUNNING")&&step.attempts()>0)attempt(e,step,"PERMANENT_FAILURE",code,now);
+        jdbc.update("UPDATE execution_steps SET status='FAILED',completed_at=?,output_json=?,error_code=? WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),output,code,e.organization(),e.id(),step.node());
+        store.event(e,"STEP_FAILED",step.node(),now);fail(e,code,now);
+    }
     private void fail(Execution e,String code,Instant now){
         service.terminateSteps(e,code.equals("DEADLINE_EXCEEDED")?code:"RECONCILIATION_REQUIRED",now);
         approvals.terminate(e.organization(),e.id(),e.actor(),code);
@@ -191,8 +207,17 @@ public class ExecutionRuntime {
         return count;
     }
     private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
-    private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume){
+    private CapabilityDispatch.Work work(Claim claim,Set<UUID> actors){return new CapabilityDispatch.Work(claim.organization(),claim.execution(),claim.owner(),claim.token(),actors);}
+    private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume,Claim claim){
+        var action=data.action(graph,plan,e.position());boolean capability=action.type().equals("capabilityAction");
         try{
+            if(capability){
+                if(capabilities==null)return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,"UNSUPPORTED_RUNTIME_NODE",false);
+                var binding=resume?capabilities.resume(e.organization(),e.id(),action.id(),actors):capabilities.prepare(work(claim,actors),action.id());var gate=data.gate(e,graph,plan,e.position());
+                var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();
+                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),gate.type().equals("approval")?gate.prompt():"Review the exact registered operation",e.deadline());
+                return resume?approvals.resumeCheck(operation,actors):approvals.check(operation,explicit(e,plan,e.position(),graph),actors);
+            }
             var intent=seed(e,plan,e.position(),graph);
             if(data.v2(graph)){
                 var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(intent.action())).findFirst().orElseThrow();var prepared=data.prepareRecord(e,step,intent.message());
@@ -201,7 +226,7 @@ public class ExecutionRuntime {
             }
             return resume?approvals.resumeCheck(intent,actors):approvals.check(intent,explicit(e,plan,e.position(),graph),actors);
         }
-        catch(DomainFailure failure){if(!failure.code().equals("OPERATION_INTENT_MISMATCH"))throw failure;return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,failure.code(),false);}
+        catch(DomainFailure failure){if(failure.code().equals("ACTOR_SET_CHANGED"))return new ApprovalRuntime.Gate(ApprovalRuntime.Result.RECHECK_ACTORS,null,null,false);if(failure.status()==403||!capability&&!failure.code().equals("OPERATION_INTENT_MISMATCH"))throw failure;return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,failure.code(),false);}
     }
     private boolean explicit(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){return data.gate(e,graph,plan,position).type().equals("approval");}
     private ApprovalRuntime.Seed seed(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){
@@ -211,7 +236,7 @@ public class ExecutionRuntime {
     }
     private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){
         if(gate.result()==ApprovalRuntime.Result.ALLOW)return false;
-        if(gate.result()==ApprovalRuntime.Result.FAIL){fail(e,gate.error(),now);return true;}
+        if(gate.result()==ApprovalRuntime.Result.FAIL){if(node.type().equals("capabilityAction")||Set.of("INVALID_CAPABILITY_INPUT","INVALID_CAPABILITY_BINDING","STALE_CONNECTION","INTEGRATION_DISABLED","STALE_TICKET_PLAN","NOT_FOUND").contains(gate.error()))failCapability(e,store.steps(e.organization(),e.id()).get(e.position()),null,gate.error(),now);else fail(e,gate.error(),now);return true;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS){
             if(step.state().equals("RUNNING")){attempt(e,step,"INTERRUPTED","ACTOR_SET_CHANGED",now);jdbc.update("UPDATE execution_steps SET status='WAITING_FOR_RETRY',error_code='ACTOR_SET_CHANGED' WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),step.node());store.state(e,ExecutionState.WAITING_FOR_RETRY,"ACTOR_SET_CHANGED",now);}
@@ -233,7 +258,7 @@ public class ExecutionRuntime {
             try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=consumeApprovalSignal(e,signal);continue;}
             var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);
             if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=consumeApprovalSignal(e,signal);continue;}
-            var gate=checkedGate(e,plan,snapshot.graph(),actors,true);
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,true,null);
             if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS)continue;
             if(!signal.outcome().equals("APPROVED")||gate.result()!=ApprovalRuntime.Result.ALLOW){fail(e,gate.error()==null?"APPROVAL_"+signal.outcome():gate.error(),now);changed|=consumeApprovalSignal(e,signal);continue;}
             changed|=consumeApprovalSignal(e,signal);

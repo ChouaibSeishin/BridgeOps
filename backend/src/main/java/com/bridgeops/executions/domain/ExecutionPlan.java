@@ -15,7 +15,8 @@ public final class ExecutionPlan {
         if(graph.path("schemaVersion").asInt()==1)return from(graph,definitions);
         if(!definitions.valid(graph))throw new DomainFailure(422,"INVALID_WORKFLOW");
         var nodes=definitions.orderedV2(graph);
-        if(nodes.stream().anyMatch(n->!Set.of("manualTrigger","syntheticAction","approval","condition","transform","delay","end").contains(n.path("type").asString())))throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");
+        if(nodes.stream().anyMatch(n->!Set.of("manualTrigger","syntheticAction","capabilityAction","approval","condition","transform","delay","end").contains(n.path("type").asString())
+            ||n.path("type").asString().equals("capabilityAction")&&!Set.of("support.list","support.get","teams.list","teams.get","teams.resolve").contains(n.path("config").path("operation").asString())))throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");
         return nodes.stream().map(n->new Node(n.path("id").asString(),n.path("type").asString(),n.path("config").path("message").asString(""),hash(definitions.stableValue(n)),n.path("config").path("prompt").asString(""))).toList();
     }
     public static List<Node> from(JsonNode graph,WorkflowDefinitions definitions) {

@@ -44,10 +44,10 @@ export function ExecutionStart({
     <section className="data-panel">
       <h2>Published execution</h2>
       <p>
-        Run the saved published version with internal record operations only.
-        Publishing and editing never start an execution. Approval gates and
-        organization policy pause protected records for a different eligible
-        person.
+        Run the saved published version with registered internal records and
+        ticket/team reads. Publishing and editing never start an execution.
+        Approval gates and organization policy pause protected operations for a
+        different eligible person.
       </p>
       {permissions.includes("execution.read") && (
         <Link
@@ -87,8 +87,8 @@ export function ExecutionStart({
         >
           <h3 id="execution-confirm-title">Start internal execution?</h3>
           <p>
-            This records real internal synthetic results using the exact
-            published snapshot. No external service is contacted. Required
+            This runs supported internal records and ticket/team reads using the
+            exact published snapshot. No external service is contacted. Required
             approval waits for a different eligible human; starting never
             approves it. The 24-hour deadline includes queue time, approval
             waits and the optional start delay.

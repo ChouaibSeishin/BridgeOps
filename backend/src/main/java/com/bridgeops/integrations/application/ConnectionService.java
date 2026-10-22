@@ -2,6 +2,7 @@ package com.bridgeops.integrations.application;
 
 import com.bridgeops.audit.application.IntegrationAudit;
 import com.bridgeops.integrations.domain.RestOperation;
+import com.bridgeops.integrations.domain.InternalOperation;
 import com.bridgeops.integrations.infrastructure.RestTransport;
 import com.bridgeops.integrations.persistence.ConnectionStore;
 import com.bridgeops.organizations.application.TenantAuthorization;
@@ -27,8 +28,8 @@ public class ConnectionService {
     private final JsonMapper json=JsonMapper.builder().build();
     public ConnectionService(ConnectionStore store,TenantAuthorization authority,IntegrationAudit audit,SecretStore secrets,RestTransport transport,Clock clock){this.store=store;this.authority=authority;this.audit=audit;this.secrets=secrets;this.transport=transport;this.clock=clock;}
     @Transactional(readOnly=true,timeout=5) public List<Definition> definitions(UUID actor,UUID family,UUID org){authority.read(actor,family,org,"integration.read");return List.of(
-        new Definition("SUPPORT","Support Service","Persisted tenant tickets with revision preconditions.",1,List.of(new Operation("list","READ",false,Map.of("status","STRING","priority","STRING","category","STRING"),Map.of("tickets","ARRAY","count","INTEGER")))),
-        new Definition("TEAMS","Team Directory","Stable team identity and explicit category responsibility mappings.",1,List.of(new Operation("resolve","READ",false,Map.of("tickets","ARRAY"),Map.of("assignments","ARRAY","unmatched","ARRAY","count","INTEGER")))),
+        new Definition("SUPPORT","Support Service","Persisted tenant tickets with revision preconditions.",1,internalOperations("support")),
+        new Definition("TEAMS","Team Directory","Stable team identity and explicit category responsibility mappings.",1,internalOperations("teams")),
         new Definition("NOTIFICATIONS","Internal Notifications","Persisted internal demo delivery; never external email or SMS.",1,List.of()),
         new Definition("REST","Configured HTTPS","Registered operations on exact operator-approved public hosts.",1,List.of()));}
     @Transactional(readOnly=true,timeout=5) public Page list(UUID actor,UUID family,UUID org,int page,int size){authority.read(actor,family,org,"integration.read");bounds(page,size);long total=store.count(org);return new Page(store.list(org,page,size).stream().map(this::summary).toList(),page,size,total,(total+size-1)/size);}
@@ -51,6 +52,7 @@ public class ConnectionService {
         return new Plan(org,id,row.revision(),row.type(),config.path("baseDestination").asString(),operation,row.credential());
     }
     @Transactional(timeout=5) Summary recordCheck(UUID actor,UUID family,UUID org,UUID id,long expected,String status,String code){authority.write(actor,family,org,"integration.manage");var row=store.get(org,id,false);store.health(row,expected,status,code,clock.instant());audit.write(org,actor,IntegrationAudit.Action.INTEGRATION_CHECKED,id,expected,clock.instant());return summary(store.get(org,id,false));}
+    private List<Operation> internalOperations(String capability){return InternalOperation.definitions(capability).stream().filter(d->d.classification().equals("READ")).map(d->new Operation(d.id(),d.classification(),d.requiresApproval(),d.inputs(),d.outputs())).toList();}
     private UUID credential(UUID actor,UUID family,UUID org,String type,String credential){
         if(credential==null)return null;if(!type.equals("REST")||credential.length()<8||credential.length()>4096||!credential.matches("[A-Za-z0-9._~+/-]+=*"))throw new DomainFailure(422,"INVALID_CREDENTIAL_FORMAT");byte[] bytes=credential.getBytes(StandardCharsets.UTF_8);try{return secrets.put(actor,family,org,"REST_CREDENTIAL",bytes);}finally{Arrays.fill(bytes,(byte)0);}
     }

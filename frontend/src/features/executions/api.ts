@@ -124,7 +124,7 @@ export function executionFailure(error: unknown): string {
     if (error.code === "INVALID_TRIGGER_INPUT")
       return "Provide exactly the published trigger's typed input fields. No execution was created.";
     if (error.code === "INVALID_APPROVAL_TARGET")
-      return "Each approval gate must immediately protect one supported internal record action. No execution was created.";
+      return "Each approval gate must connect directly to a supported protected operation. No execution was created.";
     if (error.code === "UNSUPPORTED_RUNTIME_NODE")
       return "This version contains an unsupported runtime node. No execution was created.";
     if (error.code === "WORKFLOW_NOT_PUBLISHED")

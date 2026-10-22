@@ -2,7 +2,9 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Phase 4 human approvals are complete and verified.** [Implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314): 265 backend/PostgreSQL/browser tests and 68 frontend tests passed, with no failures, errors or skips. Published workflows execute internal record operations through the durable PostgreSQL worker. An approval gate pauses execution for a different eligible human; organization policy can require approval even when a graph omits the gate. Decisions bind exact immutable intent and are rechecked before an effect. Publication itself never executes anything. External integrations, webhooks, AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md), [the approval guide](docs/development/PHASE_4_APPROVALS.md) and [the execution guide](docs/development/PHASE_3_EXECUTION.md).
+**Phase 5 controlled integrations are in progress.** Published v1/v2 workflows can execute internal records and registered ticket/team reads and plans through the durable PostgreSQL worker. Human gates bind exact prepared arguments and connection scope; publication never executes anything. The visual canvas retains immutable historical definitions. Protected business writes, external workflow calls, actual automation/webhooks and the complete triage demonstration remain in progress. AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [Phase 5 scope and configuration](docs/development/PHASE_5_INTEGRATIONS.md).
+
+The verified Phase 4 checkpoint's [implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314): 265 backend/PostgreSQL/browser tests and 68 frontend tests, with no failures, errors or skips. Those counts are historical; subsequent incremental results are recorded separately.
 
 ## Start from a clean checkout
 
