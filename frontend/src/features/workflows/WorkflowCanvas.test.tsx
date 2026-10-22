@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 import { GraphEditor, ReadOnlyDefinition } from "./GraphEditor";
@@ -16,7 +22,11 @@ beforeEach(() =>
     },
   ),
 );
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  // React Flow's passive-effect cleanup must finish while its browser fixture still exists.
+  cleanup();
+  vi.unstubAllGlobals();
+});
 function graph(): CanvasGraph {
   return {
     ...newV2Graph(),

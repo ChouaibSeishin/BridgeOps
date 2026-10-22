@@ -195,14 +195,16 @@ function DraftWorkspace({
       </div>
       <p className="phase-note">
         Publication freezes a snapshot without running it. Explicit execution
-        supports internal records, registered ticket/team reads and
-        distinct-human approval gates.
+        supports internal records, registered ticket/team operations, internal
+        notifications and distinct-human approval gates.
       </p>
       {!archived && (
         <ExecutionStart
+          key={saved.currentPublishedVersion?.id ?? "unpublished"}
           organization={organization}
           workflow={id}
           version={saved.currentPublishedVersion?.id ?? null}
+          schemaVersion={saved.currentPublishedVersion?.schemaVersion ?? 1}
           permissions={permissions}
           disabled={dirty || frozen}
         />
