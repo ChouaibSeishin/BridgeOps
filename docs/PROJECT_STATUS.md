@@ -1,6 +1,6 @@
 # Project status
 
-Updated 2026-10-21 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
+Updated 2026-10-22 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
 
 ## Current Phase 5 work
 
