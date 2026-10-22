@@ -36,6 +36,7 @@ class IntegrationBusinessIT {
     @Autowired BusinessService business;@Autowired SecretStore secrets;@Autowired AccountPasswords passwords;@Autowired PasswordSessionService sessions;@Autowired OrganizationService organizations;@Autowired TenantAuthorization authority;@Autowired PlatformTransactionManager manager;@Autowired JdbcTemplate runtime;
     @Autowired ConnectionService connections;@Autowired ConnectionChecks checks;@Autowired OutboundAdmission admission;
     @Autowired ControlledClock clock;
+    @Autowired InternalBusinessReads capabilityReads;
     JdbcTemplate operator;Actor owner;UUID org;static String passwordHash;
     record Actor(UUID id,UUID family) {}
     @BeforeEach void fixture(){
@@ -47,6 +48,30 @@ class IntegrationBusinessIT {
     BusinessService.DemoResult seed(){return business.demo(owner.id(),owner.family(),org,true);}
     long count(String table){return operator.queryForObject("SELECT count(*) FROM "+table,Long.class);}
     void denied(int status,Runnable action){assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainFailure.class,e->assertThat(e.status()).isEqualTo(status));}
+    tools.jackson.databind.JsonNode readCapability(String capability,String operation,String args){return new TransactionTemplate(manager).execute(s->capabilityReads.read(owner.id(),org,capability,operation,tools.jackson.databind.json.JsonMapper.builder().build().readTree(args)));}
+    @Test void registeredTicketReadAndTeamPlanUseActualTenantDataWithoutApplyingEffects(){
+        seed();long audit=count("organization_audit_events");var tickets=readCapability("support","list","{\"limit\":50,\"priorities\":[\"HIGH\",\"URGENT\"],\"statuses\":[\"OPEN\",\"IN_PROGRESS\"]}");assertThat(tickets.path("count").asInt()).isEqualTo(2);
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();var input=json.createObjectNode();input.set("tickets",tickets.path("tickets"));var plan=readCapability("teams","resolve",input.toString());assertThat(plan.path("count").asInt()).isEqualTo(2);assertThat(plan.path("unmatched").size()).isZero();
+        for(var item:plan.path("assignments")){assertThat(item.path("expectedRevision").asLong()).isZero();assertThat(item.path("currentTeamId").isNull()).isTrue();assertThat(operator.queryForObject("SELECT count(*) FROM support_teams WHERE organization_id=? AND id=?",Long.class,org,UUID.fromString(item.path("targetTeamId").asString()))).isEqualTo(1);}
+        assertThat(operator.queryForObject("SELECT count(*) FROM support_tickets WHERE assigned_team_id IS NOT NULL",Long.class)).isZero();assertThat(count("organization_audit_events")).isEqualTo(audit);assertThat(count("integration_operation_receipts")).isZero();assertThat(count("workflow_executions")).isZero();
+        denied(422,()->readCapability("support","assignBatch","{\"assignments\":[]}"));
+    }
+    @Test void planningRejectsStaleSnapshotsAndOmitsAlreadyCorrectOrClosedTickets(){
+        seed();var json=tools.jackson.databind.json.JsonMapper.builder().build();var initial=readCapability("support","list","{}");var input=json.createObjectNode();input.set("tickets",initial.path("tickets"));var plan=readCapability("teams","resolve",input.toString());assertThat(plan.path("assignments").size()).isEqualTo(3);assertThat(plan.path("unmatched").size()).isEqualTo(1);assertThat(plan.path("unmatched").get(0).path("category").asString()).isEqualTo("OTHER");
+        var first=plan.path("assignments").get(0);UUID ticket=UUID.fromString(first.path("ticketId").asString()),team=UUID.fromString(first.path("targetTeamId").asString());operator.update("UPDATE support_tickets SET assigned_team_id=?,revision=revision+1 WHERE organization_id=? AND id=?",team,org,ticket);
+        assertThatThrownBy(()->readCapability("teams","resolve",input.toString())).isInstanceOfSatisfying(DomainFailure.class,e->{assertThat(e.status()).isEqualTo(409);assertThat(e.code()).isEqualTo("STALE_TICKET_PLAN");});
+        input.set("tickets",readCapability("support","list","{}").path("tickets"));var refreshed=readCapability("teams","resolve",input.toString());assertThat(refreshed.path("count").asInt()).isEqualTo(2);assertThat(refreshed.path("unmatched").size()).isEqualTo(1);for(var item:refreshed.path("assignments"))assertThat(item.path("ticketId").asString()).isNotEqualTo(ticket.toString());
+    }
+    @Test void registeredReadsConcealForeignObjectsAndCheckLiveMembership(){
+        seed();UUID ticket=operator.queryForObject("SELECT id FROM support_tickets ORDER BY id LIMIT 1",UUID.class),team=operator.queryForObject("SELECT id FROM support_teams ORDER BY id LIMIT 1",UUID.class);UUID original=org;org=organizations.create(owner.id(),owner.family(),"Other scope","other-capability-scope").id();
+        denied(404,()->readCapability("support","get","{\"ticketId\":\""+ticket+"\"}"));denied(404,()->readCapability("teams","get","{\"teamId\":\""+team+"\"}"));org=original;
+        var viewer=member("VIEWER");var json=tools.jackson.databind.json.JsonMapper.builder().build();assertThat(new TransactionTemplate(manager).execute(s->capabilityReads.read(viewer.id(),org,"support","list",json.createObjectNode())).path("tickets").size()).isEqualTo(5);
+        operator.update("DELETE FROM membership_roles WHERE membership_id IN (SELECT id FROM organization_memberships WHERE organization_id=? AND user_id=?)",org,viewer.id());denied(403,()->new TransactionTemplate(manager).execute(s->capabilityReads.read(viewer.id(),org,"support","list",json.createObjectNode())));
+    }
+    @Test void teamLookupUsesItsTenantKeyEvenBeyondTheBoundedDirectoryPage(){
+        seed();UUID target=UUID.randomUUID();for(int i=0;i<101;i++)operator.update("INSERT INTO support_teams VALUES(?,?,?,'LIVE_EXECUTION')",i==100?target:UUID.randomUUID(),org,String.format(Locale.ROOT,"Extra team %03d",i));
+        var result=readCapability("teams","get","{\"teamId\":\""+target+"\"}");assertThat(result.path("team").path("teamId").asString()).isEqualTo(target.toString());assertThat(readCapability("teams","list","{}").path("teams").size()).isEqualTo(50);
+    }
     @AfterEach void cleanupFailure(){operator.execute("DROP TRIGGER IF EXISTS test_demo_audit ON organization_audit_events");}
     @Test void startupCreatesNoDemoDataOrSecrets(){for(String table:List.of("support_teams","support_tickets","internal_notifications","integration_secrets","integration_connections","integration_demo_installations"))assertThat(count(table)).isZero();}
     @Test void seedRequiresExplicitConfirmation(){denied(422,()->business.demo(owner.id(),owner.family(),org,false));assertThat(count("integration_demo_installations")).isZero();assertThat(count("support_tickets")).isZero();}
