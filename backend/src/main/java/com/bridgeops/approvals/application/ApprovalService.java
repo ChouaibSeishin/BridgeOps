@@ -29,8 +29,9 @@ public class ApprovalService {
     private final ApprovalStore store;private final TenantAuthorization authority;private final ApprovalExecutionContext executions;
     private final ApprovalLifecycle lifecycle;private final ApprovalAudit audit;private final Clock clock;
     private final IdentityQueries identities;
+    private final ApprovalOperationChecks operationChecks;
     private final JsonMapper json=JsonMapper.builder().build();
-    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock,IdentityQueries identities){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;this.identities=identities;}
+    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock,IdentityQueries identities,ApprovalOperationChecks operationChecks){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;this.identities=identities;this.operationChecks=operationChecks;}
     @Transactional(readOnly=true,timeout=5)
     public PolicyView policy(UUID actor,UUID family,UUID org){authority.read(actor,family,org,"approval.read");return policyView(store.policy(org));}
     @Transactional(timeout=10)
@@ -73,6 +74,7 @@ public class ApprovalService {
             var canonical=ApprovalIntent.record(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),execution.requester(),action.operation(),r.policyVersion(),r.policySnapshot(),r.prompt(),json.readTree(r.arguments()).path("message").asString(),r.created(),r.expires(),execution.deadline());
             if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         }
+        if(outcome.equals("APPROVE")&&r.generalized()&&!r.operationIntent().capability().equals("synthetic"))operationChecks.validateDecision(actor,family,org,r.execution(),r.action(),r.operationIntent().preparedIntent());
         store.decide(r,actor,outcome,reason,now);lifecycle.finish(r,outcome.equals("APPROVE")?ApprovalState.APPROVED:ApprovalState.REJECTED,null,actor,now);
         return view(actor,family,store.get(org,id,false),true);
     }

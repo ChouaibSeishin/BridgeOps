@@ -2,7 +2,7 @@
 
 A Java/Spring Boot and React operations workspace for governed workflow automation.
 
-**Phase 5 controlled integrations are in progress.** Published v1/v2 workflows can execute internal records and registered ticket/team reads and plans through the durable PostgreSQL worker. Human gates bind exact prepared arguments and connection scope; publication never executes anything. The visual canvas retains immutable historical definitions. Protected business writes, external workflow calls, actual automation/webhooks and the complete triage demonstration remain in progress. AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [Phase 5 scope and configuration](docs/development/PHASE_5_INTEGRATIONS.md).
+**Phase 5 controlled integrations are in progress.** Published v1/v2 workflows can execute internal records; v2 adds registered ticket/team reads, plans, approval-protected assignments/notes and persisted internal notifications through the durable PostgreSQL worker. Human gates bind exact prepared arguments and connection scope; publication never executes anything. The visual canvas retains immutable historical definitions. External workflow calls, actual automation/webhooks and the complete triage demonstration remain in progress. AI and MCP remain later phases. See [current evidence](docs/PROJECT_STATUS.md) and [Phase 5 scope and configuration](docs/development/PHASE_5_INTEGRATIONS.md).
 
 The verified Phase 4 checkpoint's [implementation CI passed](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39294922314): 265 backend/PostgreSQL/browser tests and 68 frontend tests, with no failures, errors or skips. Those counts are historical; subsequent incremental results are recorded separately.
 

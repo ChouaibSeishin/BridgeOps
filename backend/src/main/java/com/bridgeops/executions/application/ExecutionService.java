@@ -118,7 +118,11 @@ public class ExecutionService {
         store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=CASE WHEN status='PENDING' THEN 'NOT_DISPATCHED' ELSE ? END WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());
     }
     public Summary summary(Execution e){var waiting=e.state()==ExecutionState.WAITING_FOR_APPROVAL?approvals.waiting(e.organization(),e.id()):null;return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e),waiting==null?null:waiting.id(),waiting==null?null:waiting.expiresAt());}
-    private boolean eligible(Execution e){return e.state()==ExecutionState.FAILED&&"TRANSIENT_EXHAUSTED".equals(e.error());}
+    private boolean eligible(Execution e){
+        if(e.state()!=ExecutionState.FAILED||!"TRANSIENT_EXHAUSTED".equals(e.error()))return false;
+        // Capability graphs require a fresh plan and approval, rather than replaying earlier mutable observations.
+        return store.steps(e.organization(),e.id()).stream().noneMatch(s->Set.of("capabilityAction","notification","configuredHttp").contains(s.type()));
+    }
     private void revision(Execution e,long expected){if(expected<0)throw new DomainFailure(400,"INVALID_REQUEST");if(e.revision()!=expected)throw new DomainFailure(409,"STALE_REVISION");}
     private void reason(String value){if(value==null||value.isBlank()||value.length()>200||value.codePoints().anyMatch(Character::isISOControl))throw new DomainFailure(400,"INVALID_REQUEST");}
     private void key(String value){if(value==null||!value.matches("[A-Za-z0-9_-]{8,128}"))throw new DomainFailure(400,"IDEMPOTENCY_KEY_REQUIRED");}

@@ -1,0 +1,9 @@
+-- Strengthen existing append-only business receipts without rewriting history.
+ALTER TABLE execution_steps ADD CONSTRAINT execution_logical_operation_key UNIQUE(organization_id,execution_id,logical_operation_id);
+ALTER TABLE execution_operation_bindings ADD CONSTRAINT operation_binding_argument_key UNIQUE(organization_id,logical_operation_id,argument_hash);
+ALTER TABLE integration_operation_receipts ADD CONSTRAINT integration_receipt_step_fk
+ FOREIGN KEY(organization_id,execution_id,logical_operation_id) REFERENCES execution_steps(organization_id,execution_id,logical_operation_id);
+ALTER TABLE integration_operation_receipts ADD CONSTRAINT integration_receipt_arguments_fk
+ FOREIGN KEY(organization_id,logical_operation_id,argument_hash) REFERENCES execution_operation_bindings(organization_id,logical_operation_id,argument_hash);
+ALTER TABLE integration_batch_items ADD CONSTRAINT integration_batch_step_fk
+ FOREIGN KEY(organization_id,execution_id,logical_operation_id) REFERENCES execution_steps(organization_id,execution_id,logical_operation_id);

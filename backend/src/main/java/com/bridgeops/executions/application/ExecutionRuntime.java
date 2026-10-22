@@ -88,7 +88,7 @@ public class ExecutionRuntime {
                 }
             }
         }
-        if(node.type().equals("approval")||node.type().equals("syntheticAction")||node.type().equals("capabilityAction")){
+        if(node.type().equals("approval")||node.type().equals("syntheticAction")||Set.of("capabilityAction","notification").contains(node.type())){
             var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);
             if(handleGate(e,c,node,gate,now))return null;
             if(node.type().equals("approval")){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
@@ -123,7 +123,7 @@ public class ExecutionRuntime {
                 jdbc.update("INSERT INTO execution_operation_receipts(organization_id,logical_operation_id,capability,item_id,argument_hash,result_json,committed_at) VALUES(?,?,'synthetic.record',?,?,?,?)",e.organization(),step.operation(),step.node(),step.argumentHash(),output,time(now));
                 store.event(e,"RECORD_COMMITTED",step.node(),now);
             }
-        }else if(step.type().equals("capabilityAction")){
+        }else if(Set.of("capabilityAction","notification").contains(step.type())){
             var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);if(handleGate(e,c,dispatch.node(),gate,now))return false;
             try{var result=capabilities.perform(work(c,actors),step.node());output=result.output();if(result.reused())store.event(e,"RECEIPT_REUSED",step.node(),now);if(result.failed()){failCapability(e,step,output,result.code(),now);return false;}}
             catch(DomainFailure invalid){if(invalid.status()==403)throw invalid;failCapability(e,step,null,invalid.code(),now);return false;}
@@ -160,7 +160,7 @@ public class ExecutionRuntime {
     });}
     public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockContext(c);var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
     private void failCapability(Execution e,Step step,String output,String code,Instant now){
-        if(step.state().equals("RUNNING")&&step.attempts()>0)attempt(e,step,"PERMANENT_FAILURE",code,now);
+        if(step.state().equals("RUNNING")&&step.attempts()>0)attempt(e,step,code.equals("DEADLINE_EXCEEDED")?"DEADLINE_EXCEEDED":"PERMANENT_FAILURE",code,now);
         jdbc.update("UPDATE execution_steps SET status='FAILED',completed_at=?,output_json=?,error_code=? WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),output,code,e.organization(),e.id(),step.node());
         store.event(e,"STEP_FAILED",step.node(),now);fail(e,code,now);
     }
@@ -209,7 +209,7 @@ public class ExecutionRuntime {
     private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
     private CapabilityDispatch.Work work(Claim claim,Set<UUID> actors){return new CapabilityDispatch.Work(claim.organization(),claim.execution(),claim.owner(),claim.token(),actors);}
     private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume,Claim claim){
-        var action=data.action(graph,plan,e.position());boolean capability=action.type().equals("capabilityAction");
+        var action=data.action(graph,plan,e.position());boolean capability=Set.of("capabilityAction","notification").contains(action.type());
         try{
             if(capability){
                 if(capabilities==null)return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,"UNSUPPORTED_RUNTIME_NODE",false);
@@ -236,7 +236,7 @@ public class ExecutionRuntime {
     }
     private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){
         if(gate.result()==ApprovalRuntime.Result.ALLOW)return false;
-        if(gate.result()==ApprovalRuntime.Result.FAIL){if(node.type().equals("capabilityAction")||Set.of("INVALID_CAPABILITY_INPUT","INVALID_CAPABILITY_BINDING","STALE_CONNECTION","INTEGRATION_DISABLED","STALE_TICKET_PLAN","NOT_FOUND").contains(gate.error()))failCapability(e,store.steps(e.organization(),e.id()).get(e.position()),null,gate.error(),now);else fail(e,gate.error(),now);return true;}
+        if(gate.result()==ApprovalRuntime.Result.FAIL){if(Set.of("capabilityAction","notification").contains(node.type())||Set.of("INVALID_CAPABILITY_INPUT","INVALID_CAPABILITY_BINDING","STALE_CONNECTION","INTEGRATION_DISABLED","STALE_TICKET_PLAN","NOT_FOUND").contains(gate.error()))failCapability(e,store.steps(e.organization(),e.id()).get(e.position()),null,gate.error(),now);else fail(e,gate.error(),now);return true;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS){
             if(step.state().equals("RUNNING")){attempt(e,step,"INTERRUPTED","ACTOR_SET_CHANGED",now);jdbc.update("UPDATE execution_steps SET status='WAITING_FOR_RETRY',error_code='ACTOR_SET_CHANGED' WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),step.node());store.state(e,ExecutionState.WAITING_FOR_RETRY,"ACTOR_SET_CHANGED",now);}
