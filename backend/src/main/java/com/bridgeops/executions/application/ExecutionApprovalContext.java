@@ -17,5 +17,8 @@ public class ExecutionApprovalContext implements ApprovalExecutionContext {
     public View read(UUID actor,UUID family,UUID org,UUID execution){authority.read(actor,family,org,"approval.read");return view(actor,family,org,execution,false);}
     @Transactional(propagation=Propagation.MANDATORY)
     public View lock(UUID actor,UUID family,UUID org,UUID execution){authority.write(actor,family,org,"approval.decide");var result=view(actor,family,org,execution,true);store.jdbc().queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? FOR UPDATE",org,execution);return result;}
-    private View view(UUID actor,UUID family,UUID org,UUID id,boolean lock){var e=store.get(org,id,lock);var source=workflows.reference(actor,family,org,e.workflow(),e.version());return new View(org,id,e.workflow(),e.version(),e.hash(),e.actor(),e.deadline(),e.state().name(),e.revision(),e.position(),store.steps(org,id).stream().map(s->new Action(s.node(),s.position(),s.type(),s.operation(),s.argumentHash(),s.state())).toList(),source.name(),source.versionNumber());}
+    private View view(UUID actor,UUID family,UUID org,UUID id,boolean lock){var e=store.get(org,id,lock);var source=workflows.reference(actor,family,org,e.workflow(),e.version());return new View(org,id,e.workflow(),e.version(),e.hash(),e.actor(),e.deadline(),e.state().name(),e.revision(),e.position(),store.steps(org,id).stream().map(s->{
+        OperationData prepared=null;if(source.schemaVersion()==2)prepared=new com.bridgeops.executions.persistence.OperationInputStore(store.jdbc()).read(org,id,s.node()).map(p->new OperationData(p.id(),p.arguments(),p.argumentHash(),p.capability(),p.operation(),p.classification(),p.connection())).orElse(null);
+        return new Action(s.node(),s.position(),s.type(),s.operation(),s.argumentHash(),s.state(),prepared);
+    }).toList(),source.name(),source.versionNumber());}
 }

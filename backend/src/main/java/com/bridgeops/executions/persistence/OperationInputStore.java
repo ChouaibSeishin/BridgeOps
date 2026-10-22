@@ -37,6 +37,11 @@ public final class OperationInputStore {
         if(!Objects.equals(logicalOperation,row.get("logical_operation_id"))||!hash.equals(row.get("argument_hash"))||!Objects.equals(blueprintHash,row.get("blueprint_hash"))||!Objects.equals(capability,row.get("capability"))||!Objects.equals(operation,row.get("operation"))||!Objects.equals(classification,row.get("classification")))throw mismatch();
         return new Prepared((UUID)row.get("id"),org,execution,node,logicalOperation,blueprintHash,capability,operation,classification,actual,text,hash);
     }
+    public Optional<Prepared> read(UUID org,UUID execution,String node){
+        var rows=jdbc.queryForList("SELECT i.id,i.blueprint_hash,b.* FROM execution_operation_inputs i JOIN execution_operation_bindings b USING(organization_id,logical_operation_id) WHERE i.organization_id=? AND i.execution_id=? AND i.node_id=?",org,execution,node);
+        if(rows.isEmpty())return Optional.empty();var r=rows.getFirst();
+        return Optional.of(new Prepared((UUID)r.get("id"),org,execution,node,(UUID)r.get("logical_operation_id"),(String)r.get("blueprint_hash"),(String)r.get("capability"),(String)r.get("operation"),(String)r.get("classification"),connection(r),(String)r.get("arguments_json"),(String)r.get("argument_hash")));
+    }
     private OperationApprovalIntent.Connection connection(Map<String,Object> binding){
         return binding.get("connection_id")==null?null:new OperationApprovalIntent.Connection((UUID)binding.get("connection_id"),((Number)binding.get("connection_revision")).longValue(),((Number)binding.get("implementation_version")).intValue(),(String)binding.get("operation"));
     }

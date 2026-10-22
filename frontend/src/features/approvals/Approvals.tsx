@@ -113,7 +113,11 @@ export function ApprovalInbox({ user }: { user: User }) {
                       {r.invalidated && " · Authorization invalidated"} ·
                       Internal record
                     </p>
-                    <p>{r.arguments.message}</p>
+                    <p>
+                      {typeof r.arguments.message === "string"
+                        ? r.arguments.message
+                        : `${r.capability}.${r.operation}`}
+                    </p>
                     <p>
                       Created {when(r.createdAt)} · expires {when(r.expiresAt)}
                     </p>
@@ -270,11 +274,28 @@ function ApprovalReview({
         {r.errorCode && <p role="alert">Reason: {label(r.errorCode)}</p>}
       </section>
       <section className="data-panel">
-        <h2>Exact internal operation</h2>
+        <h2>
+          {r.capability === "synthetic"
+            ? "Exact internal operation"
+            : "Exact proposed operation"}
+        </h2>
         <p>
-          <strong>synthetic.record</strong> creates one bounded internal record.
-          It does not contact or change an external service.
+          <strong>
+            {r.capability}.{r.operation}
+          </strong>{" "}
+          {r.capability === "synthetic"
+            ? "creates one bounded internal record. It does not contact or change an external service."
+            : `is a registered ${r.classification === "READ" ? "read" : "write"} operation. Review its exact arguments and connection revision before deciding.`}
         </p>
+        {r.connection && (
+          <p>
+            Connection revision {r.connection.revision} · implementation v
+            {r.connection.implementationVersion} · registered operation{" "}
+            {r.connection.operationId}. Sensitive business and external writes
+            require a different eligible human even when record approval policy
+            is off.
+          </p>
+        )}
         <pre className="definition-json" aria-label="Exact proposed arguments">
           {JSON.stringify(r.arguments, null, 2)}
         </pre>
@@ -284,6 +305,12 @@ function ApprovalReview({
         </p>
         <details>
           <summary>Technical intent details</summary>
+          {r.connection && (
+            <p>
+              Connection ID <code>{r.connection.id}</code> · intent schema{" "}
+              {r.intentSchemaVersion}
+            </p>
+          )}
           <p>
             Requester ID <code>{r.requestedBy}</code>
             {r.decision && (
@@ -325,7 +352,9 @@ function ApprovalReview({
                   className="button primary"
                   onClick={() => setConfirm("APPROVE")}
                 >
-                  Approve internal record
+                  {r.capability === "synthetic"
+                    ? "Approve internal record"
+                    : "Approve exact operation"}
                 </button>
                 <button
                   className="button danger"
@@ -344,7 +373,7 @@ function ApprovalReview({
                   </legend>
                   <p>
                     {confirm === "APPROVE"
-                      ? "Authorize this exact internal record. The worker must still revalidate policy, authority and deadline before executing it."
+                      ? `Authorize this exact ${r.capability === "synthetic" ? "internal record" : "registered operation"}. The worker must still revalidate policy, authority, preconditions and deadline before executing it.`
                       : "Reject this intent. Earlier completed operations remain recorded."}
                   </p>
                   <label>

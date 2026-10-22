@@ -15,9 +15,9 @@ final class ExecutionGraphData {
     private final ExecutionStore store; private final WorkflowDefinitions graphs; private final Clock clock;
     ExecutionGraphData(ExecutionStore store,WorkflowDefinitions graphs,Clock clock){this.store=store;this.graphs=graphs;this.clock=clock;}
     boolean v2(JsonNode graph){return graph.path("schemaVersion").asInt()==2;}
-    void prepareRecord(Execution e,ExecutionStore.Step step,String message){
+    com.bridgeops.executions.persistence.OperationInputStore.Prepared prepareRecord(Execution e,ExecutionStore.Step step,String message){
         var args=tools.jackson.databind.node.JsonNodeFactory.instance.objectNode();args.put("message",message);
-        new com.bridgeops.executions.persistence.OperationInputStore(store.jdbc()).prepare(e.organization(),e.id(),step.node(),step.operation(),step.argumentHash(),"synthetic","record","WRITE",null,args,clock.instant());
+        return new com.bridgeops.executions.persistence.OperationInputStore(store.jdbc()).prepare(e.organization(),e.id(),step.node(),step.operation(),step.argumentHash(),"synthetic","record","WRITE",null,args,clock.instant());
     }
     JsonNode node(JsonNode graph,String id){for(var node:graph.path("nodes"))if(node.path("id").asString().equals(id))return node;throw new DomainFailure(409,"RECONCILIATION_REQUIRED");}
     JsonNode inputs(Execution e,JsonNode graph,String id){return inputs(e,graph,id,null);}

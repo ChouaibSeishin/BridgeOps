@@ -110,6 +110,47 @@ function show(path = "/organizations/org/approvals/approval", actor = user) {
     </QueryClientProvider>,
   );
 }
+it("shows exact business arguments and connection revision without claiming synthetic or external delivery", async () => {
+  vi.mocked(approvalApi.get).mockResolvedValue(
+    request({
+      capability: "support",
+      operation: "assignBatch",
+      classification: "WRITE",
+      intentSchemaVersion: 2,
+      connection: {
+        id: "opaque-connection",
+        revision: 7,
+        implementationVersion: 1,
+        operationId: "assignBatch",
+      },
+      arguments: {
+        assignments: [
+          {
+            ticketId: "fixture-ticket",
+            expectedRevision: 3,
+            currentTeamId: null,
+            targetTeamId: "fixture-team",
+          },
+        ],
+      },
+    }),
+  );
+  show();
+  await screen.findByRole("heading", { name: "Exact proposed operation" });
+  expect(
+    screen.getByText("support.assignBatch", { exact: true }),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Connection revision 7/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Exact proposed arguments")).toHaveTextContent(
+    '"expectedRevision": 3',
+  );
+  expect(
+    screen.getByRole("button", { name: "Approve exact operation" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText("synthetic.record", { exact: true }),
+  ).not.toBeInTheDocument();
+});
 it("loads the persisted inbox with bounded status filtering and an honest empty state", async () => {
   show("/organizations/org/approvals");
   await screen.findByText("No approval requests match this view.");
@@ -303,9 +344,7 @@ it("saves only implemented policy fields against the captured revision", async (
   fireEvent.click(screen.getByRole("button", { name: "Save approval policy" }));
   await screen.findByText(/Policy committed/);
   expect(save).toHaveBeenCalledWith("org", 0, true, 600);
-  expect(
-    screen.getByText("Effective policy version 1"),
-  ).toBeInTheDocument();
+  expect(screen.getByText("Effective policy version 1")).toBeInTheDocument();
 });
 it("keeps a stale policy draft separate until explicit reload of the server version", async () => {
   vi.spyOn(approvalApi, "updatePolicy").mockImplementation(async () => {

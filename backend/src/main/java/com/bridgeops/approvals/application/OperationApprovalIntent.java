@@ -59,6 +59,17 @@ public record OperationApprovalIntent(UUID organization,UUID execution,String ga
         }
         return JSON.writeValueAsString(sorted(arguments));
     }
+    /** Reconstruct only an exact canonical schema-2 value; this still conveys no authorization. */
+    public static OperationApprovalIntent restore(String canonical){
+        try{
+            if(canonical==null||canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>MAX_CANONICAL_BYTES)throw invalid();
+            var c=JSON.readTree(canonical);var a=c.path("actor");var people=new ArrayList<UUID>();for(var person:a.path("configuredBy"))people.add(UUID.fromString(person.asString()));
+            var actor=new ActorReference(ActorReference.Type.valueOf(a.path("type").asString()),UUID.fromString(a.path("id").asString()),people);
+            var ref=c.path("connection");Connection connection=ref.isNull()?null:new Connection(UUID.fromString(ref.path("id").asString()),ref.path("revision").asLong(),ref.path("implementationVersion").asInt(),ref.path("operationId").asString());
+            var intent=create(UUID.fromString(c.path("organization").asString()),UUID.fromString(c.path("execution").asString()),c.path("gateNode").asString(),c.path("actionNode").asString(),UUID.fromString(c.path("version").asString()),c.path("definitionHash").asString(),actor,UUID.fromString(c.path("logicalOperation").asString()),UUID.fromString(c.path("preparedIntent").asString()),c.path("capability").asString(),c.path("operation").asString(),c.path("classification").asString(),connection,c.path("arguments"),c.path("policyVersion").asLong(),c.path("policySnapshot"),c.path("prompt").asString(),Instant.parse(c.path("createdAt").asString()),Instant.parse(c.path("expiresAt").asString()),Instant.parse(c.path("deadlineAt").asString()));
+            if(!intent.canonical().equals(canonical))throw invalid();return intent;
+        }catch(RuntimeException failure){throw invalid();}
+    }
     private static JsonNode sorted(JsonNode node){if(node.isObject()){var object=JSON.createObjectNode();node.propertyNames().stream().sorted().forEach(k->object.set(k,sorted(node.get(k))));return object;}if(node.isArray()){var array=JSON.createArrayNode();node.forEach(v->array.add(sorted(v)));return array;}return node;}
     private static boolean integer(JsonNode value,long min,long max){return value!=null&&value.isIntegralNumber()&&value.bigIntegerValue().compareTo(BigInteger.valueOf(min))>=0&&value.bigIntegerValue().compareTo(BigInteger.valueOf(max))<=0;}
     private static IllegalArgumentException invalid(){return new IllegalArgumentException("Invalid operation approval intent.");}

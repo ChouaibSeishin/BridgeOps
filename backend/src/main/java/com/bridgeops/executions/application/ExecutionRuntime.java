@@ -192,14 +192,21 @@ public class ExecutionRuntime {
     }
     private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
     private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume){
-        try{var intent=seed(e,plan,e.position(),graph);return resume?approvals.resumeCheck(intent,actors):approvals.check(intent,explicit(e,plan,e.position(),graph),actors);}
+        try{
+            var intent=seed(e,plan,e.position(),graph);
+            if(data.v2(graph)){
+                var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(intent.action())).findFirst().orElseThrow();var prepared=data.prepareRecord(e,step,intent.message());
+                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),intent.gate(),intent.action(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),prepared.id(),prepared.capability(),prepared.operation(),prepared.classification(),prepared.connection(),prepared.arguments(),intent.prompt(),e.deadline());
+                return resume?approvals.resumeCheck(operation,actors):approvals.check(operation,explicit(e,plan,e.position(),graph),actors);
+            }
+            return resume?approvals.resumeCheck(intent,actors):approvals.check(intent,explicit(e,plan,e.position(),graph),actors);
+        }
         catch(DomainFailure failure){if(!failure.code().equals("OPERATION_INTENT_MISMATCH"))throw failure;return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,failure.code(),false);}
     }
     private boolean explicit(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){return data.gate(e,graph,plan,position).type().equals("approval");}
     private ApprovalRuntime.Seed seed(Execution e,List<ExecutionPlan.Node> plan,int position,tools.jackson.databind.JsonNode graph){
         var action=data.action(graph,plan,position);var gate=data.gate(e,graph,plan,position);
         var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();
-        if(data.v2(graph))data.prepareRecord(e,step,action.message());
         return new ApprovalRuntime.Seed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),gate.type().equals("approval")?gate.prompt():"Review the exact internal record operation",action.message(),e.deadline());
     }
     private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){

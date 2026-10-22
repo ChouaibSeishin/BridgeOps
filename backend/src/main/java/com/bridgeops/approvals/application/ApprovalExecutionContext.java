@@ -5,7 +5,8 @@ import java.util.*;
 
 /** Owned port: execution supplies safe context and its locks, never its persistence objects. */
 public interface ApprovalExecutionContext {
-    record Action(String node,int position,String type,UUID operation,String argumentHash,String status) {}
+    record OperationData(UUID id,String arguments,String argumentHash,String capability,String operation,String classification,OperationApprovalIntent.Connection connection) {}
+    record Action(String node,int position,String type,UUID operation,String argumentHash,String status,OperationData prepared) {}
     record View(UUID organization,UUID execution,UUID workflow,UUID version,String definitionHash,UUID requester,
         Instant deadline,String status,long revision,int position,List<Action> steps,String workflowName,int versionNumber) {
         public boolean terminal(){return Set.of("SUCCEEDED","FAILED","CANCELLED").contains(status);}

@@ -23,7 +23,8 @@ public class ApprovalService {
         String gateNodeId,String actionNodeId,String prompt,String capability,String operation,JsonNode arguments,String argumentHash,String intentHash,
         long policyVersion,JsonNode policySnapshot,Instant createdAt,Instant expiresAt,Instant deadlineAt,
         ApprovalState status,long revision,Instant finalizedAt,String errorCode,String executionStatus,boolean actionable,boolean invalidated,
-        DecisionView decision,List<EventView> events,String workflowName,int versionNumber,String requesterName) {}
+        DecisionView decision,List<EventView> events,String workflowName,int versionNumber,String requesterName,
+        int intentSchemaVersion,String classification,OperationApprovalIntent.Connection connection) {}
     public record Page(List<View> items,int page,int size,long totalElements,long totalPages) {}
     private final ApprovalStore store;private final TenantAuthorization authority;private final ApprovalExecutionContext executions;
     private final ApprovalLifecycle lifecycle;private final ApprovalAudit audit;private final Clock clock;
@@ -63,8 +64,15 @@ public class ApprovalService {
         if(!execution.version().equals(r.version())||!execution.definitionHash().equals(r.definitionHash())||!execution.requester().equals(r.requester())
             ||!action.operation().equals(r.operation())||!action.argumentHash().equals(r.operationHash())||Set.of("SUCCEEDED","RUNNING","FAILED","CANCELLED","SKIPPED").contains(action.status())
             ||!execution.steps().get(execution.position()).node().equals(r.gate()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
-        var canonical=ApprovalIntent.record(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),execution.requester(),action.operation(),r.policyVersion(),r.policySnapshot(),r.prompt(),json.readTree(r.arguments()).path("message").asString(),r.created(),r.expires(),execution.deadline());
-        if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
+        if(r.generalized()){
+            var p=action.prepared();var recorded=r.operationIntent();
+            if(p==null||!p.id().equals(recorded.preparedIntent())||!p.argumentHash().equals(r.argumentHash())||!p.arguments().equals(r.arguments()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
+            var canonical=OperationApprovalIntent.create(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),com.bridgeops.shared.domain.ActorReference.user(execution.requester()),action.operation(),p.id(),p.capability(),p.operation(),p.classification(),p.connection(),json.readTree(p.arguments()),r.policyVersion(),json.readTree(r.policySnapshot()),r.prompt(),r.created(),r.expires(),execution.deadline());
+            if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
+        }else{
+            var canonical=ApprovalIntent.record(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),execution.requester(),action.operation(),r.policyVersion(),r.policySnapshot(),r.prompt(),json.readTree(r.arguments()).path("message").asString(),r.created(),r.expires(),execution.deadline());
+            if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
+        }
         store.decide(r,actor,outcome,reason,now);lifecycle.finish(r,outcome.equals("APPROVE")?ApprovalState.APPROVED:ApprovalState.REJECTED,null,actor,now);
         return view(actor,family,store.get(org,id,false),true);
     }
@@ -77,7 +85,8 @@ public class ApprovalService {
         java.util.function.Function<UUID,String> name=id->labels.containsKey(id)?labels.get(id).displayName():"Member";
         var decision=recorded.map(d->new DecisionView(d.id(),d.actor(),d.decision(),d.at(),d.expectedRevision(),d.reason(),name.apply(d.actor()))).orElse(null);
         var events=history.stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code(),name.apply(v.actor()))).toList();
-        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),"synthetic","record",json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),name.apply(r.requester()));
+        var intent=r.generalized()?r.operationIntent():null;
+        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),intent==null?"synthetic":intent.capability(),intent==null?"record":intent.operation(),json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),name.apply(r.requester()),intent==null?1:2,intent==null?"WRITE":intent.classification(),intent==null?null:intent.connection());
     }
     private PolicyView policyView(Policy p){return new PolicyView(p.version(),p.version(),p.required(),p.lifetime());}
 }

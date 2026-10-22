@@ -17,7 +17,15 @@ export interface Approval {
   prompt: string;
   capability: string;
   operation: string;
-  arguments: { message: string };
+  arguments: Record<string, unknown>;
+  intentSchemaVersion?: number;
+  classification?: "READ" | "WRITE";
+  connection?: {
+    id: string;
+    revision: number;
+    implementationVersion: number;
+    operationId: string;
+  } | null;
   argumentHash: string;
   intentHash: string;
   policyVersion: number;

@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.*;
 public class ApprovalRuntime {
     public record Seed(UUID organization,UUID execution,String gate,String action,UUID version,String definitionHash,
         UUID requester,UUID operation,String operationHash,String prompt,String message,Instant deadline) {}
+    public record OperationSeed(UUID organization,UUID execution,String gate,String action,UUID version,String definitionHash,
+        UUID requester,UUID operation,String blueprintHash,UUID prepared,String capability,String registeredOperation,String classification,
+        OperationApprovalIntent.Connection connection,String arguments,String prompt,Instant deadline) {}
     public enum Result { ALLOW,WAIT,FAIL,RECHECK_ACTORS }
     public record Gate(Result result,UUID request,String error,boolean created) {}
     public record SignalView(UUID id,UUID request,UUID execution,String outcome,String gate,String action,Instant createdAt) {}
@@ -34,6 +37,58 @@ public class ApprovalRuntime {
     public Gate check(Seed seed,boolean explicit,Set<UUID> lockedActors){return gate(seed,explicit,lockedActors,true);}
     @Transactional(propagation=Propagation.MANDATORY)
     public Gate resumeCheck(Seed seed,Set<UUID> lockedActors){return gate(seed,true,lockedActors,false);}
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Gate check(OperationSeed seed,boolean explicit,Set<UUID> lockedActors){return operationGate(seed,explicit,lockedActors,true);}
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Gate resumeCheck(OperationSeed seed,Set<UUID> lockedActors){return operationGate(seed,true,lockedActors,false);}
+    private Gate operationGate(OperationSeed seed,boolean explicit,Set<UUID> lockedActors,boolean requireConsumed){
+        var existing=store.action(seed.organization(),seed.execution(),seed.action());
+        // A V16 execution already waiting on a schema-1 record request keeps that exact request/hash.
+        if(existing.isPresent()&&!existing.get().generalized()){
+            if(!seed.capability().equals("synthetic")||!seed.registeredOperation().equals("record"))return new Gate(Result.FAIL,existing.get().id(),"INTENT_MISMATCH",false);
+            String message=tools.jackson.databind.json.JsonMapper.builder().build().readTree(seed.arguments()).path("message").asString();
+            return gate(new Seed(seed.organization(),seed.execution(),seed.gate(),seed.action(),seed.version(),seed.definitionHash(),seed.requester(),seed.operation(),seed.blueprintHash(),seed.prompt(),message,seed.deadline()),explicit,lockedActors,requireConsumed);
+        }
+        if(!lockedActors.contains(seed.requester()))return new Gate(Result.RECHECK_ACTORS,null,null,false);
+        try{authority.trusted(seed.requester(),seed.organization(),seed.classification().equals("WRITE")?"capability.write":"capability.read");}
+        catch(DomainFailure revoked){return new Gate(Result.FAIL,null,"CAPABILITY_PERMISSION_REVOKED",false);}
+        var policy=store.policy(seed.organization());Instant now=clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        if(!seed.deadline().isAfter(now))return new Gate(Result.FAIL,null,"DEADLINE_EXCEEDED",false);
+        Instant candidateExpiry=now.plusSeconds(policy.lifetime());if(candidateExpiry.isAfter(seed.deadline()))candidateExpiry=seed.deadline();
+        OperationApprovalIntent candidate;
+        try{candidate=operationIntent(seed,policy.version(),policy.snapshot(),now,candidateExpiry);}
+        catch(IllegalArgumentException malformed){return new Gate(Result.FAIL,null,"INTENT_MISMATCH",false);}
+        if(existing.isEmpty()){
+            boolean mandatoryWrite=seed.classification().equals("WRITE")&&Set.of("support","rest").contains(seed.capability());
+            if(!explicit&&!mandatoryWrite&&!(seed.capability().equals("synthetic")&&policy.required()))return new Gate(Result.ALLOW,null,null,false);
+            if(!seed.deadline().isAfter(now))return new Gate(Result.FAIL,null,"DEADLINE_EXCEEDED",false);
+            store.ensurePolicy(seed.organization(),now);
+            var r=store.insert(candidate,seed.blueprintHash());
+            store.event(r,seed.requester(),"APPROVAL_REQUESTED",now);audit.write(r.organization(),seed.requester(),ApprovalAudit.Action.APPROVAL_REQUESTED,r.id(),0,now);
+            return new Gate(Result.WAIT,r.id(),null,true);
+        }
+        var r=store.get(seed.organization(),existing.get().id(),true);
+        if(r.state()!=ApprovalState.PENDING&&r.state()!=ApprovalState.APPROVED)return new Gate(Result.FAIL,r.id(),r.error()==null?"APPROVAL_"+r.state().name():r.error(),false);
+        String invalid=null;
+        try{var actual=operationIntent(seed,r.policyVersion(),r.policySnapshot(),r.created(),r.expires());if(!r.operationHash().equals(seed.blueprintHash())||!actual.hash().equals(r.intentHash())||!actual.argumentHash().equals(r.argumentHash()))invalid="INTENT_MISMATCH";}
+        catch(IllegalArgumentException malformed){invalid="INTENT_MISMATCH";}
+        if(invalid==null&&r.policyVersion()!=policy.version())invalid="POLICY_CHANGED";
+        if(invalid==null&&!r.expires().isAfter(now))invalid="APPROVAL_EXPIRED";
+        if(invalid!=null){invalidate(r,invalid,seed.requester(),now);return new Gate(Result.FAIL,r.id(),invalid,false);}
+        if(store.invalidated(r.organization(),r.id()))return new Gate(Result.FAIL,r.id(),"APPROVAL_INVALIDATED",false);
+        if(r.state()==ApprovalState.PENDING)return new Gate(Result.WAIT,r.id(),null,false);
+        var decision=store.decision(r.organization(),r.id()).orElseThrow(()->new DomainFailure(409,"APPROVAL_INVALIDATED"));
+        if(!lockedActors.contains(decision.actor()))return new Gate(Result.RECHECK_ACTORS,r.id(),null,false);
+        try{authority.trusted(decision.actor(),r.organization(),"approval.decide");}
+        catch(DomainFailure revoked){invalidate(r,"APPROVER_REVOKED",seed.requester(),now);return new Gate(Result.FAIL,r.id(),"APPROVER_REVOKED",false);}
+        if(decision.actor().equals(r.requester())||!decision.decision().equals("APPROVE"))return new Gate(Result.FAIL,r.id(),"APPROVAL_INVALIDATED",false);
+        if(requireConsumed&&!store.consumed(r.organization(),r.id()))return new Gate(Result.WAIT,r.id(),null,false);
+        return new Gate(Result.ALLOW,r.id(),null,false);
+    }
+    private OperationApprovalIntent operationIntent(OperationSeed seed,long policyVersion,String policy,Instant created,Instant expires){
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();
+        return OperationApprovalIntent.create(seed.organization(),seed.execution(),seed.gate(),seed.action(),seed.version(),seed.definitionHash(),com.bridgeops.shared.domain.ActorReference.user(seed.requester()),seed.operation(),seed.prepared(),seed.capability(),seed.registeredOperation(),seed.classification(),seed.connection(),json.readTree(seed.arguments()),policyVersion,json.readTree(policy),seed.prompt(),created,expires,seed.deadline());
+    }
     private Gate gate(Seed seed,boolean explicit,Set<UUID> lockedActors,boolean requireConsumed){
         if(!lockedActors.contains(seed.requester()))return new Gate(Result.RECHECK_ACTORS,null,null,false);
         try{authority.trusted(seed.requester(),seed.organization(),"capability.write");}

@@ -1,6 +1,7 @@
 package com.bridgeops.approvals.persistence;
 
 import com.bridgeops.approvals.application.ApprovalIntent;
+import com.bridgeops.approvals.application.OperationApprovalIntent;
 import com.bridgeops.approvals.domain.ApprovalState;
 import com.bridgeops.shared.web.DomainFailure;
 import java.sql.*;
@@ -16,7 +17,11 @@ public class ApprovalStore {
     }
     public record Request(UUID id,UUID organization,UUID execution,String gate,String action,UUID version,String definitionHash,
         UUID requester,UUID operation,String operationHash,String arguments,String argumentHash,long policyVersion,String policySnapshot,
-        String prompt,String canonical,String intentHash,Instant created,Instant expires,Instant deadline,ApprovalState state,long revision,Instant finalized,String error) {}
+        String prompt,String canonical,String intentHash,Instant created,Instant expires,Instant deadline,ApprovalState state,long revision,Instant finalized,String error) {
+        public boolean generalized(){return tools.jackson.databind.json.JsonMapper.builder().build().readTree(canonical).path("schemaVersion").asInt()==2;}
+        public OperationApprovalIntent operationIntent(){return OperationApprovalIntent.restore(canonical);}
+        @Override public String toString(){return "ApprovalRequest[REDACTED]";}
+    }
     public record Decision(UUID id,UUID actor,String decision,Instant at,long expectedRevision,String reason) {}
     public record Signal(UUID id,UUID request,UUID execution,String outcome) {}
     public record Candidate(UUID organization,UUID execution,UUID requester) {}
@@ -41,6 +46,13 @@ public class ApprovalStore {
         UUID id=UUID.randomUUID();
         jdbc.update("INSERT INTO approval_requests(id,organization_id,execution_id,gate_node_id,action_node_id,workflow_version_id,definition_hash,requested_by,logical_operation_id,operation_argument_hash,capability,operation,arguments_json,argument_hash,policy_version,policy_snapshot,prompt,canonical_intent,intent_hash,created_at,expires_at,execution_deadline_at) VALUES(?,?,?,?,?,?,?,?,?,?,'synthetic','record',?,?,?,?,?,?,?,?,?,?)",
             id,intent.organization(),intent.execution(),intent.gateNode(),intent.actionNode(),intent.version(),intent.definitionHash(),intent.requester(),intent.logicalOperation(),operationHash,intent.arguments(),intent.argumentHash(),intent.policyVersion(),intent.policySnapshot(),intent.prompt(),intent.canonical(),intent.hash(),time(created),time(intent.expiresAt()),time(intent.deadlineAt()));
+        return get(intent.organization(),id,false);
+    }
+    public Request insert(OperationApprovalIntent intent,String operationHash){
+        if(intent.actor().type()!=com.bridgeops.shared.domain.ActorReference.Type.USER)throw new IllegalArgumentException("Automation approval persistence is not enabled.");
+        UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO approval_requests(id,organization_id,execution_id,gate_node_id,action_node_id,workflow_version_id,definition_hash,requested_by,logical_operation_id,operation_argument_hash,capability,operation,arguments_json,argument_hash,policy_version,policy_snapshot,prompt,canonical_intent,intent_hash,created_at,expires_at,execution_deadline_at,intent_schema_version,prepared_intent_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,2,?)",
+            id,intent.organization(),intent.execution(),intent.gateNode(),intent.actionNode(),intent.version(),intent.definitionHash(),intent.actor().id(),intent.logicalOperation(),operationHash,intent.capability(),intent.operation(),intent.arguments(),intent.argumentHash(),intent.policyVersion(),intent.policySnapshot(),intent.prompt(),intent.canonical(),intent.hash(),time(intent.createdAt()),time(intent.expiresAt()),time(intent.deadlineAt()),intent.preparedIntent());
         return get(intent.organization(),id,false);
     }
     public void finalize(Request request,ApprovalState state,String error,Instant now){
