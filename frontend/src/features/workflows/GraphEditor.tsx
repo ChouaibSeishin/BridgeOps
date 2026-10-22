@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState, type ComponentProps } from "react";
 import {
   addNode,
   removeNode,
@@ -9,19 +9,54 @@ import {
   nodeLabels,
 } from "./model";
 import type { Graph, ValidationError } from "./model";
+import { convertV1, isCanvasGraph } from "./canvasModel";
+import type { WorkflowCanvas as CanvasView } from "./WorkflowCanvas";
+const LazyCanvas = lazy(() =>
+  import("./WorkflowCanvas").then((module) => ({
+    default: module.WorkflowCanvas,
+  })),
+);
+function WorkflowCanvas(props: ComponentProps<typeof CanvasView>) {
+  return (
+    <Suspense fallback={<p role="status">Loading workflow canvas…</p>}>
+      <LazyCanvas {...props} />
+    </Suspense>
+  );
+}
 
 export function GraphEditor({
   definition,
   change,
   disabled,
   errors,
+  pendingChange,
 }: {
   definition: unknown;
   change: (graph: Graph) => void;
   disabled: boolean;
   errors: ValidationError[];
+  pendingChange?: (pending: boolean) => void;
 }) {
   const [type, setType] = useState("syntheticAction");
+  const [canvasVisible, setCanvasVisible] = useState(false);
+  const [convert, setConvert] = useState(false);
+  const [pending, setPending] = useState(false);
+  function propertiesPending(value: boolean) {
+    setPending(value);
+    pendingChange?.(value);
+  }
+  if (isCanvasGraph(definition) && definition.schemaVersion === 2)
+    return (
+      <section className="data-panel">
+        <WorkflowCanvas
+          graph={definition}
+          change={change}
+          disabled={disabled}
+          errors={errors}
+          pendingChange={propertiesPending}
+        />
+      </section>
+    );
   if (!isGraph(definition))
     return (
       <section className="data-panel">
@@ -79,6 +114,66 @@ export function GraphEditor({
         Connections define the single path. Card order is presentation only.
         Editing these definitions does not run actions or process approvals.
       </p>
+      <div className="action-row">
+        <button
+          type="button"
+          className="button"
+          disabled={pending}
+          aria-expanded={canvasVisible}
+          onClick={() => setCanvasVisible(!canvasVisible)}
+        >
+          {canvasVisible ? "Hide visual canvas" : "Show visual canvas"}
+        </button>
+        <button
+          type="button"
+          className="button"
+          disabled={disabled || pending}
+          onClick={() => setConvert(true)}
+        >
+          Convert draft to schema v2
+        </button>
+      </div>
+      {convert && (
+        <section
+          className="confirmation"
+          role="dialog"
+          aria-label="Convert draft schema"
+        >
+          <p>
+            Convert only this editable draft to schema v2 with explicit input
+            mappings. Stable node IDs and existing configuration are retained.
+            Published versions and their hashes stay immutable. Save and
+            validate the converted draft before publication.
+          </p>
+          <button
+            type="button"
+            className="button"
+            disabled={disabled}
+            onClick={() => {
+              change(convertV1(graph));
+              setConvert(false);
+            }}
+          >
+            Confirm schema v2 conversion
+          </button>
+          <button
+            type="button"
+            className="button"
+            onClick={() => setConvert(false)}
+          >
+            Keep schema v1
+          </button>
+        </section>
+      )}
+      {canvasVisible && (
+        <WorkflowCanvas
+          graph={graph}
+          change={change}
+          disabled={disabled}
+          errors={errors}
+          pendingChange={propertiesPending}
+        />
+      )}
       <div className="action-row node-palette">
         <label>
           Node type
@@ -96,7 +191,7 @@ export function GraphEditor({
         </label>
         <button
           className="button"
-          disabled={disabled || graph.nodes.length >= 50}
+          disabled={disabled || pending || graph.nodes.length >= 50}
           onClick={() =>
             change(
               addNode(
@@ -129,6 +224,7 @@ export function GraphEditor({
               key={node.id}
               id={`node-${node.id}`}
               tabIndex={-1}
+              disabled={pending}
             >
               <legend>{labels.get(node.id)}</legend>
               <details>
@@ -274,6 +370,7 @@ export function GraphEditor({
 }
 
 export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
+  const [canvasVisible, setCanvasVisible] = useState(false);
   const labels = isGraph(definition)
     ? nodeLabels(definition)
     : new Map<string, string>();
@@ -284,6 +381,12 @@ export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
         This snapshot is read-only. Editing its separate draft cannot change
         these bytes.
       </p>
+      {isCanvasGraph(definition) && (
+        <details onToggle={(e) => setCanvasVisible(e.currentTarget.open)}>
+          <summary>Visual published graph</summary>
+          {canvasVisible && <WorkflowCanvas graph={definition} />}
+        </details>
+      )}
       {isGraph(definition) && (
         <>
           <h3>Connections</h3>

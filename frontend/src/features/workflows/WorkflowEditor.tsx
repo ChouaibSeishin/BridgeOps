@@ -93,6 +93,7 @@ function DraftWorkspace({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [pendingProperties, setPendingProperties] = useState(false);
   const [confirmation, setConfirmation] = useState<
     "publish" | "archive" | "reload" | null
   >(null);
@@ -102,6 +103,7 @@ function DraftWorkspace({
   const edit = permissions.includes("workflow.edit");
   const publish = permissions.includes("workflow.publish");
   const dirty =
+    pendingProperties ||
     name !== saved.workflow.name ||
     description !== saved.workflow.description ||
     JSON.stringify(definition) !== JSON.stringify(saved.definition);
@@ -278,7 +280,10 @@ function DraftWorkspace({
             />
           </label>
           {edit && !archived && (
-            <button className="button primary" disabled={!dirty || frozen}>
+            <button
+              className="button primary"
+              disabled={!dirty || frozen || pendingProperties}
+            >
               Save draft
             </button>
           )}
@@ -289,6 +294,7 @@ function DraftWorkspace({
         change={setDefinition}
         disabled={!edit || archived || frozen}
         errors={validation?.errors ?? []}
+        pendingChange={setPendingProperties}
       />
       <div className="action-row workflow-actions">
         <button
@@ -344,7 +350,7 @@ function DraftWorkspace({
         )}
         <button
           className="button"
-          disabled={frozen}
+          disabled={frozen || pendingProperties}
           onClick={() =>
             dirty
               ? setConfirmation("reload")

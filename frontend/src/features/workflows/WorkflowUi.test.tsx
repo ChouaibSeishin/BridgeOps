@@ -90,6 +90,45 @@ function show(route = "/organizations/org/workflows/workflow") {
 async function ready() {
   await screen.findByRole("heading", { name: "Ticket triage" });
 }
+it("blocks saving and publication while canvas properties have unapplied invalid edits", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  try {
+    show();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Show visual canvas" }));
+    const inspect = await screen.findByRole(
+      "combobox",
+      { name: "Inspect node" },
+      { timeout: 10000 },
+    );
+    fireEvent.change(inspect, { target: { value: "action" } });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Node configuration JSON" }),
+      { target: { value: "invalid configuration" } },
+    );
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Publish draft" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Reload saved draft" }),
+    ).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Discard property edits" }),
+    );
+    expect(screen.getByRole("button", { name: "Publish draft" })).toBeEnabled();
+    expect(screen.getByText("All changes saved")).toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+}, 15000);
 it("adds and removes a configured node through the accessible palette controls", async () => {
   show();
   await ready();

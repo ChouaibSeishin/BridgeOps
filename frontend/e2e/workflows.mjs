@@ -172,6 +172,102 @@ export async function workflowJourney({
       }),
     ).toBeVisible();
 
+    report("workflow visual canvas inspection and unapplied-property guard");
+    await page
+      .getByRole("button", { name: "Show visual canvas", exact: true })
+      .click();
+    const canvas = page.getByRole("region", {
+      name: "Visual workflow editor",
+      exact: true,
+    });
+    await expect(canvas.locator(".react-flow__node")).toHaveCount(5);
+    await expect(canvas.locator(".react-flow__edge")).toHaveCount(4);
+    expect(
+      await canvas
+        .locator(".react-flow__controls-button")
+        .evaluateAll((buttons) =>
+          buttons.every(
+            (button) =>
+              button.getBoundingClientRect().width >= 44 &&
+              button.getBoundingClientRect().height >= 44,
+          ),
+        ),
+    ).toBe(true);
+    const firstAction = saved.definition.nodes.find(
+      (node) =>
+        node.type === "syntheticAction" &&
+        node.config.message === "Prepare plan",
+    );
+    await canvas
+      .getByRole("combobox", { name: "Inspect node", exact: true })
+      .selectOption(firstAction.id);
+    await expect(
+      canvas.getByRole("heading", {
+        name: "Synthetic action 1 — Prepare plan",
+        exact: true,
+      }),
+    ).toBeVisible();
+    const technical = canvas
+      .locator("details")
+      .filter({ hasText: "Stable node ID:" });
+    await expect(technical).not.toHaveAttribute("open");
+    await technical
+      .getByText("Technical node details", { exact: true })
+      .click();
+    await expect(technical.locator("code")).toHaveText(firstAction.id);
+    await canvas
+      .getByRole("textbox", { name: "Node configuration JSON", exact: true })
+      .fill("invalid local properties");
+    await expect(
+      page.getByRole("button", { name: "Save draft", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Publish draft", exact: true }),
+    ).toBeDisabled();
+    await canvas
+      .getByRole("button", { name: "Apply node properties", exact: true })
+      .click();
+    await expect(canvas.getByRole("alert")).toContainText("valid JSON objects");
+    await canvas
+      .getByRole("button", { name: "Discard property edits", exact: true })
+      .click();
+    await expect(
+      page.getByText("All changes saved", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Publish draft", exact: true }),
+    ).toBeEnabled();
+    expect((await http("GET", item)).body.definition).toEqual(saved.definition);
+    await mkdir(resolve("backend/target/browser-checks"), { recursive: true });
+    await page.screenshot({
+      path: resolve(
+        "backend/target/browser-checks/workflow-canvas-desktop.png",
+      ),
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", { name: "Switch to dark theme", exact: true })
+      .click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: resolve(
+        "backend/target/browser-checks/workflow-canvas-mobile-dark.png",
+      ),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page
+      .getByRole("button", { name: "Switch to light theme", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Hide visual canvas", exact: true })
+      .click();
+
     report("workflow publication and immutable exact history");
     const firstResponse = await publish(201);
     const first = await firstResponse.json();
