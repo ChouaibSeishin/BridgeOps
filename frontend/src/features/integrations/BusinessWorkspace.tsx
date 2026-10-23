@@ -5,6 +5,7 @@ import { failureMessage, type User } from "../../lib/session";
 import { useWorkflowAccess } from "../workflows/useWorkflowAccess";
 import { Pager, Problem } from "../workflows/Feedback";
 import { businessApi } from "./businessApi";
+import { DemoWorkflows } from "./DemoWorkflows";
 
 export function BusinessWorkspace({ user }: { user: User }) {
   const { id = "" } = useParams();
@@ -24,6 +25,16 @@ export function BusinessWorkspace({ user }: { user: User }) {
         access.data.permissions.includes("integration.manage") &&
         access.data.permissions.includes("capability.write")
       }
+      canReadWorkflows={
+        access.data.permissions.includes("workflow.read") &&
+        access.data.permissions.includes("integration.read")
+      }
+      canInstallWorkflows={[
+        "integration.manage",
+        "capability.write",
+        "workflow.edit",
+        "workflow.publish",
+      ].every((permission) => access.data.permissions.includes(permission))}
     />
   );
 }
@@ -31,10 +42,14 @@ function BusinessData({
   user,
   org,
   canSeed,
+  canReadWorkflows,
+  canInstallWorkflows,
 }: {
   user: User;
   org: string;
   canSeed: boolean;
+  canReadWorkflows: boolean;
+  canInstallWorkflows: boolean;
 }) {
   const client = useQueryClient();
   const [page, setPage] = useState(0);
@@ -175,6 +190,13 @@ function BusinessData({
             </button>
           )}
         </section>
+      )}
+      {canReadWorkflows && (
+        <DemoWorkflows
+          user={user.id}
+          org={org}
+          canInstall={canInstallWorkflows}
+        />
       )}
       <section className="data-panel">
         <h2>Support tickets</h2>

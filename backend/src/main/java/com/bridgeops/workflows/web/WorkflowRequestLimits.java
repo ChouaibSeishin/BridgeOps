@@ -14,7 +14,7 @@ public class WorkflowRequestLimits extends OncePerRequestFilter {
     private final GraphDefinition graphs;
     public WorkflowRequestLimits(GraphDefinition graphs) { this.graphs = graphs; }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/(?:workflows|executions|approvals|approval-policy|demo-data|integrations|support|teams|notifications|automations|webhook-endpoints)(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH") || request.getMethod().equals("PUT"));
+        return !request.getRequestURI().matches("/api/v1/organizations/[^/]+/(?:workflows|executions|approvals|approval-policy|demo-data|demo-workflows|integrations|support|teams|notifications|automations|webhook-endpoints)(?:/.*)?") || !(request.getMethod().equals("POST") || request.getMethod().equals("PATCH") || request.getMethod().equals("PUT"));
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
         if (request.getContentLengthLong() > MAX_REQUEST) { tooLarge(request, response); return; }

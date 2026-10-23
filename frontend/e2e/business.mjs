@@ -77,134 +77,65 @@ try {
   report("independent real requester and reviewer");
   const ownerToken = await login(owner, "owner@example.invalid"),
     reviewerToken = await login(reviewer, "approver@example.invalid");
-  report("explicit isolated business examples and registered connections");
-  expect(
-    (
-      await http(owner, ownerToken, "POST", `${base}/demo-data`, {
-        confirmed: true,
-      })
-    ).status,
-  ).toBe(200);
-  const connections = {};
-  for (const type of ["SUPPORT", "TEAMS", "NOTIFICATIONS"]) {
-    const response = await http(
-      owner,
-      ownerToken,
-      "POST",
-      `${base}/integrations`,
-      {
-        name: `Browser ${type}`,
-        description: "Disposable internal workflow fixture",
-        type,
-        configuration: {},
-      },
-    );
-    expect(response.status).toBe(201);
-    connections[type] = response.body.connection.id;
-  }
-  const node = (id, type, config = {}, inputs = {}) => ({
-    id,
-    type,
-    typeVersion: 1,
-    config,
-    inputs,
-  });
-  const graph = {
-    schemaVersion: 2,
-    nodes: [
-      node("start", "manualTrigger", { inputFields: { limit: "INTEGER" } }),
-      node(
-        "read",
-        "capabilityAction",
-        {
-          integrationId: connections.SUPPORT,
-          revision: 0,
-          operation: "support.list",
-        },
-        {
-          limit: { from: "start", path: "limit" },
-          priorities: { literal: ["HIGH", "URGENT"] },
-          statuses: { literal: ["OPEN", "IN_PROGRESS"] },
-        },
-      ),
-      node(
-        "resolve",
-        "capabilityAction",
-        {
-          integrationId: connections.TEAMS,
-          revision: 0,
-          operation: "teams.resolve",
-        },
-        { tickets: { from: "read", path: "tickets" } },
-      ),
-      node(
-        "hasWork",
-        "condition",
-        { operator: "GT", compare: 0 },
-        { value: { from: "resolve", path: "count" } },
-      ),
-      node("review", "approval", {
-        prompt: "Review the exact ticket revisions and target teams",
-      }),
-      node(
-        "assign",
-        "capabilityAction",
-        {
-          integrationId: connections.SUPPORT,
-          revision: 0,
-          operation: "support.assignBatch",
-        },
-        { assignments: { from: "resolve", path: "assignments" } },
-      ),
-      node(
-        "notify",
-        "notification",
-        { integrationId: connections.NOTIFICATIONS, revision: 0 },
-        {
-          message: {
-            parts: [
-              { literal: "Assigned " },
-              { from: "assign", path: "applied" },
-              { literal: " tickets" },
-            ],
-          },
-        },
-      ),
-      node(
-        "noWork",
-        "transform",
-        {},
-        { result: { literal: "No assignment needed" } },
-      ),
-      node("finish", "end"),
-    ],
-    edges: [
-      { source: "start", target: "read" },
-      { source: "read", target: "resolve" },
-      { source: "resolve", target: "hasWork" },
-      { source: "hasWork", target: "review", branch: "true" },
-      { source: "hasWork", target: "noWork", branch: "false" },
-      { source: "review", target: "assign" },
-      { source: "assign", target: "notify" },
-      { source: "notify", target: "finish" },
-      { source: "noWork", target: "finish" },
-    ],
-  };
-  const created = await http(owner, ownerToken, "POST", `${base}/workflows`, {
-    name: "Controlled ticket triage",
-    description: "Internal business capabilities only",
-    definition: graph,
-  });
-  expect(created.status).toBe(201);
-  const workflow = created.body.workflow.id;
-  const publication = await http(
+  report(
+    "explicit browser setup of persisted example connections and published workflows",
+  );
+  await owner.goto(`/organizations/${org}/business`);
+  await owner
+    .getByRole("button", { name: "Set up triage workflows", exact: true })
+    .click();
+  const installing = owner.waitForResponse(
+    (r) =>
+      r.request().method() === "POST" && r.url().endsWith("/demo-workflows"),
+  );
+  await owner
+    .getByRole("button", {
+      name: "Confirm setup triage workflows",
+      exact: true,
+    })
+    .click();
+  const installed = await installing;
+  expect(installed.status()).toBe(201);
+  const artifacts = (await installed.json()).artifacts;
+  await expect(
+    owner.getByRole("link", {
+      name: "Open manual triage example",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(artifacts.provenance).toBe("SEEDED_EXAMPLE");
+  const replay = await http(
     owner,
     ownerToken,
     "POST",
-    `${base}/workflows/${workflow}/publish`,
-    { expectedRevision: 0 },
+    `${base}/demo-workflows`,
+    { confirmed: true },
   );
-  expect(publication.status).toBe(201);
+  expect(replay.status).toBe(200);
+  expect(replay.body.artifacts).toEqual(artifacts);
+  const workflow = artifacts.manual.workflowId;
+  const published = await http(
+    owner,
+    ownerToken,
+    "GET",
+    `${base}/workflows/${workflow}/versions/${artifacts.manual.versionId}`,
+  );
+  expect(published.status).toBe(200);
+  expect(published.body.version.definitionHash).toBe(
+    artifacts.manual.definitionHash,
+  );
+  const webhookExample = await http(
+    owner,
+    ownerToken,
+    "GET",
+    `${base}/workflows/${artifacts.webhook.workflowId}/versions/${artifacts.webhook.versionId}`,
+  );
+  expect(webhookExample.status).toBe(200);
+  expect(
+    webhookExample.body.definition.nodes.some(
+      (n) => n.type === "webhookTrigger",
+    ),
+  ).toBe(true);
   async function start() {
     await owner.goto(`/organizations/${org}/workflows/${workflow}`);
     await owner
@@ -237,10 +168,8 @@ try {
     "GET",
     `${base}/executions/${execution}`,
   );
-  expect(waiting.body.versionId).toBe(publication.body.version.id);
-  expect(waiting.body.definitionHash).toBe(
-    publication.body.version.definitionHash,
-  );
+  expect(waiting.body.versionId).toBe(artifacts.manual.versionId);
+  expect(waiting.body.definitionHash).toBe(artifacts.manual.definitionHash);
   const request = await http(
     owner,
     ownerToken,

@@ -56,8 +56,8 @@ class BusinessBrowserIT {
         }catch(Exception failure){if(exchange.getResponseCode()<0)reply(exchange,502,"text/plain","Disposable business gateway unavailable.".getBytes(StandardCharsets.UTF_8));}finally{exchange.close();}});gateway.start();
         Path results=root.resolve("backend/target/browser-checks");Files.createDirectories(results);var command=new ProcessBuilder(System.getenv().getOrDefault("BRIDGEOPS_TEST_NODE","node"),root.resolve("frontend/e2e/business.mjs").toString()).directory(root.toFile()).redirectErrorStream(true).redirectOutput(results.resolve("business.log").toFile());command.environment().put("BRIDGEOPS_TEST_ORIGIN",ORIGIN);command.environment().put("BRIDGEOPS_TEST_ORG",org.toString());command.environment().put("BRIDGEOPS_TEST_FOREIGN_ORG",foreign.toString());command.environment().put("BRIDGEOPS_TEST_PASSWORD",password);
         var process=command.start();try{boolean finished=process.waitFor(180,TimeUnit.SECONDS);if(!finished)process.destroyForcibly();assertThat(finished).withFailMessage("Business browser timed out; inspect ignored redacted diagnostics.").isTrue();if(process.exitValue()!=0)try(var lines=Files.lines(results.resolve("business.log"))){lines.filter(l->l.startsWith("STEP:")||l.startsWith("FAIL:")||l.startsWith("AT:")).forEach(System.out::println);}assertThat(process.exitValue()).withFailMessage("Business browser failed; see ignored browser-checks/business.log.").isZero();
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows",Long.class)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_versions",Long.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM workflows",Long.class)).isEqualTo(2);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_versions",Long.class)).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions WHERE status='SUCCEEDED'",Long.class)).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_executions",Long.class)).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM support_tickets WHERE assigned_team_id IS NOT NULL AND revision=1",Long.class)).isEqualTo(2);
@@ -70,6 +70,9 @@ class BusinessBrowserIT {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM approval_decisions d JOIN approval_requests r ON r.organization_id=d.organization_id AND r.id=d.request_id WHERE d.decided_by=r.requested_by",Long.class)).isZero();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM organization_audit_events WHERE action='TICKET_ASSIGNED'",Long.class)).isEqualTo(2);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM synthetic_records",Long.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM integration_demo_workflows",Long.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM automation_principals",Long.class)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM integration_secrets",Long.class)).isZero();
         }finally{if(process.isAlive())process.destroyForcibly();}
     }
     static void reply(HttpExchange exchange,int status,String mime,byte[] bytes)throws java.io.IOException{if(mime!=null)exchange.getResponseHeaders().set("Content-Type",mime);exchange.sendResponseHeaders(status,status==204?-1:bytes.length);if(status!=204)exchange.getResponseBody().write(bytes);}

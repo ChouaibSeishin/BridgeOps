@@ -71,6 +71,8 @@ public class AuthenticationConfiguration {
             authorize.requestMatchers(HttpMethod.PUT,"/api/v1/organizations/*/approval-policy").authenticated();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/support/tickets","/api/v1/organizations/*/support/tickets/*","/api/v1/organizations/*/teams","/api/v1/organizations/*/teams/*","/api/v1/organizations/*/notifications","/api/v1/organizations/*/notifications/*","/api/v1/organizations/*/notifications/*/attempts").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/demo-data").authenticated();
+            authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/demo-workflows").authenticated();
+            authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/demo-workflows").authenticated();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/integration-definitions","/api/v1/organizations/*/integrations","/api/v1/organizations/*/integrations/*","/api/v1/organizations/*/integrations/*/configuration","/api/v1/organizations/*/integrations/*/operations").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/integrations","/api/v1/organizations/*/integrations/*/test").authenticated();
             authorize.requestMatchers(HttpMethod.PUT,"/api/v1/organizations/*/integrations/*").authenticated();

@@ -257,8 +257,8 @@ export function Organizations({ user }: { user: User }) {
         </section>
       )}
       <p className="muted">
-        Workflows can run internal records and registered ticket/team reads,
-        with distinct-human approval when required.
+        Workflows can run internal records, registered ticket/team operations
+        and internal notifications, with distinct-human approval when required.
       </p>
     </>
   );
