@@ -38,3 +38,5 @@ Protected internal assignments/notes and notification delivery now share fenced 
 The explicit opt-in triage installer and persisted artifact manifest are implemented and browser-verified; it creates examples only, without enabling automation or modifying existing resources. Actual automation actors and signed endpoint acceptance are the next incomplete delivery.
 
 Versioned webhook configuration, one-time encrypted signing-key lifecycle and the raw HMAC protocol primitive are verified. Actual actor-aware execution/approval and durable signed callback acceptance are the next incomplete delivery; configuration alone accepts no callback.
+
+V22 explicit actor/origin persistence and database approval exclusions are verified, with historical human lifecycle regression retained. The next delivery must wire these identities through the real worker, exact approval services and internal capability gateway before accepting signed callbacks.

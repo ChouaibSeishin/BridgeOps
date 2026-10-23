@@ -2,6 +2,7 @@ package com.bridgeops.audit.application;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.bridgeops.shared.domain.ActorReference;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
@@ -16,5 +17,11 @@ public class BusinessAudit {
     public void write(UUID org,UUID actor,UUID execution,UUID version,String hash,Action action,UUID target,long revision,Instant now){
         String resource=action==Action.INTERNAL_NOTIFICATION_RECORDED?"NOTIFICATION":"SUPPORT_TICKET";
         jdbc.update("INSERT INTO organization_audit_events(id,organization_id,actor_id,action,target_id,occurred_at,resource_type,revision,version_id,definition_hash,correlation_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),org,actor,action.name(),target,java.sql.Timestamp.from(now),resource,revision,version,hash,execution.toString());
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void write(UUID org,ActorReference actor,UUID execution,UUID version,String hash,Action action,UUID target,long revision,Instant now){
+        if(actor.type()==ActorReference.Type.USER){write(org,actor.id(),execution,version,hash,action,target,revision,now);return;}
+        String resource=action==Action.INTERNAL_NOTIFICATION_RECORDED?"NOTIFICATION":"SUPPORT_TICKET";
+        jdbc.update("INSERT INTO organization_audit_events(id,organization_id,actor_id,actor_type,automation_actor_id,action,target_id,occurred_at,resource_type,revision,version_id,definition_hash,correlation_id) VALUES(?,?,NULL,'AUTOMATION',?,?,?,?,?,?,?,?,?)",UUID.randomUUID(),org,actor.id(),action.name(),target,java.sql.Timestamp.from(now),resource,revision,version,hash,execution.toString());
     }
 }

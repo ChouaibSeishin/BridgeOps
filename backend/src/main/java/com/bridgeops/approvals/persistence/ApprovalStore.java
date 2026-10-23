@@ -4,11 +4,14 @@ import com.bridgeops.approvals.application.ApprovalIntent;
 import com.bridgeops.approvals.application.OperationApprovalIntent;
 import com.bridgeops.approvals.domain.ApprovalState;
 import com.bridgeops.shared.web.DomainFailure;
+import com.bridgeops.shared.domain.ActorReference;
+import com.bridgeops.shared.domain.AutomationOrigin;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Repository
 public class ApprovalStore {
@@ -20,6 +23,7 @@ public class ApprovalStore {
         String prompt,String canonical,String intentHash,Instant created,Instant expires,Instant deadline,ApprovalState state,long revision,Instant finalized,String error) {
         public boolean generalized(){return tools.jackson.databind.json.JsonMapper.builder().build().readTree(canonical).path("schemaVersion").asInt()==2;}
         public OperationApprovalIntent operationIntent(){return OperationApprovalIntent.restore(canonical);}
+        public ActorReference actorReference(){return generalized()?operationIntent().actor():ActorReference.user(requester);}
         @Override public String toString(){return "ApprovalRequest[REDACTED]";}
     }
     public record Decision(UUID id,UUID actor,String decision,Instant at,long expectedRevision,String reason) {}
@@ -49,10 +53,18 @@ public class ApprovalStore {
         return get(intent.organization(),id,false);
     }
     public Request insert(OperationApprovalIntent intent,String operationHash){
-        if(intent.actor().type()!=com.bridgeops.shared.domain.ActorReference.Type.USER)throw new IllegalArgumentException("Automation approval persistence is not enabled.");
+        if(intent.actor().type()!=ActorReference.Type.USER)throw new IllegalArgumentException("An accepted automation origin is required.");
         UUID id=UUID.randomUUID();
         jdbc.update("INSERT INTO approval_requests(id,organization_id,execution_id,gate_node_id,action_node_id,workflow_version_id,definition_hash,requested_by,logical_operation_id,operation_argument_hash,capability,operation,arguments_json,argument_hash,policy_version,policy_snapshot,prompt,canonical_intent,intent_hash,created_at,expires_at,execution_deadline_at,intent_schema_version,prepared_intent_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,2,?)",
             id,intent.organization(),intent.execution(),intent.gateNode(),intent.actionNode(),intent.version(),intent.definitionHash(),intent.actor().id(),intent.logicalOperation(),operationHash,intent.capability(),intent.operation(),intent.arguments(),intent.argumentHash(),intent.policyVersion(),intent.policySnapshot(),intent.prompt(),intent.canonical(),intent.hash(),time(intent.createdAt()),time(intent.expiresAt()),time(intent.deadlineAt()),intent.preparedIntent());
+        return get(intent.organization(),id,false);
+    }
+    public Request insert(OperationApprovalIntent intent,String operationHash,AutomationOrigin origin){
+        if(!TransactionSynchronizationManager.isActualTransactionActive()||jdbc.getDataSource()==null||!TransactionSynchronizationManager.hasResource(jdbc.getDataSource()))throw new IllegalStateException("Automation approval requires its database transaction.");
+        if(intent.actor().type()!=ActorReference.Type.AUTOMATION||origin==null||!origin.principal().equals(intent.actor().id()))throw new IllegalArgumentException("Invalid accepted automation origin.");
+        UUID id=UUID.randomUUID();
+        jdbc.update("INSERT INTO approval_requests(id,organization_id,execution_id,gate_node_id,action_node_id,workflow_version_id,definition_hash,requested_by,requester_type,automation_principal_id,principal_created_by,webhook_endpoint_id,webhook_endpoint_revision,endpoint_revision_author,logical_operation_id,operation_argument_hash,capability,operation,arguments_json,argument_hash,policy_version,policy_snapshot,prompt,canonical_intent,intent_hash,created_at,expires_at,execution_deadline_at,intent_schema_version,prepared_intent_id) VALUES(?,?,?,?,?,?,?,NULL,'AUTOMATION',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,2,?)",
+            id,intent.organization(),intent.execution(),intent.gateNode(),intent.actionNode(),intent.version(),intent.definitionHash(),origin.principal(),origin.principalCreator(),origin.endpoint(),origin.endpointRevision(),origin.endpointAuthor(),intent.logicalOperation(),operationHash,intent.capability(),intent.operation(),intent.arguments(),intent.argumentHash(),intent.policyVersion(),intent.policySnapshot(),intent.prompt(),intent.canonical(),intent.hash(),time(intent.createdAt()),time(intent.expiresAt()),time(intent.deadlineAt()),intent.preparedIntent());
         return get(intent.organization(),id,false);
     }
     public void finalize(Request request,ApprovalState state,String error,Instant now){
@@ -70,6 +82,7 @@ public class ApprovalStore {
     public boolean invalidate(Request r,String code,Instant now){return jdbc.update("INSERT INTO approval_invalidations VALUES(?,?,?,?) ON CONFLICT DO NOTHING",r.organization(),r.id(),time(now),code)==1;}
     public boolean invalidated(UUID org,UUID request){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM approval_invalidations WHERE organization_id=? AND request_id=?)",Boolean.class,org,request));}
     public void event(Request r,UUID actor,String code,Instant now){jdbc.update("INSERT INTO approval_events(id,organization_id,request_id,event_sequence,occurred_at,actor_id,code) SELECT ?,?,?,coalesce(max(event_sequence),0)+1,?,?,? FROM approval_events WHERE organization_id=? AND request_id=?",UUID.randomUUID(),r.organization(),r.id(),time(now),actor,code,r.organization(),r.id());}
+    public void event(Request r,ActorReference actor,String code,Instant now){if(actor.type()==ActorReference.Type.USER){event(r,actor.id(),code,now);return;}jdbc.update("INSERT INTO approval_events(id,organization_id,request_id,event_sequence,occurred_at,actor_id,actor_type,automation_actor_id,code) SELECT ?,?,?,coalesce(max(event_sequence),0)+1,?,NULL,'AUTOMATION',?,? FROM approval_events WHERE organization_id=? AND request_id=?",UUID.randomUUID(),r.organization(),r.id(),time(now),actor.id(),code,r.organization(),r.id());}
     public record Event(long sequence,Instant occurredAt,UUID actor,String code) {}
     public List<Event> events(UUID org,UUID request){return jdbc.query("SELECT * FROM approval_events WHERE organization_id=? AND request_id=? ORDER BY event_sequence LIMIT 100",(r,i)->new Event(r.getLong("event_sequence"),instant(r,"occurred_at"),r.getObject("actor_id",UUID.class),r.getString("code")),org,request);}
     private Request request(ResultSet r,int index)throws SQLException{return new Request(r.getObject("id",UUID.class),r.getObject("organization_id",UUID.class),r.getObject("execution_id",UUID.class),r.getString("gate_node_id"),r.getString("action_node_id"),r.getObject("workflow_version_id",UUID.class),r.getString("definition_hash"),r.getObject("requested_by",UUID.class),r.getObject("logical_operation_id",UUID.class),r.getString("operation_argument_hash"),r.getString("arguments_json"),r.getString("argument_hash"),r.getLong("policy_version"),r.getString("policy_snapshot"),r.getString("prompt"),r.getString("canonical_intent"),r.getString("intent_hash"),instant(r,"created_at"),instant(r,"expires_at"),instant(r,"execution_deadline_at"),ApprovalState.valueOf(r.getString("status")),r.getLong("revision"),instant(r,"finalized_at"),r.getString("error_code"));}
