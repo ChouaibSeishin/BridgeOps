@@ -13,6 +13,7 @@ public final class BrowserOriginFilter extends OncePerRequestFilter {
     public BrowserOriginFilter(BrowserPolicy policy) { this.policy = policy; }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if (com.bridgeops.shared.web.WebhookCallbackPath.matches(request)) { chain.doFilter(request,response); return; }
         boolean unsafe = !Set.of("GET", "HEAD", "OPTIONS", "TRACE").contains(request.getMethod());
         String path = request.getServletPath().isEmpty()
                 ? request.getRequestURI().substring(request.getContextPath().length()) : request.getServletPath();

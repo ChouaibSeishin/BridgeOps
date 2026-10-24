@@ -19,6 +19,7 @@ public final class AccessBearerFilter extends OncePerRequestFilter {
     public AccessBearerFilter(AccessTokens tokens, PasswordSessionService sessions) { this.tokens = tokens; this.sessions = sessions; }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        if (com.bridgeops.shared.web.WebhookCallbackPath.matches(request)) { chain.doFilter(request,response); return; }
         var headers = Collections.list(request.getHeaders("Authorization"));
         if (!headers.isEmpty()) {
             try {

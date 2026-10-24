@@ -9,6 +9,8 @@ required.push("OperationApprovalGateTest");
 required.push("InternalOperationTest");
 required.push("BusinessBrowserIT");
 required.push("WebhookSignatureTest");
+required.push("WebhookCallbackPathTest", "WebhookPayloadTest", "WebhookOutageIT");
+required.push("WebhookBrowserIT");
 const totals = { reports: 0, tests: 0, failures: 0, errors: 0, skipped: 0 };
 for (const directory of directories) {
   const files = (await readdir(directory)).filter(name => /^TEST-.*\.xml$/.test(name));

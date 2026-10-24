@@ -366,6 +366,9 @@ export function OrganizationDetail({ user }: { user: User }) {
         <p>
           <Link className="button" to={`/organizations/${id}/integrations`}>
             Open integrations
+          </Link>{" "}
+          <Link className="button" to={`/organizations/${id}/automations`}>
+            Automations & webhooks
           </Link>
         </p>
       )}

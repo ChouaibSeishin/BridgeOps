@@ -48,6 +48,7 @@ public class AuthenticationConfiguration {
     @Bean SecurityFilterChain authenticatedHttp(HttpSecurity http, BrowserPolicy policy, AccessTokens access,
             PasswordSessionService sessions, SignedCsrfTokens csrf, @Value("${bridgeops.api-docs.enabled:false}") boolean docsEnabled) throws Exception {
         http.authorizeHttpRequests(authorize -> {
+            authorize.requestMatchers(com.bridgeops.shared.web.WebhookCallbackPath::matches).permitAll();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/system/info","/actuator/health/liveness","/actuator/health/readiness","/api/v1/auth/csrf").permitAll();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/refresh","/api/v1/auth/logout","/api/v1/auth/forgot","/api/v1/auth/reset").permitAll();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/auth/me").authenticated();
@@ -79,13 +80,14 @@ public class AuthenticationConfiguration {
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/automations","/api/v1/organizations/*/automations/*").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/automations","/api/v1/organizations/*/automations/*/revoke").authenticated();
             authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/webhook-endpoints","/api/v1/organizations/*/webhook-endpoints/*").authenticated();
+            authorize.requestMatchers(HttpMethod.GET,"/api/v1/organizations/*/webhook-endpoints/*/deliveries").authenticated();
             authorize.requestMatchers(HttpMethod.POST,"/api/v1/organizations/*/webhook-endpoints","/api/v1/organizations/*/webhook-endpoints/*/rotate","/api/v1/organizations/*/webhook-endpoints/*/revoke").authenticated();
             authorize.anyRequest().denyAll();
         });
         http.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable).cors(AbstractHttpConfigurer::disable).requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .csrf(config -> config.csrfTokenRepository(csrf).csrfTokenRequestHandler(new StrictCsrfHeaderHandler()))
+                .csrf(config -> config.csrfTokenRepository(csrf).csrfTokenRequestHandler(new StrictCsrfHeaderHandler()).ignoringRequestMatchers(com.bridgeops.shared.web.WebhookCallbackPath::matches))
                 .addFilterBefore(new BrowserOriginFilter(policy),CsrfFilter.class)
                 .addFilterAfter(new AccessBearerFilter(access,sessions),CsrfFilter.class)
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request,response,failure) ->

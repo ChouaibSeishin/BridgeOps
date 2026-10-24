@@ -46,6 +46,7 @@ import {
   ApprovalPolicy,
 } from "../features/approvals/Approvals";
 import { BusinessWorkspace } from "../features/integrations/BusinessWorkspace";
+import { Automations } from "../features/integrations/Automations";
 import {
   Connections,
   ConnectionDetail,
@@ -197,6 +198,10 @@ export function App() {
             <Route
               path="/organizations/:id/integrations"
               element={<Connections user={state.user!} />}
+            />
+            <Route
+              path="/organizations/:id/automations"
+              element={<Automations user={state.user!} />}
             />
             <Route
               path="/organizations/:id/integrations/:connectionId"
