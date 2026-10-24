@@ -1,8 +1,10 @@
 # Project status
 
-Updated 2026-10-23 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
+Updated 2026-10-24 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
 
 ## Current Phase 5 work
+
+The actor-aware runtime increment now carries real automation identities through the fenced worker, internal business capabilities, exact human approvals, cancellation and audit. Current grants and endpoint/principal revocation are enforced independently of configuring humans' sessions; both configuring humans remain excluded from approval. Local verification passed 126 unit/MVC and 166 PostgreSQL/HTTP tests with zero failures/errors/skips, plus 116 frontend tests/typecheck/lint/build and zero-vulnerability production audit. All three retained real Chromium journeys also passed before publication. The V22 persistence checkpoint has [successful exact hosted CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39959515895). Signed callback acceptance, external workflow dispatch, typed canvas properties and full release verification remain incomplete; production remains V11.
 
 Verified incremental delivery includes encrypted secret primitives, opt-in persisted business examples/read UI (V12), controlled REST connection configuration/health UI with actual-connection DNS/TLS controls (V13), and separate bounded graph-v2 publication/mapping semantics (V14). Each published checkpoint's exact hosted result is in the Phase 5 guide. Scoped automation configuration (V15) adds explicit identities and immutable grants; actor-aware execution, webhook acceptance and the complete authoring/demo flow remain in progress. This is not a Phase 5 release.
 

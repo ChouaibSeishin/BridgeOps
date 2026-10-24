@@ -7,6 +7,7 @@ import com.bridgeops.executions.persistence.ExecutionStore;
 import com.bridgeops.executions.persistence.ExecutionStore.*;
 import com.bridgeops.organizations.application.TenantAuthorization;
 import com.bridgeops.shared.web.DomainFailure;
+import com.bridgeops.shared.domain.ActorReference;
 import com.bridgeops.workflows.application.WorkflowRuntime;
 import com.bridgeops.workflows.application.WorkflowDefinitions;
 import java.time.*;
@@ -19,24 +20,32 @@ import static com.bridgeops.executions.persistence.ExecutionStore.time;
 
 @Service
 public class ExecutionRuntime {
-    public record Dispatch(Claim claim,ExecutionPlan.Node node,UUID actor,UUID operation) {}
+    public record Dispatch(Claim claim,ExecutionPlan.Node node,UUID actor,UUID operation,ActorReference requester) {
+        public Dispatch(Claim claim,ExecutionPlan.Node node,UUID actor,UUID operation){this(claim,node,actor,operation,ActorReference.user(actor));}
+    }
     private final ExecutionStore store;private final JdbcTemplate jdbc;private final TransactionTemplate tx;
     private final TenantAuthorization authority;private final WorkflowRuntime workflows;private final WorkflowDefinitions graphs;
     private final ExecutionService service;private final ExecutionAudit audit;private final Clock clock;private final RetryPolicy retries;
     private final ApprovalRuntime approvals;
     private final ExecutionGraphData data;
     private final CapabilityDispatch capabilities;
+    private final ExecutionActors actorAuthority;
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals){
         this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,null);
     }
-    @org.springframework.beans.factory.annotation.Autowired
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities){
+        this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,capabilities,null);
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
+        WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities,ExecutionActors actorAuthority){
         this.store=store;this.jdbc=store.jdbc();this.tx=new TransactionTemplate(manager);tx.setTimeout(10);
         this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.service=service;this.audit=audit;this.clock=clock;this.retries=new RetryPolicy(randomness::sample);this.approvals=approvals;
         this.data=new ExecutionGraphData(store,graphs,clock);
         this.capabilities=capabilities;
+        this.actorAuthority=actorAuthority;
     }
     public Claim claim(UUID owner,int globalLimit,int tenantLimit,int leaseSeconds){
         if(globalLimit<1||globalLimit>16||tenantLimit<1||tenantLimit>globalLimit||leaseSeconds<5||leaseSeconds>120)throw new IllegalArgumentException("Invalid worker bounds.");
@@ -61,7 +70,7 @@ public class ExecutionRuntime {
     public Dispatch prepare(Claim c){return tx.execute(status->{
         var preview=store.get(c.organization(),c.execution(),false);
         var actors=workerActors(preview);
-        var snapshot=workflows.snapshot(preview.actor(),c.organization(),preview.workflow(),preview.version());
+        var snapshot=snapshot(preview);
         var e=owned(c);if(e==null)return null;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return null;}
         if(!snapshot.hash().equals(e.hash())){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
@@ -97,16 +106,16 @@ public class ExecutionRuntime {
         if(node.type().equals("delay")&&step.state().equals("WAITING_FOR_DELAY"))jdbc.update("UPDATE execution_steps SET status='RUNNING',error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),node.id());
         else jdbc.update("UPDATE execution_steps SET status='RUNNING',attempt_count=attempt_count+1,attempt_started_at=?,error_code=NULL WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),e.organization(),e.id(),node.id());
         store.event(e,"STEP_STARTED",node.id(),now);
-        return new Dispatch(c,node,e.actor(),step.operation());
+        return new Dispatch(c,node,e.actor(),step.operation(),e.requester());
     });}
     /** Effect, receipt, successful attempt and step result share one fenced database transaction. */
     public boolean complete(Dispatch dispatch){return Boolean.TRUE.equals(tx.execute(status->{
-        var c=dispatch.claim();var preview=store.get(c.organization(),c.execution(),false);var actors=workerActors(preview);authority.worker(dispatch.actor(),c.organization());var e=owned(c);if(e==null)return false;Instant now=clock.instant();
+        var c=dispatch.claim();var preview=store.get(c.organization(),c.execution(),false);var actors=workerActors(preview);worker(preview);var e=owned(c);if(e==null)return false;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return false;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(!step.node().equals(dispatch.node().id())||!step.state().equals("RUNNING"))return false;
-        var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);boolean v2=data.v2(snapshot.graph());
-        if(v2&&(!dispatch.node().equals(plan.get(e.position()))||!dispatch.operation().equals(step.operation())||!dispatch.actor().equals(e.actor()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
+        var snapshot=snapshot(e);var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);boolean v2=data.v2(snapshot.graph());
+        if(v2&&(!dispatch.node().equals(plan.get(e.position()))||!dispatch.operation().equals(step.operation())||!Objects.equals(dispatch.actor(),e.actor())||!e.requester().equals(dispatch.requester()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
         String output="{}";
         if(step.type().equals("syntheticAction")){
             if(!dispatch.node().equals(plan.get(e.position()))){fail(e,"APPROVAL_INTENT_MISMATCH",now);return false;}
@@ -137,7 +146,7 @@ public class ExecutionRuntime {
         return true;
     }));}
     private void advance(Execution e){
-        var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());
+        var snapshot=snapshot(e);
         if(data.v2(snapshot.graph()))data.advance(e,snapshot.graph(),ExecutionPlan.runtime(snapshot.graph(),graphs));
         else jdbc.update("UPDATE workflow_executions SET current_position=current_position+1,revision=revision+1 WHERE organization_id=? AND id=? AND revision=?",e.organization(),e.id(),e.revision());
     }
@@ -166,21 +175,21 @@ public class ExecutionRuntime {
     }
     private void fail(Execution e,String code,Instant now){
         service.terminateSteps(e,code.equals("DEADLINE_EXCEEDED")?code:"RECONCILIATION_REQUIRED",now);
-        approvals.terminate(e.organization(),e.id(),e.actor(),code);
+        approvals.terminate(e.organization(),e.id(),e.requester(),code);
         store.state(e,ExecutionState.FAILED,code,now);store.done(e);store.event(e,"EXECUTION_FAILED",null,now);
-        audit.write(e.organization(),e.actor(),ExecutionAudit.Action.EXECUTION_FAILED,e.id(),e.revision()+1,e.version(),e.hash(),now);
+        audit.write(e.organization(),e.requester(),ExecutionAudit.Action.EXECUTION_FAILED,e.id(),e.revision()+1,e.version(),e.hash(),now);
     }
     private void succeed(Execution e,Instant now){
         data.skipped(e,now);
         store.state(e,ExecutionState.SUCCEEDED,null,now);store.done(e);store.event(e,"EXECUTION_SUCCEEDED",null,now);
-        audit.write(e.organization(),e.actor(),ExecutionAudit.Action.EXECUTION_SUCCEEDED,e.id(),e.revision()+1,e.version(),e.hash(),now);
+        audit.write(e.organization(),e.requester(),ExecutionAudit.Action.EXECUTION_SUCCEEDED,e.id(),e.revision()+1,e.version(),e.hash(),now);
     }
     private void attempt(Execution e,Step step,String outcome,String error,Instant now){
         jdbc.update("INSERT INTO execution_attempts(id,organization_id,execution_id,node_id,attempt_number,started_at,completed_at,outcome,error_code) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",UUID.randomUUID(),e.organization(),e.id(),step.node(),step.attempts(),time(step.started()),time(now),outcome,error);
     }
     private void lockContext(Claim c){
         var preview=store.get(c.organization(),c.execution(),false);
-        authority.lockDurableContext(preview.actor(),c.organization());
+        durable(preview);
     }
     /** Bounded reconciliation executes one execution per transaction, preserving lock order. */
     public int reconcile(){
@@ -188,7 +197,7 @@ public class ExecutionRuntime {
         int count=0;
         for(var candidate:candidates){UUID org=(UUID)candidate.get("organization_id"),id=(UUID)candidate.get("id");
             Boolean changed=tx.execute(status->{
-                var preview=store.get(org,id,false);authority.lockDurableContext(preview.actor(),org);var e=store.get(org,id,true);if(e.state().terminal())return false;
+                var preview=store.get(org,id,false);durable(preview);var e=store.get(org,id,true);if(e.state().terminal())return false;
                 var work=jdbc.queryForList("SELECT * FROM execution_work_items WHERE organization_id=? AND execution_id=? FOR UPDATE",org,id).getFirst();Instant at=clock.instant();
                 if(!e.deadline().isAfter(at)){fail(e,"DEADLINE_EXCEEDED",at);return true;}
                 var lease=(java.sql.Timestamp)work.get("lease_expires_at");
@@ -206,8 +215,11 @@ public class ExecutionRuntime {
         for(var candidate:approvals.candidates())if(resumeApproval(candidate))count++;
         return count;
     }
-    private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
-    private CapabilityDispatch.Work work(Claim claim,Set<UUID> actors){return new CapabilityDispatch.Work(claim.organization(),claim.execution(),claim.owner(),claim.token(),actors);}
+    private Set<UUID> workerActors(Execution e){var actors=new HashSet<>(approvals.actors(e.organization(),e.id()));if(e.actor()!=null)actors.add(e.actor());authority.lockActors(actors);return Set.copyOf(actors);}
+    private CapabilityDispatch.Work work(Claim claim,Set<UUID> actors){var e=store.get(claim.organization(),claim.execution(),false);return new CapabilityDispatch.Work(claim.organization(),claim.execution(),claim.owner(),claim.token(),actors,e.requester());}
+    private WorkflowRuntime.Definition snapshot(Execution e){if(actorAuthority!=null)return actorAuthority.snapshot(e);if(e.automation()!=null)throw new DomainFailure(403,"AUTOMATION_SCOPE_DENIED");return workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());}
+    private void worker(Execution e){if(actorAuthority!=null)actorAuthority.worker(e);else if(e.automation()==null)authority.trusted(e.actor(),e.organization(),"execution.run");else throw new DomainFailure(403,"AUTOMATION_SCOPE_DENIED");}
+    private void durable(Execution e){if(e.automation()==null)authority.lockDurableContext(e.actor(),e.organization());else authority.lockDurableOrganization(e.organization());}
     private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume,Claim claim){
         var action=data.action(graph,plan,e.position());boolean capability=Set.of("capabilityAction","notification").contains(action.type());
         try{
@@ -215,15 +227,15 @@ public class ExecutionRuntime {
                 if(capabilities==null)return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,"UNSUPPORTED_RUNTIME_NODE",false);
                 var binding=resume?capabilities.resume(e.organization(),e.id(),action.id(),actors):capabilities.prepare(work(claim,actors),action.id());var gate=data.gate(e,graph,plan,e.position());
                 var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();
-                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),gate.type().equals("approval")?gate.prompt():"Review the exact registered operation",e.deadline());
+                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.requester(),e.automation(),step.operation(),step.argumentHash(),binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),gate.type().equals("approval")?gate.prompt():"Review the exact registered operation",e.deadline());
+                return resume?approvals.resumeCheck(operation,actors):approvals.check(operation,explicit(e,plan,e.position(),graph),actors);
+            }
+            if(data.v2(graph)){
+                var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(action.id())).findFirst().orElseThrow();var prepared=data.prepareRecord(e,step,action.message());var gate=data.gate(e,graph,plan,e.position());
+                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),gate.id(),action.id(),e.version(),e.hash(),e.requester(),e.automation(),step.operation(),step.argumentHash(),prepared.id(),prepared.capability(),prepared.operation(),prepared.classification(),prepared.connection(),prepared.arguments(),gate.type().equals("approval")?gate.prompt():"Review the exact internal record operation",e.deadline());
                 return resume?approvals.resumeCheck(operation,actors):approvals.check(operation,explicit(e,plan,e.position(),graph),actors);
             }
             var intent=seed(e,plan,e.position(),graph);
-            if(data.v2(graph)){
-                var step=store.steps(e.organization(),e.id()).stream().filter(s->s.node().equals(intent.action())).findFirst().orElseThrow();var prepared=data.prepareRecord(e,step,intent.message());
-                var operation=new ApprovalRuntime.OperationSeed(e.organization(),e.id(),intent.gate(),intent.action(),e.version(),e.hash(),e.actor(),step.operation(),step.argumentHash(),prepared.id(),prepared.capability(),prepared.operation(),prepared.classification(),prepared.connection(),prepared.arguments(),intent.prompt(),e.deadline());
-                return resume?approvals.resumeCheck(operation,actors):approvals.check(operation,explicit(e,plan,e.position(),graph),actors);
-            }
             return resume?approvals.resumeCheck(intent,actors):approvals.check(intent,explicit(e,plan,e.position(),graph),actors);
         }
         catch(DomainFailure failure){if(failure.code().equals("ACTOR_SET_CHANGED"))return new ApprovalRuntime.Gate(ApprovalRuntime.Result.RECHECK_ACTORS,null,null,false);if(failure.status()==403||!capability&&!failure.code().equals("OPERATION_INTENT_MISMATCH"))throw failure;return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,failure.code(),false);}
@@ -247,16 +259,16 @@ public class ExecutionRuntime {
         store.state(e,ExecutionState.WAITING_FOR_APPROVAL,null,now);store.park(c,now);store.event(e,gate.created()?"APPROVAL_REQUESTED":"APPROVAL_WAITING",node.id(),now);return true;
     }
     private boolean resumeApproval(ApprovalRuntime.Candidate candidate){return Boolean.TRUE.equals(tx.execute(status->{
-        var preview=store.get(candidate.organization(),candidate.execution(),false);var actors=workerActors(preview);authority.lockDurableContext(preview.actor(),preview.organization());
+        var preview=store.get(candidate.organization(),candidate.execution(),false);var actors=workerActors(preview);durable(preview);
         var e=store.get(preview.organization(),preview.id(),true);jdbc.queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? FOR UPDATE",e.organization(),e.id());
-        approvals.reconcile(e.organization(),e.id(),e.actor());boolean changed=false;
+        approvals.reconcile(e.organization(),e.id(),e.requester());boolean changed=false;
         for(var signal:approvals.signals(e.organization(),e.id())){
             e=store.get(e.organization(),e.id(),false);Instant now=clock.instant();
             if(e.state().terminal()){changed|=consumeApprovalSignal(e,signal);continue;}
             if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);changed|=consumeApprovalSignal(e,signal);continue;}
             if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL){fail(e,"RECONCILIATION_REQUIRED",now);changed|=consumeApprovalSignal(e,signal);continue;}
-            try{authority.trusted(e.actor(),e.organization(),"execution.run");}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=consumeApprovalSignal(e,signal);continue;}
-            var snapshot=workflows.snapshot(e.actor(),e.organization(),e.workflow(),e.version());var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);
+            try{worker(e);}catch(DomainFailure revoked){fail(e,"PERMISSION_REVOKED",now);changed|=consumeApprovalSignal(e,signal);continue;}
+            var snapshot=snapshot(e);var plan=ExecutionPlan.runtime(snapshot.graph(),graphs);
             if(e.position()>=plan.size()||!plan.get(e.position()).id().equals(signal.gate())){fail(e,"APPROVAL_INTENT_MISMATCH",now);changed|=consumeApprovalSignal(e,signal);continue;}
             var gate=checkedGate(e,plan,snapshot.graph(),actors,true,null);
             if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS)continue;
@@ -272,7 +284,7 @@ public class ExecutionRuntime {
         return changed;
     }));}
     private boolean consumeApprovalSignal(Execution e,ApprovalRuntime.SignalView signal){
-        if(!approvals.consume(e.organization(),e.id(),signal.id(),e.actor()))return false;
+        if(!approvals.consume(e.organization(),e.id(),signal.id(),e.requester()))return false;
         store.event(e,"APPROVAL_SIGNAL_"+signal.outcome(),signal.gate(),clock.instant());
         store.event(e,"APPROVAL_SIGNAL_CONSUMED",signal.gate(),clock.instant());return true;
     }

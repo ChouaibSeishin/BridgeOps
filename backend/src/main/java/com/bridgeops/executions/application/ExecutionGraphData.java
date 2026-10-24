@@ -52,7 +52,7 @@ final class ExecutionGraphData {
     String output(Execution e,JsonNode graph,ExecutionStore.Step step){
         var inputs=inputs(e,graph,step.node());var node=node(graph,step.node());
         return switch(step.type()){
-            case "manualTrigger" -> graphs.stableValue(graphs.triggerV2(graph,graphs.parse(e.input())));
+            case "manualTrigger","webhookTrigger" -> graphs.stableValue(graphs.triggerV2(graph,graphs.parse(e.input())));
             case "transform" -> graphs.stableValue(inputs);
             case "condition" -> "{\"matched\":"+graphs.conditionV2(node.path("config"),inputs)+"}";
             case "delay" -> "{\"resumedAt\":\""+clock.instant()+"\"}";

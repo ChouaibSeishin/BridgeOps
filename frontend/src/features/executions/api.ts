@@ -14,7 +14,9 @@ export interface Execution {
   workflowId: string;
   versionId: string;
   definitionHash: string;
-  requestedBy: string;
+  requestedBy: string | null;
+  actor?: import("../../lib/actors").ActorReference;
+  origin?: import("../../lib/actors").AutomationOrigin | null;
   source: string;
   mode: string;
   status: State;

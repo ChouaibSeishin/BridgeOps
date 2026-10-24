@@ -20,5 +20,5 @@ public class ExecutionApprovalContext implements ApprovalExecutionContext {
     private View view(UUID actor,UUID family,UUID org,UUID id,boolean lock){var e=store.get(org,id,lock);var source=workflows.reference(actor,family,org,e.workflow(),e.version());var inputs=source.schemaVersion()==2?new com.bridgeops.executions.persistence.OperationInputStore(store.jdbc()).readAll(org,id):java.util.Map.<String,com.bridgeops.executions.persistence.OperationInputStore.Prepared>of();return new View(org,id,e.workflow(),e.version(),e.hash(),e.actor(),e.deadline(),e.state().name(),e.revision(),e.position(),store.steps(org,id).stream().map(s->{
         var p=inputs.get(s.node());OperationData prepared=p==null?null:new OperationData(p.id(),p.arguments(),p.argumentHash(),p.capability(),p.operation(),p.classification(),p.connection());
         return new Action(s.node(),s.position(),s.type(),s.operation(),s.argumentHash(),s.state(),prepared);
-    }).toList(),source.name(),source.versionNumber());}
+    }).toList(),source.name(),source.versionNumber(),e.requester(),e.automation());}
 }

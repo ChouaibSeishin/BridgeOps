@@ -42,6 +42,7 @@ public class ExecutionService {
         key(key);if(delay<0||delay>3600)throw new DomainFailure(400,"INVALID_REQUEST");
         var snapshot=workflows.version(actor,family,org,workflow,version);
         boolean v2=snapshot.version().schemaVersion()==2;
+        if(v2&&java.util.stream.StreamSupport.stream(snapshot.definition().path("nodes").spliterator(),false).anyMatch(n->n.path("type").asString().equals("webhookTrigger")))throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");
         if(v2&&!effectsAcknowledged)throw new DomainFailure(422,"EFFECTS_ACKNOWLEDGEMENT_REQUIRED");
         if(v2)input=graphs.triggerV2(snapshot.definition(),input);
         String canonicalInput=v2?graphs.stableValue(input):String.valueOf(input);
@@ -117,8 +118,9 @@ public class ExecutionService {
         }
         store.jdbc().update("UPDATE execution_steps SET status=CASE WHEN status='PENDING' AND ?='FAILED' THEN 'SKIPPED' ELSE ? END,completed_at=?,error_code=CASE WHEN status='PENDING' THEN 'NOT_DISPATCHED' ELSE ? END WHERE organization_id=? AND execution_id=? AND status NOT IN ('SUCCEEDED','FAILED','CANCELLED','SKIPPED')",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",outcome.equals("CANCELLED")?"CANCELLED":"FAILED",time(now),outcome,e.organization(),e.id());
     }
-    public Summary summary(Execution e){var waiting=e.state()==ExecutionState.WAITING_FOR_APPROVAL?approvals.waiting(e.organization(),e.id()):null;return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e),waiting==null?null:waiting.id(),waiting==null?null:waiting.expiresAt());}
+    public Summary summary(Execution e){var waiting=e.state()==ExecutionState.WAITING_FOR_APPROVAL?approvals.waiting(e.organization(),e.id()):null;return new Summary(e.id(),e.workflow(),e.version(),e.hash(),e.actor(),e.source(),"LIVE_EXECUTION",e.state(),e.revision(),e.position(),e.created(),e.started(),e.completed(),e.deadline(),e.notBefore(),e.error(),e.retryOf(),eligible(e),waiting==null?null:waiting.id(),waiting==null?null:waiting.expiresAt(),e.requester(),e.automation());}
     private boolean eligible(Execution e){
+        if(e.automation()!=null)return false;
         if(e.state()!=ExecutionState.FAILED||!"TRANSIENT_EXHAUSTED".equals(e.error()))return false;
         // Capability graphs require a fresh plan and approval, rather than replaying earlier mutable observations.
         return store.steps(e.organization(),e.id()).stream().noneMatch(s->Set.of("capabilityAction","notification","configuredHttp").contains(s.type()));

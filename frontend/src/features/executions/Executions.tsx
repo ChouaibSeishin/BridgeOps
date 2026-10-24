@@ -366,11 +366,25 @@ function ExecutionWorkspace({
             Original failed execution
           </Link>
         )}
+        {e.actor?.type === "AUTOMATION" && (
+          <p>
+            Requester: automation principal. Its scoped grants authorize work;
+            configuring people do not act as the requester.
+          </p>
+        )}
         <details>
           <summary>Technical execution details</summary>
+          {e.origin && (
+            <p>
+              Accepted webhook endpoint <code>{e.origin.endpoint}</code> ·
+              revision {e.origin.endpointRevision} · signing revision author{" "}
+              <code>{e.origin.endpointAuthor}</code>
+            </p>
+          )}
           <p>
             Execution ID: <code>{e.id}</code> · revision {e.revision} ·
-            requester <code>{e.requestedBy}</code>
+            requester{" "}
+            <code>{e.actor?.id ?? e.requestedBy ?? "Unavailable"}</code>
           </p>
         </details>
         <div className="action-row">

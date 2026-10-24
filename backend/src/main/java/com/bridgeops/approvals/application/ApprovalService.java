@@ -7,6 +7,8 @@ import com.bridgeops.audit.application.ApprovalAudit;
 import com.bridgeops.identity.application.IdentityQueries;
 import com.bridgeops.organizations.application.TenantAuthorization;
 import com.bridgeops.shared.web.DomainFailure;
+import com.bridgeops.shared.domain.ActorReference;
+import com.bridgeops.shared.domain.AutomationOrigin;
 import java.time.*;
 import java.util.*;
 import org.springframework.stereotype.Service;
@@ -24,14 +26,15 @@ public class ApprovalService {
         long policyVersion,JsonNode policySnapshot,Instant createdAt,Instant expiresAt,Instant deadlineAt,
         ApprovalState status,long revision,Instant finalizedAt,String errorCode,String executionStatus,boolean actionable,boolean invalidated,
         DecisionView decision,List<EventView> events,String workflowName,int versionNumber,String requesterName,
-        int intentSchemaVersion,String classification,OperationApprovalIntent.Connection connection) {}
+        int intentSchemaVersion,String classification,OperationApprovalIntent.Connection connection,ActorReference actor,AutomationOrigin origin) {}
     public record Page(List<View> items,int page,int size,long totalElements,long totalPages) {}
     private final ApprovalStore store;private final TenantAuthorization authority;private final ApprovalExecutionContext executions;
     private final ApprovalLifecycle lifecycle;private final ApprovalAudit audit;private final Clock clock;
     private final IdentityQueries identities;
     private final ApprovalOperationChecks operationChecks;
+    private final ApprovalRequesterAuthority requesters;
     private final JsonMapper json=JsonMapper.builder().build();
-    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock,IdentityQueries identities,ApprovalOperationChecks operationChecks){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;this.identities=identities;this.operationChecks=operationChecks;}
+    public ApprovalService(ApprovalStore store,TenantAuthorization authority,ApprovalExecutionContext executions,ApprovalLifecycle lifecycle,ApprovalAudit audit,Clock clock,IdentityQueries identities,ApprovalOperationChecks operationChecks,ApprovalRequesterAuthority requesters){this.store=store;this.authority=authority;this.executions=executions;this.lifecycle=lifecycle;this.audit=audit;this.clock=clock;this.identities=identities;this.operationChecks=operationChecks;this.requesters=requesters;}
     @Transactional(readOnly=true,timeout=5)
     public PolicyView policy(UUID actor,UUID family,UUID org){authority.read(actor,family,org,"approval.read");return policyView(store.policy(org));}
     @Transactional(timeout=10)
@@ -56,39 +59,42 @@ public class ApprovalService {
         authority.write(actor,family,org,"approval.decide");
         if(revision<0||!Set.of("APPROVE","REJECT").contains(outcome==null?"":outcome)||reason!=null&&(reason.length()>200||reason.codePoints().anyMatch(Character::isISOControl)))throw new DomainFailure(400,"INVALID_REQUEST");
         var preview=store.get(org,id,false);var execution=executions.lock(actor,family,org,preview.execution());var r=store.get(org,id,true);Instant now=clock.instant();
-        if(r.requester().equals(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
+        if(r.actorReference().excludes(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
         if(r.revision()!=revision||r.state()!=ApprovalState.PENDING)throw new DomainFailure(409,"APPROVAL_CONFLICT");
         if(!r.expires().isAfter(now)||!execution.deadline().isAfter(now))throw new DomainFailure(409,"APPROVAL_EXPIRED");
         if(execution.terminal()||!execution.status().equals("WAITING_FOR_APPROVAL"))throw new DomainFailure(409,"EXECUTION_NOT_WAITING");
         if(r.policyVersion()!=store.policy(org).version()||store.invalidated(org,id))throw new DomainFailure(409,"APPROVAL_INVALIDATED");
         var action=execution.action(r.action());
-        if(!execution.version().equals(r.version())||!execution.definitionHash().equals(r.definitionHash())||!execution.requester().equals(r.requester())
+        if(!execution.version().equals(r.version())||!execution.definitionHash().equals(r.definitionHash())||!execution.actor().equals(r.actorReference())
             ||!action.operation().equals(r.operation())||!action.argumentHash().equals(r.operationHash())||Set.of("SUCCEEDED","RUNNING","FAILED","CANCELLED","SKIPPED").contains(action.status())
             ||!execution.steps().get(execution.position()).node().equals(r.gate()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         if(r.generalized()){
             var p=action.prepared();var recorded=r.operationIntent();
             if(p==null||!p.id().equals(recorded.preparedIntent())||!p.argumentHash().equals(r.argumentHash())||!p.arguments().equals(r.arguments()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
-            var canonical=OperationApprovalIntent.create(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),com.bridgeops.shared.domain.ActorReference.user(execution.requester()),action.operation(),p.id(),p.capability(),p.operation(),p.classification(),p.connection(),json.readTree(p.arguments()),r.policyVersion(),json.readTree(r.policySnapshot()),r.prompt(),r.created(),r.expires(),execution.deadline());
+            var canonical=OperationApprovalIntent.create(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),execution.actor(),action.operation(),p.id(),p.capability(),p.operation(),p.classification(),p.connection(),json.readTree(p.arguments()),r.policyVersion(),json.readTree(r.policySnapshot()),r.prompt(),r.created(),r.expires(),execution.deadline());
             if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         }else{
             var canonical=ApprovalIntent.record(org,r.execution(),r.gate(),r.action(),execution.version(),execution.definitionHash(),execution.requester(),action.operation(),r.policyVersion(),r.policySnapshot(),r.prompt(),json.readTree(r.arguments()).path("message").asString(),r.created(),r.expires(),execution.deadline());
             if(!canonical.hash().equals(r.intentHash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         }
-        if(outcome.equals("APPROVE")&&r.generalized()&&!r.operationIntent().capability().equals("synthetic"))operationChecks.validateDecision(actor,family,org,r.execution(),r.action(),r.operationIntent().preparedIntent());
+        if(outcome.equals("APPROVE")&&r.generalized()){
+            var intent=r.operationIntent();if(execution.actor().type()==ActorReference.Type.AUTOMATION)requesters.check(org,r.execution(),execution.actor(),execution.origin(),r.action(),intent.connection(),intent.capability().equals("rest")?intent.operation():intent.capability()+"."+intent.operation(),intent.classification());
+            if(!intent.capability().equals("synthetic"))operationChecks.validateDecision(actor,family,org,r.execution(),r.action(),intent.preparedIntent());
+        }
         store.decide(r,actor,outcome,reason,now);lifecycle.finish(r,outcome.equals("APPROVE")?ApprovalState.APPROVED:ApprovalState.REJECTED,null,actor,now);
         return view(actor,family,store.get(org,id,false),true);
     }
     private View view(UUID actor,UUID family,Request r,boolean detail){
         var e=executions.read(actor,family,r.organization(),r.execution());boolean decide=authority.permitted(actor,family,r.organization(),"approval.decide");
         boolean invalid=store.invalidated(r.organization(),r.id())||r.policyVersion()!=store.policy(r.organization()).version();Instant now=clock.instant();
-        boolean actionable=decide&&!actor.equals(r.requester())&&r.state()==ApprovalState.PENDING&&!invalid&&r.expires().isAfter(now)&&e.deadline().isAfter(now)&&e.status().equals("WAITING_FOR_APPROVAL");
+        boolean actionable=decide&&!r.actorReference().excludes(actor)&&r.state()==ApprovalState.PENDING&&!invalid&&r.expires().isAfter(now)&&e.deadline().isAfter(now)&&e.status().equals("WAITING_FOR_APPROVAL");
         var recorded=store.decision(r.organization(),r.id());var history=detail?store.events(r.organization(),r.id()):List.<Event>of();
-        var actors=new HashSet<UUID>();actors.add(r.requester());recorded.ifPresent(d->actors.add(d.actor()));history.forEach(v->actors.add(v.actor()));var labels=identities.labels(actors);
+        var actors=new HashSet<UUID>();if(r.requester()!=null)actors.add(r.requester());recorded.ifPresent(d->actors.add(d.actor()));history.forEach(v->{if(v.actor()!=null)actors.add(v.actor());});var labels=identities.labels(actors);
         java.util.function.Function<UUID,String> name=id->labels.containsKey(id)?labels.get(id).displayName():"Member";
         var decision=recorded.map(d->new DecisionView(d.id(),d.actor(),d.decision(),d.at(),d.expectedRevision(),d.reason(),name.apply(d.actor()))).orElse(null);
-        var events=history.stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code(),name.apply(v.actor()))).toList();
+        var events=history.stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code(),v.actor()==null?"Automation principal":name.apply(v.actor()))).toList();
         var intent=r.generalized()?r.operationIntent():null;
-        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),intent==null?"synthetic":intent.capability(),intent==null?"record":intent.operation(),json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),name.apply(r.requester()),intent==null?1:2,intent==null?"WRITE":intent.classification(),intent==null?null:intent.connection());
+        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),intent==null?"synthetic":intent.capability(),intent==null?"record":intent.operation(),json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),r.requester()==null?"Automation principal":name.apply(r.requester()),intent==null?1:2,intent==null?"WRITE":intent.classification(),intent==null?null:intent.connection(),r.actorReference(),e.origin());
     }
     private PolicyView policyView(Policy p){return new PolicyView(p.version(),p.version(),p.required(),p.lifetime());}
 }

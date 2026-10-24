@@ -305,6 +305,13 @@ function ApprovalReview({
         </p>
         <details>
           <summary>Technical intent details</summary>
+          {r.origin && (
+            <p>
+              Accepted webhook endpoint <code>{r.origin.endpoint}</code> ·
+              revision {r.origin.endpointRevision} · signing revision author{" "}
+              <code>{r.origin.endpointAuthor}</code>
+            </p>
+          )}
           {r.connection && (
             <p>
               Connection ID <code>{r.connection.id}</code> · intent schema{" "}
@@ -312,7 +319,8 @@ function ApprovalReview({
             </p>
           )}
           <p>
-            Requester ID <code>{r.requestedBy}</code>
+            Requester ID{" "}
+            <code>{r.actor?.id ?? r.requestedBy ?? "Unavailable"}</code>
             {r.decision && (
               <>
                 {" "}
@@ -409,7 +417,10 @@ function ApprovalReview({
             <p>
               {r.requestedBy === user.id
                 ? "You requested this operation. A different eligible person must decide; Owner status does not permit self-approval."
-                : "This request is not actionable for your current permissions or its current state. The server will reject expired or stale decisions."}
+                : r.actor?.type === "AUTOMATION" &&
+                    r.actor.configuringHumans.includes(user.id)
+                  ? "You configured this automation or its accepted signing revision. A different eligible person must decide this request."
+                  : "This request is not actionable for your current permissions or its current state. The server will reject expired or stale decisions."}
             </p>
           )
         )}

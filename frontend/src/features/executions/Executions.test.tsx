@@ -363,3 +363,37 @@ it("shows the persisted automatic retry schedule beside the waiting step", async
     new Date("2026-10-17T12:00:02Z").toLocaleString(),
   );
 });
+
+it("renders a persisted automation principal without borrowing a human requester", async () => {
+  vi.mocked(executionApi.get).mockResolvedValue({
+    ...execution("SUCCEEDED"),
+    requestedBy: null,
+    source: "WEBHOOK",
+    origin: {
+      principal: "accepted-principal",
+      principalCreator: "configurer",
+      endpoint: "accepted-endpoint",
+      endpointRevision: 7,
+      endpointAuthor: "configurer",
+    },
+    actor: {
+      type: "AUTOMATION",
+      id: "accepted-principal",
+      configuringHumans: ["configurer"],
+    },
+  });
+  show();
+  expect(
+    await screen.findByText(/Requester: automation principal/),
+  ).toBeInTheDocument();
+  const details = screen
+    .getByText("Technical execution details")
+    .closest("details")!;
+  expect(details.open).toBe(false);
+  expect(within(details).getByText("accepted-principal")).toBeInTheDocument();
+  expect(within(details).getByText("accepted-endpoint")).toBeInTheDocument();
+  expect(details).toHaveTextContent("revision 7");
+  expect(
+    screen.queryByRole("button", { name: /Retry/ }),
+  ).not.toBeInTheDocument();
+});

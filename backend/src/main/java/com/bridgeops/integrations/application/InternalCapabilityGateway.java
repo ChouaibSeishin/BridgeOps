@@ -29,12 +29,12 @@ public class InternalCapabilityGateway implements CapabilityDispatch,ApprovalOpe
     @Override @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public Result perform(Work work,String action){
         var context=effects.dispatch(work,action);var binding=binding(context,work,false);
-        var gate=approvals.check(new ApprovalRuntime.OperationSeed(context.organization(),context.execution(),context.gate(),context.node(),context.version(),context.hash(),context.actor(),context.logicalOperation(),context.blueprintHash(),binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),context.prompt(),context.deadline()),context.explicit(),context.lockedActors());
+        var gate=approvals.check(new ApprovalRuntime.OperationSeed(context.organization(),context.execution(),context.gate(),context.node(),context.version(),context.hash(),context.requester(),context.origin(),context.logicalOperation(),context.blueprintHash(),binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),context.prompt(),context.deadline()),context.explicit(),context.lockedActors());
         if(gate.result()!=ApprovalRuntime.Result.ALLOW)throw new DomainFailure(409,gate.error()==null?"OPERATION_APPROVAL_REQUIRED":gate.error());
         if(binding.classification().equals("WRITE"))return writes.perform(context,binding);
         String operation=binding.capability()+"."+binding.operation();var saved=receipts.receipt(context.organization(),context.logicalOperation(),operation,context.node(),binding.argumentHash());
         if(saved.isPresent())return new Result(saved.get(),false,null,true);
-        String output=json.writeValueAsString(reads.read(context.actor(),context.organization(),binding.capability(),binding.operation(),json.readTree(binding.arguments())));
+        String output=json.writeValueAsString(context.origin()==null?reads.read(context.actor(),context.organization(),binding.capability(),binding.operation(),json.readTree(binding.arguments())):reads.readRegistered(context.organization(),binding.capability(),binding.operation(),json.readTree(binding.arguments())));
         return new Result(receipts.commit(context.organization(),context.execution(),context.logicalOperation(),operation,context.node(),binding.argumentHash(),output,clock.instant()),false,null,false);
     }
     @Override @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
@@ -57,7 +57,7 @@ public class InternalCapabilityGateway implements CapabilityDispatch,ApprovalOpe
         return new Plan(descriptor,new OperationApprovalIntent.Connection(id,connection.revision(),connection.implementationVersion(),operation),InternalOperation.arguments(capability,operation,json.readTree(context.inputs())));
     }
     private Binding binding(ExecutionEffects.Context context,Work work,boolean resume){
-        var plan=plan(context);var descriptor=plan.definition();authority.trusted(context.actor(),context.organization(),descriptor.classification().equals("WRITE")?"capability.write":"capability.read");
+        var plan=plan(context);var descriptor=plan.definition();effects.authorize(context,plan.connection(),descriptor.capability()+"."+descriptor.id(),descriptor.classification());
         var bound=resume?effects.bindResume(context.organization(),context.execution(),context.node(),context.lockedActors(),descriptor.capability(),descriptor.id(),descriptor.classification(),plan.connection(),plan.arguments()):effects.bind(work,context.node(),descriptor.capability(),descriptor.id(),descriptor.classification(),plan.connection(),plan.arguments());
         if(resume||!context.stepStatus().equals("RUNNING")||descriptor.classification().equals("READ"))preconditions.check(context.organization(),context.logicalOperation(),context.node(),descriptor.capability(),descriptor.id(),bound.argumentHash(),json.readTree(bound.arguments()));
         return bound;

@@ -20,6 +20,11 @@ public class InternalBusinessReads {
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public JsonNode read(UUID actor,UUID organization,String capability,String operation,JsonNode arguments){
         authority.trusted(actor,organization,"capability.read");
+        return readRegistered(organization,capability,operation,arguments);
+    }
+    /** Package-private handler; automation reaches it only through the independently fenced, granted gateway. */
+    @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
+    JsonNode readRegistered(UUID organization,String capability,String operation,JsonNode arguments){
         var definition=InternalOperation.definition(capability,operation);if(!definition.classification().equals("READ"))throw new DomainFailure(422,"UNSUPPORTED_CAPABILITY_OPERATION");
         var input=json.readTree(InternalOperation.arguments(capability,operation,arguments));var output=json.createObjectNode();
         switch(capability+"."+operation){

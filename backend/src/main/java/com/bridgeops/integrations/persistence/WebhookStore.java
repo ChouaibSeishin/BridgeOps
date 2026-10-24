@@ -9,11 +9,13 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class WebhookStore {
+    public record Accepted(UUID principal,UUID principalCreator,UUID workflow,UUID version,String hash,String status,UUID author){}
     public record Row(UUID id,UUID organization,String name,UUID principal,UUID principalCreator,UUID workflow,UUID version,String hash,long revision,String status,UUID secret,UUID creator,Instant created,UUID author,Instant updated){@Override public String toString(){return "WebhookConfiguration[REDACTED]";}}
     private final JdbcTemplate jdbc;
     public WebhookStore(JdbcTemplate jdbc){this.jdbc=jdbc;}
     public Row get(UUID org,UUID id,boolean lock){return jdbc.query("SELECT * FROM webhook_endpoints WHERE organization_id=? AND id=?"+(lock?" FOR UPDATE":""),this::row,org,id).stream().findFirst().orElseThrow(()->new DomainFailure(404,"NOT_FOUND"));}
     public long count(UUID org){return jdbc.queryForObject("SELECT count(*) FROM webhook_endpoints WHERE organization_id=?",Long.class,org);}
+    public Accepted accepted(UUID org,UUID id,long revision){return jdbc.query("SELECT principal_id,principal_created_by,workflow_id,workflow_version_id,definition_hash,status,authored_by FROM webhook_endpoint_versions WHERE organization_id=? AND endpoint_id=? AND revision=?",(r,i)->new Accepted(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),r.getString(5),r.getString(6),r.getObject(7,UUID.class)),org,id,revision).stream().findFirst().orElseThrow(()->new DomainFailure(403,"AUTOMATION_SCOPE_DENIED"));}
     public List<Row> list(UUID org,int page,int size){return jdbc.query("SELECT * FROM webhook_endpoints WHERE organization_id=? ORDER BY created_at DESC,id LIMIT ? OFFSET ?",this::row,org,size,(long)page*size);}
     public void create(Row r){jdbc.update("INSERT INTO webhook_endpoints(id,organization_id,name,principal_id,principal_created_by,workflow_id,workflow_version_id,definition_hash,revision,status,signing_secret_id,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",r.id(),r.organization(),r.name(),r.principal(),r.principalCreator(),r.workflow(),r.version(),r.hash(),r.revision(),r.status(),r.secret(),r.creator(),Timestamp.from(r.created()),r.author(),Timestamp.from(r.updated()));version(r);}
     public void change(Row old,UUID secret,UUID author,Instant now,boolean revoke){

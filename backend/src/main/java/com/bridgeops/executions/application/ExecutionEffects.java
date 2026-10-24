@@ -6,6 +6,7 @@ import com.bridgeops.executions.domain.*;
 import com.bridgeops.executions.persistence.*;
 import com.bridgeops.organizations.application.TenantAuthorization;
 import com.bridgeops.shared.web.DomainFailure;
+import com.bridgeops.shared.domain.*;
 import com.bridgeops.workflows.application.*;
 import java.time.*;
 import java.util.*;
@@ -18,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 public class ExecutionEffects {
     public record Context(UUID organization,UUID execution,UUID actor,UUID workflow,UUID version,String hash,
         String node,String type,String configuration,String inputs,UUID logicalOperation,String blueprintHash,
-        String gate,String prompt,boolean explicit,Instant deadline,Set<UUID> lockedActors,String stepStatus){
+        String gate,String prompt,boolean explicit,Instant deadline,Set<UUID> lockedActors,String stepStatus,ActorReference requester,AutomationOrigin origin){
         public Context{lockedActors=Set.copyOf(lockedActors);}
         @Override public String toString(){return "ExecutionEffectContext[REDACTED]";}
     }
@@ -27,7 +28,8 @@ public class ExecutionEffects {
     private final ExecutionStore store;private final TenantAuthorization authority;private final WorkflowRuntime workflows;
     private final WorkflowDefinitions definitions;private final ApprovalRuntime approvals;private final Clock clock;
     private final WorkflowService browserWorkflows;
-    public ExecutionEffects(ExecutionStore store,TenantAuthorization authority,WorkflowRuntime workflows,WorkflowDefinitions definitions,ApprovalRuntime approvals,Clock clock,WorkflowService browserWorkflows){this.store=store;this.authority=authority;this.workflows=workflows;this.definitions=definitions;this.approvals=approvals;this.clock=clock;this.browserWorkflows=browserWorkflows;}
+    private final ExecutionActors actorAuthority;
+    public ExecutionEffects(ExecutionStore store,TenantAuthorization authority,WorkflowRuntime workflows,WorkflowDefinitions definitions,ApprovalRuntime approvals,Clock clock,WorkflowService browserWorkflows,ExecutionActors actorAuthority){this.store=store;this.authority=authority;this.workflows=workflows;this.definitions=definitions;this.approvals=approvals;this.clock=clock;this.browserWorkflows=browserWorkflows;this.actorAuthority=actorAuthority;}
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public Context prepare(CapabilityDispatch.Work work,String action){return context(work.organization(),work.execution(),work,action,work.actors(),Mode.PREPARE);}
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
@@ -38,13 +40,20 @@ public class ExecutionEffects {
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public Decision decision(UUID actor,UUID family,UUID org,UUID execution,String action,UUID prepared){
         authority.write(actor,family,org,"approval.decide");var e=store.get(org,execution,true);
-        if(e.actor().equals(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
+        if(e.requester().excludes(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
         if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL||!e.deadline().isAfter(clock.instant())||store.jdbc().queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? AND state='WAITING' FOR UPDATE",org,execution).isEmpty())throw new DomainFailure(409,"EXECUTION_NOT_WAITING");
         var snapshot=browserWorkflows.version(actor,family,org,e.workflow(),e.version());if(!snapshot.version().definitionHash().equals(e.hash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         var plan=ExecutionPlan.runtime(snapshot.definition(),definitions);if(e.position()>=plan.size())throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");var data=new ExecutionGraphData(store,definitions,clock);var target=data.action(snapshot.definition(),plan,e.position());if(!target.id().equals(action)||!Set.of("capabilityAction","notification").contains(target.type()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         var step=store.steps(org,execution).stream().filter(s->s.node().equals(action)).findFirst().orElseThrow();var binding=new OperationInputStore(store.jdbc()).read(org,execution,action).orElseThrow(()->new DomainFailure(409,"RECONCILIATION_REQUIRED"));if(!binding.id().equals(prepared)||!binding.blueprintHash().equals(target.argumentHash())||!binding.logicalOperation().equals(step.operation()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         var mapped=store.jdbc().queryForList("SELECT arguments_json FROM execution_step_inputs WHERE organization_id=? AND execution_id=? AND node_id=?",String.class,org,execution,action);if(mapped.isEmpty())throw new DomainFailure(409,"RECONCILIATION_REQUIRED");var gate=data.gate(e,snapshot.definition(),plan,e.position());
-        return new Decision(new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(data.node(snapshot.definition(),action).path("config")),mapped.getFirst(),step.operation(),step.argumentHash(),gate.id(),gate.prompt(),gate.type().equals("approval"),e.deadline(),Set.of(actor),step.state()),new CapabilityDispatch.Binding(binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),binding.argumentHash()));
+        return new Decision(new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(data.node(snapshot.definition(),action).path("config")),mapped.getFirst(),step.operation(),step.argumentHash(),gate.id(),gate.prompt(),gate.type().equals("approval"),e.deadline(),Set.of(actor),step.state(),e.requester(),e.automation()),new CapabilityDispatch.Binding(binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),binding.argumentHash()));
+    }
+    /** Rechecks the live actor/grant behind an independently derived context; returns no bearer authority. */
+    @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
+    public void authorize(Context context,OperationApprovalIntent.Connection connection,String operation,String classification){
+        var e=store.get(context.organization(),context.execution(),true);
+        if(!e.requester().equals(context.requester())||!Objects.equals(e.automation(),context.origin())||!e.version().equals(context.version())||!e.hash().equals(context.hash())||e.state().terminal()||!e.deadline().isAfter(clock.instant()))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
+        actorAuthority.operation(e,context.node(),connection==null?null:connection.id(),connection==null?null:connection.revision(),operation,classification);
     }
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public CapabilityDispatch.Binding bind(CapabilityDispatch.Work work,String action,String capability,String operation,String classification,OperationApprovalIntent.Connection connection,String arguments){
@@ -68,9 +77,10 @@ public class ExecutionEffects {
         return new CapabilityDispatch.Binding(saved.id(),capability,operation,classification,connection,saved.arguments(),saved.argumentHash());
     }
     private Context context(UUID org,UUID execution,CapabilityDispatch.Work work,String action,Set<UUID> declaredActors,Mode mode){
-        var preview=store.get(org,execution,false);var actors=new HashSet<>(approvals.actors(org,execution));actors.add(preview.actor());if(!actors.equals(declaredActors))throw new DomainFailure(409,"ACTOR_SET_CHANGED");authority.lockActors(declaredActors);
-        var snapshot=workflows.snapshot(preview.actor(),org,preview.workflow(),preview.version());var e=store.get(org,execution,true);
-        var currentActors=new HashSet<>(approvals.actors(org,execution));currentActors.add(e.actor());if(!currentActors.equals(declaredActors))throw new DomainFailure(409,"ACTOR_SET_CHANGED");
+        var preview=store.get(org,execution,false);var actors=new HashSet<>(approvals.actors(org,execution));if(preview.actor()!=null)actors.add(preview.actor());if(!actors.equals(declaredActors))throw new DomainFailure(409,"ACTOR_SET_CHANGED");authority.lockActors(declaredActors);
+        if(work!=null&&(work.requester()!=null&&!work.requester().equals(preview.requester())||preview.automation()!=null&&work.requester()==null))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
+        var snapshot=actorAuthority.snapshot(preview);var e=store.get(org,execution,true);
+        var currentActors=new HashSet<>(approvals.actors(org,execution));if(e.actor()!=null)currentActors.add(e.actor());if(!currentActors.equals(declaredActors))throw new DomainFailure(409,"ACTOR_SET_CHANGED");
         if(e.state().terminal()||!e.deadline().isAfter(clock.instant())||!snapshot.hash().equals(e.hash()))throw new DomainFailure(409,"EXECUTION_NOT_DISPATCHABLE");
         if(mode==Mode.RESUME){
             if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL||store.jdbc().queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? AND state='WAITING' FOR UPDATE",org,execution).isEmpty())throw new DomainFailure(409,"EXECUTION_NOT_WAITING");
@@ -81,6 +91,6 @@ public class ExecutionEffects {
         var step=store.steps(org,execution).stream().filter(s->s.node().equals(action)).findFirst().orElseThrow();if(!step.argumentHash().equals(target.argumentHash()))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
         var node=graphData.node(snapshot.graph(),action);JsonNode input=graphData.inputs(e,snapshot.graph(),action,current.type().equals("approval")?current.id():null);
         var gate=graphData.gate(e,snapshot.graph(),plan,e.position());boolean explicit=gate.type().equals("approval");
-        return new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(node.path("config")),definitions.stableValue(input),step.operation(),step.argumentHash(),gate.id(),explicit?gate.prompt():"Review the exact registered operation",explicit,e.deadline(),declaredActors,step.state());
+        return new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(node.path("config")),definitions.stableValue(input),step.operation(),step.argumentHash(),gate.id(),explicit?gate.prompt():"Review the exact registered operation",explicit,e.deadline(),declaredActors,step.state(),e.requester(),e.automation());
     }
 }

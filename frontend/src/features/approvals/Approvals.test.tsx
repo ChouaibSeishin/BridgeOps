@@ -395,3 +395,69 @@ it("sends decision values only, omits an empty optional reason and keeps argumen
     approvalFailure(new HttpFailure(403, "SELF_APPROVAL_FORBIDDEN")),
   ).toContain("different eligible person");
 });
+
+it("explains why a configuring human cannot decide an automated request", async () => {
+  vi.mocked(approvalApi.get).mockResolvedValue(
+    request({
+      requestedBy: null,
+      requesterName: "Automation principal",
+      origin: {
+        principal: "accepted-principal",
+        principalCreator: user.id,
+        endpoint: "accepted-endpoint",
+        endpointRevision: 3,
+        endpointAuthor: user.id,
+      },
+      actor: {
+        type: "AUTOMATION",
+        id: "accepted-principal",
+        configuringHumans: [user.id],
+      },
+      actionable: false,
+      events: [
+        {
+          sequence: 1,
+          occurredAt: "2026-10-23T12:00:00Z",
+          actor: null,
+          actorName: "Automation principal",
+          code: "APPROVAL_REQUESTED",
+        },
+      ],
+    }),
+  );
+  show();
+  expect(
+    await screen.findByText(
+      /You configured this automation or its accepted signing revision/,
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Approve/ }),
+  ).not.toBeInTheDocument();
+  const details = screen
+    .getByText("Technical intent details")
+    .closest("details")!;
+  expect(details.open).toBe(false);
+  expect(screen.getByText("accepted-principal")).toBeInTheDocument();
+  expect(screen.getByText("accepted-endpoint")).toBeInTheDocument();
+  expect(details).toHaveTextContent("revision 3");
+});
+it("offers an automated decision only when the backend confirms a distinct human is eligible", async () => {
+  vi.mocked(approvalApi.get).mockResolvedValue(
+    request({
+      requestedBy: null,
+      requesterName: "Automation principal",
+      actor: {
+        type: "AUTOMATION",
+        id: "accepted-principal",
+        configuringHumans: ["different-configurer"],
+      },
+      actionable: true,
+    }),
+  );
+  show();
+  expect(
+    await screen.findByText("Requester Automation principal"),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Approve/ })).toBeInTheDocument();
+});

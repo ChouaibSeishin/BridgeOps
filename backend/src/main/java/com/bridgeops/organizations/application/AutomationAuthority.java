@@ -43,14 +43,14 @@ public class AutomationAuthority {
     @Transactional(timeout=10)
     public Principal revoke(UUID actor, UUID family, UUID org, UUID id, long expected) { configure(actor, family, org); var row = store.get(org, id, true); if (expected < 0) throw new DomainFailure(400, "INVALID_REQUEST"); if (row.revision() != expected || !row.status().equals("ACTIVE")) throw new DomainFailure(409, "AUTOMATION_CONFLICT"); store.revoke(row, actor, clock.instant()); audit.write(org, actor, IntegrationAudit.Action.AUTOMATION_REVOKED, id, row.revision() + 1, clock.instant()); return view(store.get(org, id, false)); }
     /** No user/session is synthesized. Holds the active tenant/principal locks through its caller's transaction. */
-    @Transactional(propagation=Propagation.MANDATORY)
+    @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public Principal worker(UUID org, UUID id, UUID workflow, UUID version, String hash) {
         organizations.organization(org, true); var row = store.get(org, id, true);
         if (!row.status().equals("ACTIVE")) throw new DomainFailure(403, "AUTOMATION_REVOKED");
         if (!row.workflow().equals(workflow) || !row.version().equals(version) || !row.hash().equals(hash)) throw new DomainFailure(403, "AUTOMATION_SCOPE_DENIED");
         return view(row);
     }
-    @Transactional(propagation=Propagation.MANDATORY)
+    @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
     public void operation(UUID org, UUID id, UUID workflow, UUID version, String hash, Grant operation) {
         var principal = worker(org, id, workflow, version, hash); if (!principal.grants().contains(operation)) throw new DomainFailure(403, "AUTOMATION_SCOPE_DENIED");
     }

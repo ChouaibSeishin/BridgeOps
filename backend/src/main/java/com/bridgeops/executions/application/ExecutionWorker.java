@@ -40,7 +40,7 @@ public class ExecutionWorker implements SmartLifecycle {
     public void dispatch(Claim claim){
         try{
             var task=runtime.prepare(claim);if(task==null)return;
-            var invocation=new SyntheticCapability.Invocation(claim.organization(),task.actor(),task.operation(),task.node().id(),task.node().message());
+            var invocation=new SyntheticCapability.Invocation(claim.organization(),task.actor(),task.operation(),task.node().id(),task.node().message(),task.requester());
             try{
                 if(task.node().type().equals("syntheticAction"))capability.prepare(invocation);
             }catch(SyntheticCapability.Failure failure){runtime.failure(task,failure.kind());return;}

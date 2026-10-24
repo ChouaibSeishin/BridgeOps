@@ -6,6 +6,7 @@ import com.bridgeops.approvals.domain.ApprovalState;
 import com.bridgeops.audit.application.ApprovalAudit;
 import java.time.Instant;
 import java.util.UUID;
+import com.bridgeops.shared.domain.ActorReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 
@@ -15,4 +16,6 @@ class ApprovalLifecycle {
     ApprovalLifecycle(ApprovalStore store,ApprovalAudit audit){this.store=store;this.audit=audit;}
     @Transactional(propagation=Propagation.MANDATORY)
     public void finish(Request r,ApprovalState outcome,String error,UUID actor,Instant now){store.finalize(r,outcome,error,now);store.event(r,actor,"APPROVAL_"+outcome.name(),now);audit.write(r.organization(),actor,ApprovalAudit.Action.valueOf("APPROVAL_"+outcome.name()),r.id(),r.revision()+1,now);}
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void finish(Request r,ApprovalState outcome,String error,ActorReference actor,Instant now){if(actor.type()==ActorReference.Type.USER){finish(r,outcome,error,actor.id(),now);return;}store.finalize(r,outcome,error,now);store.event(r,actor,"APPROVAL_"+outcome.name(),now);audit.write(r.organization(),actor,ApprovalAudit.Action.valueOf("APPROVAL_"+outcome.name()),r.id(),r.revision()+1,now);}
 }

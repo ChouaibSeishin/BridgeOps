@@ -1,12 +1,15 @@
 package com.bridgeops.executions.application;
 
 import java.util.UUID;
+import com.bridgeops.shared.domain.ActorReference;
 import org.springframework.stereotype.Component;
 
 /** Controlled capability boundary. No workflow-supplied code, URLs or failure switches. */
 @Component
 public class SyntheticCapability {
-    public record Invocation(UUID organization,UUID actor,UUID operation,String node,String message) {}
+    public record Invocation(UUID organization,UUID actor,UUID operation,String node,String message,ActorReference requester) {
+        public Invocation(UUID organization,UUID actor,UUID operation,String node,String message){this(organization,actor,operation,node,message,ActorReference.user(actor));}
+    }
     public enum FailureKind { TRANSIENT, PERMANENT, AMBIGUOUS }
     public static final class Failure extends RuntimeException {
         private final FailureKind kind;

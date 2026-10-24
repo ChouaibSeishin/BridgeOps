@@ -10,7 +10,9 @@ export interface Approval {
   versionNumber: number;
   versionId: string;
   definitionHash: string;
-  requestedBy: string;
+  requestedBy: string | null;
+  actor?: import("../../lib/actors").ActorReference;
+  origin?: import("../../lib/actors").AutomationOrigin | null;
   requesterName: string;
   gateNodeId: string;
   actionNodeId: string;
@@ -52,7 +54,7 @@ export interface Approval {
   events: {
     sequence: number;
     occurredAt: string;
-    actor: string;
+    actor: string | null;
     actorName: string;
     code: string;
   }[];

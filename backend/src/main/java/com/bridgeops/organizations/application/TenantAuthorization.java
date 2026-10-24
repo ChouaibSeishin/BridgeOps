@@ -32,6 +32,9 @@ public class TenantAuthorization {
         identities.lockDurableActor(actor);
         organizations.lockDurable(organization);
     }
+    /** Locks durable tenant history only; it authorizes no automated dispatch or effect. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void lockDurableOrganization(UUID organization){organizations.lockDurable(organization);}
     /** Trusted durable worker context; browser session expiry is not execution authority. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void worker(UUID user, UUID organization) {
