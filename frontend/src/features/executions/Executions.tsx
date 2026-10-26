@@ -10,6 +10,7 @@ import type { User } from "../../lib/session";
 import { useWorkflowAccess } from "../workflows/useWorkflowAccess";
 import { Pager, Problem } from "../workflows/Feedback";
 import { nodeSchema } from "../workflows/model";
+import { canvasTypes } from "../workflows/canvasModel";
 import { executionApi, executionFailure, active } from "./api";
 import type { Execution, Step } from "./api";
 
@@ -43,7 +44,7 @@ export function ExecutionList({ user }: { user: User }) {
         <div>
           <div className="eyebrow">PERSISTED OPERATIONS</div>
           <h1>Execution history</h1>
-          <p>Actual internal workflow executions and partial outcomes.</p>
+          <p>Persisted workflow executions and partial outcomes.</p>
         </div>
         <Link to={`/organizations/${id}/workflows`}>
           Organization workflows
@@ -141,7 +142,7 @@ export function ExecutionDetail({ user }: { user: User }) {
         <div>
           <div className="eyebrow">DURABLE EXECUTION</div>
           <h1>Execution detail</h1>
-          <p>Persisted state and internal operation receipts.</p>
+          <p>Persisted state and registered operation receipts.</p>
         </div>
         <Link to={`/organizations/${id}/executions`}>All executions</Link>
       </div>
@@ -240,10 +241,8 @@ function ExecutionWorkspace({
     counts.set(step.type, n);
     names.set(
       step.nodeId,
-      (nodeSchema(step.type)?.label ?? "Step") +
-        (step.type === "syntheticAction" || step.type === "approval"
-          ? ` ${n}`
-          : ""),
+      (nodeSchema(step.type)?.label ?? canvasTypes[step.type] ?? "Step") +
+        (!step.type.endsWith("Trigger") && step.type !== "end" ? ` ${n}` : ""),
     );
   }
   async function mutate() {
@@ -344,6 +343,8 @@ function ExecutionWorkspace({
           <p role="alert">
             Reason: {stateLabel(e.errorCode)}. Earlier completed effects remain
             recorded.
+            {e.errorCode === "RECONCILIATION_REQUIRED" &&
+              " An operation may have completed without a committed result. Inspect the original operation before submitting a new intent."}
           </p>
         )}
         <Link
@@ -430,7 +431,7 @@ function ExecutionWorkspace({
             </h3>
             <p>
               {confirm === "cancel"
-                ? "Completed effects will remain. Cancellation prevents further dispatch at cooperative checkpoints."
+                ? "Completed effects will remain. Cancellation prevents further dispatch at cooperative checkpoints; it cannot recall an external request already sent."
                 : "A new linked execution reuses committed operation receipts and receives a new explicit 24-hour deadline. The original remains failed."}
             </p>
             <label>
@@ -560,6 +561,13 @@ function StepView({ step, name }: { step: Step; name: string }) {
       <details>
         <summary>Technical step details</summary>
         <code>{step.nodeId}</code> · position {step.position}
+        {step.logicalOperationId && (
+          <p>
+            Logical operation ID: <code>{step.logicalOperationId}</code>. Use
+            this identifier to reconcile the original provider operation when
+            supported.
+          </p>
+        )}
       </details>
     </li>
   );

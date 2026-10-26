@@ -59,6 +59,7 @@ beforeEach(() => {
   vi.spyOn(executionApi, "steps").mockResolvedValue([
     {
       nodeId: "stable-node",
+      logicalOperationId: "46b99545-0200-41a0-b47f-238d432001de",
       position: 0,
       type: "syntheticAction",
       status: "SUCCEEDED",
@@ -94,6 +95,41 @@ beforeEach(() => {
   );
 });
 afterEach(() => vi.restoreAllMocks());
+it("uses friendly numbered labels for registered HTTP steps in results, attempts and timeline", async () => {
+  vi.mocked(executionApi.steps).mockResolvedValue(
+    [0, 1].map((position) => ({
+      nodeId: `http_${position}`,
+      position,
+      type: "configuredHttp",
+      status: "SUCCEEDED",
+      attemptCount: 1,
+      startedAt: null,
+      completedAt: null,
+      output: null,
+      errorCode: null,
+    })),
+  );
+  show();
+  expect(
+    await screen.findByRole("heading", {
+      name: "Configured HTTP 1 · SUCCEEDED",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Configured HTTP 2 · SUCCEEDED" }),
+  ).toBeInTheDocument();
+});
+it("exposes the stable logical operation only in secondary technical details for reconciliation", async () => {
+  show();
+  const identifier = await screen.findByText(
+    "46b99545-0200-41a0-b47f-238d432001de",
+  );
+  const details = identifier.closest("details");
+  expect(details).not.toHaveAttribute("open");
+  expect(
+    within(details!).getByText("Technical step details"),
+  ).toBeInTheDocument();
+});
 function show(
   route = "/organizations/org/executions/execution",
   start = false,

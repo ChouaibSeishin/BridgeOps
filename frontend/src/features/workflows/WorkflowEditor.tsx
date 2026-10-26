@@ -196,7 +196,8 @@ function DraftWorkspace({
       <p className="phase-note">
         Publication freezes a snapshot without running it. Explicit execution
         supports internal records, registered ticket/team operations, internal
-        notifications and distinct-human approval gates.
+        notifications, configured REST operations and distinct-human approval
+        gates.
       </p>
       {!archived && (
         <ExecutionStart

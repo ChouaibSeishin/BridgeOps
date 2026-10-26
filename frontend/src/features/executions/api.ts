@@ -34,6 +34,7 @@ export interface Execution {
   approvalExpiresAt?: string | null;
 }
 export interface Step {
+  logicalOperationId?: string;
   retryAt?: string | null;
   nodeId: string;
   position: number;

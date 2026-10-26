@@ -22,6 +22,7 @@ export function ExecutionStart({
 }) {
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState(false);
+  const [externalAcknowledged, setExternalAcknowledged] = useState(false);
   const [delay, setDelay] = useState(0);
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
@@ -58,12 +59,14 @@ export function ExecutionStart({
     schemaVersion !== 2 ||
     Boolean(preview && preview.manual && !preview.unsupported && input);
   function updateValue(name: string, value: string) {
+    setExternalAcknowledged(false);
     setValues((before) => ({ ...before, [name]: value }));
     setKey(crypto.randomUUID());
     setError("");
   }
   async function start() {
-    if (!version || !inputReady) return;
+    if (!version || !inputReady || (preview?.external && !externalAcknowledged))
+      return;
     setBusy(true);
     setError("");
     try {
@@ -87,9 +90,10 @@ export function ExecutionStart({
       <h2>Published execution</h2>
       <p>
         Run the saved published version with registered internal records,
-        ticket/team operations and internal notifications. Publishing and
-        editing never start an execution. Approval gates and organization policy
-        pause protected operations for a different eligible person.
+        ticket/team operations, internal notifications and configured REST
+        operations. Publishing and editing never start an execution. Approval
+        gates and organization policy pause protected operations for a different
+        eligible person.
       </p>
       {permissions.includes("execution.read") && (
         <Link
@@ -104,6 +108,7 @@ export function ExecutionStart({
           disabled={!version || disabled || busy}
           onClick={() => {
             setConfirm(true);
+            setExternalAcknowledged(false);
             setError("");
             setSnapshot(null);
             setSnapshotError(false);
@@ -130,14 +135,20 @@ export function ExecutionStart({
           aria-labelledby="execution-confirm-title"
           className="confirmation-panel"
         >
-          <h3 id="execution-confirm-title">Start internal execution?</h3>
+          <h3 id="execution-confirm-title">
+            {preview?.external
+              ? "Start external workflow execution?"
+              : "Start internal execution?"}
+          </h3>
           <p>
-            This runs supported internal records, ticket/team operations and
-            internal notifications using the exact published snapshot. No
-            external service is contacted. Required approval waits for a
-            different eligible human; starting never approves it. The 24-hour
-            deadline includes queue time, approval waits and the optional start
-            delay.
+            {preview?.external
+              ? "This published version can contact its configured external provider and perform approved writes. External effects cannot be undone by cancelling this execution. An uncertain write outcome requires reconciliation before any new submission. "
+              : schemaVersion === 2 && !preview
+                ? "Inspect the published inputs and registered operations before confirming. "
+                : "This runs supported internal records, ticket/team operations and internal notifications using the exact published snapshot. No external service is contacted. "}
+            Required approval waits for a different eligible human; starting
+            never approves it. The 24-hour deadline includes queue time,
+            approval waits and the optional start delay.
           </p>
           <details>
             <summary>Pinned version ID</summary>
@@ -236,6 +247,8 @@ export function ExecutionStart({
                       <strong>{effect.label}</strong>: {effect.operation}
                       {effect.protected &&
                         " — distinct-human approval required"}
+                      {effect.external &&
+                        " — configured external writes require distinct-human approval"}
                       <details>
                         <summary>Operation binding details</summary>
                         <p>
@@ -267,12 +280,27 @@ export function ExecutionStart({
               value={delay}
               disabled={busy}
               onChange={(event) => {
+                setExternalAcknowledged(false);
                 setDelay(event.target.valueAsNumber);
                 setKey(crypto.randomUUID());
                 setError("");
               }}
             />
           </label>
+          {preview?.external && (
+            <label>
+              <input
+                type="checkbox"
+                checked={externalAcknowledged}
+                disabled={busy}
+                onChange={(event) =>
+                  setExternalAcknowledged(event.target.checked)
+                }
+              />
+              I acknowledge that these configured operations may contact an
+              external provider and create effects.
+            </label>
+          )}
           {error && <p role="alert">{error}</p>}
           {busy && <p role="status">Submitting durable execution…</p>}
           <div className="action-row">
@@ -281,13 +309,16 @@ export function ExecutionStart({
               disabled={
                 busy ||
                 !inputReady ||
+                (Boolean(preview?.external) && !externalAcknowledged) ||
                 !Number.isInteger(delay) ||
                 delay < 0 ||
                 delay > 3600
               }
               onClick={() => void start()}
             >
-              Confirm internal execution
+              {preview?.external
+                ? "Confirm external execution"
+                : "Confirm internal execution"}
             </button>
             <button
               className="button"

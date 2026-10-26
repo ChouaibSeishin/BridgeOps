@@ -100,7 +100,7 @@ public class ExecutionService {
     @Transactional(readOnly=true,timeout=5)
     public List<Step> steps(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"execution.read");store.get(org,id,false);
         var due=store.due(org,id);
-        return store.steps(org,id).stream().map(s->new Step(s.node(),s.position(),s.type(),s.state(),s.attempts(),s.started(),s.completed(),s.output()==null?null:graphs.parse(s.output()),s.error(),s.state().equals("WAITING_FOR_RETRY")?due:null)).toList();
+        return store.steps(org,id).stream().map(s->new Step(s.node(),s.position(),s.type(),s.state(),s.attempts(),s.started(),s.completed(),s.output()==null?null:graphs.parse(s.output()),s.error(),s.state().equals("WAITING_FOR_RETRY")?due:null,s.operation())).toList();
     }
     @Transactional(readOnly=true,timeout=5)
     public Page<Attempt> attempts(UUID actor,UUID family,UUID org,UUID id,int page,int size){authority.read(actor,family,org,"execution.read");store.get(org,id,false);bounds(page,size);

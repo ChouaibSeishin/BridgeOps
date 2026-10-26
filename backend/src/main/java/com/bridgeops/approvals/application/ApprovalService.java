@@ -26,7 +26,7 @@ public class ApprovalService {
         long policyVersion,JsonNode policySnapshot,Instant createdAt,Instant expiresAt,Instant deadlineAt,
         ApprovalState status,long revision,Instant finalizedAt,String errorCode,String executionStatus,boolean actionable,boolean invalidated,
         DecisionView decision,List<EventView> events,String workflowName,int versionNumber,String requesterName,
-        int intentSchemaVersion,String classification,OperationApprovalIntent.Connection connection,ActorReference actor,AutomationOrigin origin) {}
+        int intentSchemaVersion,String classification,OperationApprovalIntent.Connection connection,ActorReference actor,AutomationOrigin origin,String canonicalArguments) {}
     public record Page(List<View> items,int page,int size,long totalElements,long totalPages) {}
     private final ApprovalStore store;private final TenantAuthorization authority;private final ApprovalExecutionContext executions;
     private final ApprovalLifecycle lifecycle;private final ApprovalAudit audit;private final Clock clock;
@@ -94,7 +94,7 @@ public class ApprovalService {
         var decision=recorded.map(d->new DecisionView(d.id(),d.actor(),d.decision(),d.at(),d.expectedRevision(),d.reason(),name.apply(d.actor()))).orElse(null);
         var events=history.stream().map(v->new EventView(v.sequence(),v.occurredAt(),v.actor(),v.code(),v.actor()==null?"Automation principal":name.apply(v.actor()))).toList();
         var intent=r.generalized()?r.operationIntent():null;
-        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),intent==null?"synthetic":intent.capability(),intent==null?"record":intent.operation(),json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),r.requester()==null?"Automation principal":name.apply(r.requester()),intent==null?1:2,intent==null?"WRITE":intent.classification(),intent==null?null:intent.connection(),r.actorReference(),e.origin());
+        return new View(r.id(),r.execution(),e.workflow(),r.version(),r.definitionHash(),r.requester(),r.gate(),r.action(),r.prompt(),intent==null?"synthetic":intent.capability(),intent==null?"record":intent.operation(),json.readTree(r.arguments()),r.argumentHash(),r.intentHash(),r.policyVersion(),json.readTree(r.policySnapshot()),r.created(),r.expires(),r.deadline(),r.state(),r.revision(),r.finalized(),r.error(),e.status(),actionable,invalid,decision,events,e.workflowName(),e.versionNumber(),r.requester()==null?"Automation principal":name.apply(r.requester()),intent==null?1:2,intent==null?"WRITE":intent.classification(),intent==null?null:intent.connection(),r.actorReference(),e.origin(),detail?r.arguments():null);
     }
     private PolicyView policyView(Policy p){return new PolicyView(p.version(),p.version(),p.required(),p.lifetime());}
 }

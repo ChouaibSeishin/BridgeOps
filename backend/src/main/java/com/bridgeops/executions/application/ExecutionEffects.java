@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 public class ExecutionEffects {
     public record Context(UUID organization,UUID execution,UUID actor,UUID workflow,UUID version,String hash,
         String node,String type,String configuration,String inputs,UUID logicalOperation,String blueprintHash,
-        String gate,String prompt,boolean explicit,Instant deadline,Set<UUID> lockedActors,String stepStatus,ActorReference requester,AutomationOrigin origin){
+        String gate,String prompt,boolean explicit,Instant deadline,Set<UUID> lockedActors,String stepStatus,int attempt,ActorReference requester,AutomationOrigin origin){
         public Context{lockedActors=Set.copyOf(lockedActors);}
         @Override public String toString(){return "ExecutionEffectContext[REDACTED]";}
     }
@@ -43,10 +43,10 @@ public class ExecutionEffects {
         if(e.requester().excludes(actor))throw new DomainFailure(403,"SELF_APPROVAL_FORBIDDEN");
         if(e.state()!=ExecutionState.WAITING_FOR_APPROVAL||!e.deadline().isAfter(clock.instant())||store.jdbc().queryForList("SELECT execution_id FROM execution_work_items WHERE organization_id=? AND execution_id=? AND state='WAITING' FOR UPDATE",org,execution).isEmpty())throw new DomainFailure(409,"EXECUTION_NOT_WAITING");
         var snapshot=browserWorkflows.version(actor,family,org,e.workflow(),e.version());if(!snapshot.version().definitionHash().equals(e.hash()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
-        var plan=ExecutionPlan.runtime(snapshot.definition(),definitions);if(e.position()>=plan.size())throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");var data=new ExecutionGraphData(store,definitions,clock);var target=data.action(snapshot.definition(),plan,e.position());if(!target.id().equals(action)||!Set.of("capabilityAction","notification").contains(target.type()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
+        var plan=ExecutionPlan.runtime(snapshot.definition(),definitions);if(e.position()>=plan.size())throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");var data=new ExecutionGraphData(store,definitions,clock);var target=data.action(snapshot.definition(),plan,e.position());if(!target.id().equals(action)||!Set.of("capabilityAction","notification","configuredHttp").contains(target.type()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         var step=store.steps(org,execution).stream().filter(s->s.node().equals(action)).findFirst().orElseThrow();var binding=new OperationInputStore(store.jdbc()).read(org,execution,action).orElseThrow(()->new DomainFailure(409,"RECONCILIATION_REQUIRED"));if(!binding.id().equals(prepared)||!binding.blueprintHash().equals(target.argumentHash())||!binding.logicalOperation().equals(step.operation()))throw new DomainFailure(409,"APPROVAL_INTENT_MISMATCH");
         var mapped=store.jdbc().queryForList("SELECT arguments_json FROM execution_step_inputs WHERE organization_id=? AND execution_id=? AND node_id=?",String.class,org,execution,action);if(mapped.isEmpty())throw new DomainFailure(409,"RECONCILIATION_REQUIRED");var gate=data.gate(e,snapshot.definition(),plan,e.position());
-        return new Decision(new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(data.node(snapshot.definition(),action).path("config")),mapped.getFirst(),step.operation(),step.argumentHash(),gate.id(),gate.prompt(),gate.type().equals("approval"),e.deadline(),Set.of(actor),step.state(),e.requester(),e.automation()),new CapabilityDispatch.Binding(binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),binding.argumentHash()));
+        return new Decision(new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(data.node(snapshot.definition(),action).path("config")),mapped.getFirst(),step.operation(),step.argumentHash(),gate.id(),gate.prompt(),gate.type().equals("approval"),e.deadline(),Set.of(actor),step.state(),step.attempts(),e.requester(),e.automation()),new CapabilityDispatch.Binding(binding.id(),binding.capability(),binding.operation(),binding.classification(),binding.connection(),binding.arguments(),binding.argumentHash()));
     }
     /** Rechecks the live actor/grant behind an independently derived context; returns no bearer authority. */
     @Transactional(propagation=Propagation.MANDATORY,noRollbackFor=DomainFailure.class)
@@ -65,9 +65,9 @@ public class ExecutionEffects {
     }
     private CapabilityDispatch.Binding bind(Context context,String capability,String operation,String classification,OperationApprovalIntent.Connection connection,String arguments,boolean resume){
         var config=definitions.parse(context.configuration());
-        String name=capability+"."+operation;String expected=switch(name){case "support.list","support.get","teams.list","teams.get","teams.resolve"->"READ";case "support.assignBatch","support.addNote","notifications.create"->"WRITE";default->throw new DomainFailure(422,"UNSUPPORTED_CAPABILITY_OPERATION");};
+        boolean rest=context.type().equals("configuredHttp");String name=rest?operation:capability+"."+operation;String expected=rest?classification:switch(name){case "support.list","support.get","teams.list","teams.get","teams.resolve"->"READ";case "support.assignBatch","support.addNote","notifications.create"->"WRITE";default->throw new DomainFailure(422,"UNSUPPORTED_CAPABILITY_OPERATION");};
         String declared=context.type().equals("notification")?"notifications.create":config.path("operation").asString();
-        if(!Set.of("capabilityAction","notification").contains(context.type())||connection==null||!expected.equals(classification)
+        if(!Set.of("capabilityAction","notification","configuredHttp").contains(context.type())||rest&&(!capability.equals("rest")||!Set.of("READ","WRITE").contains(classification))||!rest&&capability.equals("rest")||connection==null||!expected.equals(classification)
             ||!declared.equals(name)||!config.path("integrationId").asString().equals(connection.id().toString())||config.path("revision").asLong()!=connection.revision()||!connection.operationId().equals(operation))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
         var inputs=new OperationInputStore(store.jdbc());
         if(resume){var saved=inputs.read(context.organization(),context.execution(),context.node()).orElseThrow(()->new DomainFailure(409,"RECONCILIATION_REQUIRED"));
@@ -87,10 +87,10 @@ public class ExecutionEffects {
         }else if(e.state()!=ExecutionState.RUNNING||!store.guard(new ExecutionStore.Claim(org,execution,work.owner(),work.fence()),clock.instant()))throw new DomainFailure(409,"EXECUTION_OWNERSHIP_LOST");
         var plan=ExecutionPlan.runtime(snapshot.graph(),definitions);if(e.position()>=plan.size())throw new DomainFailure(409,"EXECUTION_NOT_DISPATCHABLE");
         var current=plan.get(e.position());var graphData=new ExecutionGraphData(store,definitions,clock);var target=graphData.action(snapshot.graph(),plan,e.position());
-        if(!target.id().equals(action)||!Set.of("capabilityAction","notification").contains(target.type())||mode==Mode.DISPATCH&&(!current.id().equals(action)||!store.steps(org,execution).get(e.position()).state().equals("RUNNING")))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
+        if(!target.id().equals(action)||!Set.of("capabilityAction","notification","configuredHttp").contains(target.type())||mode==Mode.DISPATCH&&(!current.id().equals(action)||!store.steps(org,execution).get(e.position()).state().equals("RUNNING")))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
         var step=store.steps(org,execution).stream().filter(s->s.node().equals(action)).findFirst().orElseThrow();if(!step.argumentHash().equals(target.argumentHash()))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");
         var node=graphData.node(snapshot.graph(),action);JsonNode input=graphData.inputs(e,snapshot.graph(),action,current.type().equals("approval")?current.id():null);
         var gate=graphData.gate(e,snapshot.graph(),plan,e.position());boolean explicit=gate.type().equals("approval");
-        return new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(node.path("config")),definitions.stableValue(input),step.operation(),step.argumentHash(),gate.id(),explicit?gate.prompt():"Review the exact registered operation",explicit,e.deadline(),declaredActors,step.state(),e.requester(),e.automation());
+        return new Context(org,execution,e.actor(),e.workflow(),e.version(),e.hash(),action,target.type(),definitions.stableValue(node.path("config")),definitions.stableValue(input),step.operation(),step.argumentHash(),gate.id(),explicit?gate.prompt():"Review the exact registered operation",explicit,e.deadline(),declaredActors,step.state(),step.attempts(),e.requester(),e.automation());
     }
 }

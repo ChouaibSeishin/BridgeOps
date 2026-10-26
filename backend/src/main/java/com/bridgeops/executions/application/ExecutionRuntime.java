@@ -29,7 +29,7 @@ public class ExecutionRuntime {
     private final ApprovalRuntime approvals;
     private final ExecutionGraphData data;
     private final CapabilityDispatch capabilities;
-    private final ExecutionActors actorAuthority;
+    private final ExecutionActors actorAuthority;private final ExternalDispatch external;
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals){
         this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,null);
@@ -38,14 +38,18 @@ public class ExecutionRuntime {
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities){
         this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,capabilities,null);
     }
-    @org.springframework.beans.factory.annotation.Autowired
     public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
         WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities,ExecutionActors actorAuthority){
+        this(store,manager,authority,workflows,graphs,service,audit,clock,randomness,approvals,capabilities,actorAuthority,null);
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExecutionRuntime(ExecutionStore store,PlatformTransactionManager manager,TenantAuthorization authority,WorkflowRuntime workflows,
+        WorkflowDefinitions graphs,ExecutionService service,ExecutionAudit audit,Clock clock,ExecutionRandom randomness,ApprovalRuntime approvals,CapabilityDispatch capabilities,ExecutionActors actorAuthority,ExternalDispatch external){
         this.store=store;this.jdbc=store.jdbc();this.tx=new TransactionTemplate(manager);tx.setTimeout(10);
         this.authority=authority;this.workflows=workflows;this.graphs=graphs;this.service=service;this.audit=audit;this.clock=clock;this.retries=new RetryPolicy(randomness::sample);this.approvals=approvals;
         this.data=new ExecutionGraphData(store,graphs,clock);
         this.capabilities=capabilities;
-        this.actorAuthority=actorAuthority;
+        this.actorAuthority=actorAuthority;this.external=external;
     }
     public Claim claim(UUID owner,int globalLimit,int tenantLimit,int leaseSeconds){
         if(globalLimit<1||globalLimit>16||tenantLimit<1||tenantLimit>globalLimit||leaseSeconds<5||leaseSeconds>120)throw new IllegalArgumentException("Invalid worker bounds.");
@@ -97,7 +101,7 @@ public class ExecutionRuntime {
                 }
             }
         }
-        if(node.type().equals("approval")||node.type().equals("syntheticAction")||Set.of("capabilityAction","notification").contains(node.type())){
+        if(node.type().equals("approval")||node.type().equals("syntheticAction")||Set.of("capabilityAction","notification","configuredHttp").contains(node.type())){
             var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);
             if(handleGate(e,c,node,gate,now))return null;
             if(node.type().equals("approval")){fail(e,"RECONCILIATION_REQUIRED",now);return null;}
@@ -109,7 +113,8 @@ public class ExecutionRuntime {
         return new Dispatch(c,node,e.actor(),step.operation(),e.requester());
     });}
     /** Effect, receipt, successful attempt and step result share one fenced database transaction. */
-    public boolean complete(Dispatch dispatch){return Boolean.TRUE.equals(tx.execute(status->{
+    public boolean complete(Dispatch dispatch){return complete(dispatch,null);}
+    public boolean complete(Dispatch dispatch,ExternalDispatch.Observation observation){return Boolean.TRUE.equals(tx.execute(status->{
         var c=dispatch.claim();var preview=store.get(c.organization(),c.execution(),false);var actors=workerActors(preview);worker(preview);var e=owned(c);if(e==null)return false;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return false;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
@@ -132,6 +137,10 @@ public class ExecutionRuntime {
                 jdbc.update("INSERT INTO execution_operation_receipts(organization_id,logical_operation_id,capability,item_id,argument_hash,result_json,committed_at) VALUES(?,?,'synthetic.record',?,?,?,?)",e.organization(),step.operation(),step.node(),step.argumentHash(),output,time(now));
                 store.event(e,"RECORD_COMMITTED",step.node(),now);
             }
+        }else if(step.type().equals("configuredHttp")){
+            var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);if(gate.result()!=ApprovalRuntime.Result.ALLOW){failCapability(e,step,null,"RECONCILIATION_REQUIRED",now);return false;}
+            try{if(external==null)throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");var result=external.finish(work(c,actors),step.node(),observation);output=result.output();if(result.reused())store.event(e,"RECEIPT_REUSED",step.node(),now);store.event(e,result.failure()==null?"EXTERNAL_RESULT_COMMITTED":result.failure()==SyntheticCapability.FailureKind.AMBIGUOUS?"EXTERNAL_OUTCOME_UNKNOWN":"EXTERNAL_OPERATION_FAILED",step.node(),now);if(result.failure()!=null){failedAttempt(e,step,c,result.failure(),result.code(),result.retryAfter(),now);return false;}}
+            catch(DomainFailure invalid){if(invalid.status()==403)throw invalid;failCapability(e,step,null,invalid.code(),now);return false;}
         }else if(Set.of("capabilityAction","notification").contains(step.type())){
             var gate=checkedGate(e,plan,snapshot.graph(),actors,false,c);if(handleGate(e,c,dispatch.node(),gate,now))return false;
             try{var result=capabilities.perform(work(c,actors),step.node());output=result.output();if(result.reused())store.event(e,"RECEIPT_REUSED",step.node(),now);if(result.failed()){failCapability(e,step,output,result.code(),now);return false;}}
@@ -155,21 +164,30 @@ public class ExecutionRuntime {
         if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return;}
         if(e.position()==store.steps(e.organization(),e.id()).size())succeed(e,clock.instant());else store.release(c,clock.instant(),false);
     });}
-    public void failure(Dispatch dispatch,SyntheticCapability.FailureKind kind){tx.executeWithoutResult(status->{
+    /** Only the port implementation performs I/O; this method leaves its context transaction first. */
+    public ExternalDispatch.Observation executeExternal(Dispatch dispatch){
+        if(external==null)throw new DomainFailure(422,"UNSUPPORTED_RUNTIME_NODE");
+        var reference=tx.execute(status->{var preview=store.get(dispatch.claim().organization(),dispatch.claim().execution(),false);var actors=workerActors(preview);worker(preview);var e=owned(dispatch.claim());if(e==null)return null;if(!e.deadline().isAfter(clock.instant())){fail(e,"DEADLINE_EXCEEDED",clock.instant());return null;}var step=store.steps(e.organization(),e.id()).get(e.position());var plan=ExecutionPlan.runtime(snapshot(e).graph(),graphs);if(!step.state().equals("RUNNING")||!step.type().equals("configuredHttp")||!dispatch.node().equals(plan.get(e.position()))||!dispatch.operation().equals(step.operation())||!Objects.equals(dispatch.actor(),e.actor())||!dispatch.requester().equals(e.requester()))throw new DomainFailure(409,"OPERATION_INTENT_MISMATCH");store.event(e,"EXTERNAL_DISPATCH_REQUESTED",step.node(),clock.instant());return work(dispatch.claim(),actors);});
+        return reference==null?null:external.execute(reference,dispatch.node().id());
+    }
+    public void failure(Dispatch dispatch,SyntheticCapability.FailureKind kind){failure(dispatch,kind,switch(kind){case TRANSIENT->"TRANSIENT_FAILURE";case PERMANENT->"PERMANENT_FAILURE";case AMBIGUOUS->"RECONCILIATION_REQUIRED";});}
+    public void failure(Dispatch dispatch,SyntheticCapability.FailureKind kind,String code){tx.executeWithoutResult(status->{
+        if(code==null||!code.matches("[A-Z_]{1,48}"))throw new IllegalArgumentException("Invalid safe failure code.");
         var c=dispatch.claim();lockContext(c);var e=owned(c);if(e==null)return;Instant now=clock.instant();
         if(!e.deadline().isAfter(now)){fail(e,"DEADLINE_EXCEEDED",now);return;}
-        var step=store.steps(e.organization(),e.id()).get(e.position());
-        if(!step.node().equals(dispatch.node().id())||!step.state().equals("RUNNING"))return;
-        String code=switch(kind){case TRANSIENT->"TRANSIENT_FAILURE";case PERMANENT->"PERMANENT_FAILURE";case AMBIGUOUS->"RECONCILIATION_REQUIRED";};
-        attempt(e,step,code,code,now);
-        jdbc.update("UPDATE execution_steps SET status=?,error_code=?,completed_at=? WHERE organization_id=? AND execution_id=? AND node_id=?",kind==SyntheticCapability.FailureKind.TRANSIENT&&step.attempts()<3?"WAITING_FOR_RETRY":"FAILED",code,kind==SyntheticCapability.FailureKind.TRANSIENT&&step.attempts()<3?null:time(now),e.organization(),e.id(),step.node());
-        if(kind==SyntheticCapability.FailureKind.TRANSIENT&&step.attempts()<3){
-            Instant due=now.plus(retries.delay(step.attempts()));store.state(e,ExecutionState.WAITING_FOR_RETRY,code,now);store.event(e,"RETRY_SCHEDULED",step.node(),now);store.release(c,due,false);
-        }else fail(e,kind==SyntheticCapability.FailureKind.TRANSIENT?"TRANSIENT_EXHAUSTED":code,now);
+        var step=store.steps(e.organization(),e.id()).get(e.position());if(!step.node().equals(dispatch.node().id())||!step.state().equals("RUNNING"))return;
+        failedAttempt(e,step,c,kind,code,null,now);
     });}
+    private void failedAttempt(Execution e,Step step,Claim c,SyntheticCapability.FailureKind kind,String code,Duration retryAfter,Instant now){
+        String outcome=switch(kind){case TRANSIENT->"TRANSIENT_FAILURE";case PERMANENT->"PERMANENT_FAILURE";case AMBIGUOUS->"RECONCILIATION_REQUIRED";};
+        attempt(e,step,outcome,code,now);boolean retry=kind==SyntheticCapability.FailureKind.TRANSIENT&&step.attempts()<3;
+        jdbc.update("UPDATE execution_steps SET status=?,error_code=?,completed_at=? WHERE organization_id=? AND execution_id=? AND node_id=?",retry?"WAITING_FOR_RETRY":"FAILED",code,retry?null:time(now),e.organization(),e.id(),step.node());
+        if(retry){Duration delay=retries.delay(step.attempts());if(retryAfter!=null&&!retryAfter.isNegative()&&retryAfter.compareTo(delay)>0)delay=retryAfter.compareTo(Duration.ofSeconds(60))>0?Duration.ofSeconds(60):retryAfter;Instant due=now.plus(delay);if(due.isAfter(e.deadline()))due=e.deadline();store.state(e,ExecutionState.WAITING_FOR_RETRY,code,now);store.event(e,"RETRY_SCHEDULED",step.node(),now);store.release(c,due,false);}
+        else fail(e,kind==SyntheticCapability.FailureKind.TRANSIENT?"TRANSIENT_EXHAUSTED":code,now);
+    }
     public void permissionDenied(Claim c){tx.executeWithoutResult(status->{lockContext(c);var e=owned(c);if(e!=null)fail(e,"PERMISSION_REVOKED",clock.instant());});}
     private void failCapability(Execution e,Step step,String output,String code,Instant now){
-        if(step.state().equals("RUNNING")&&step.attempts()>0)attempt(e,step,code.equals("DEADLINE_EXCEEDED")?"DEADLINE_EXCEEDED":"PERMANENT_FAILURE",code,now);
+        if(step.state().equals("RUNNING")&&step.attempts()>0)attempt(e,step,code.equals("DEADLINE_EXCEEDED")?"DEADLINE_EXCEEDED":code.equals("RECONCILIATION_REQUIRED")?"RECONCILIATION_REQUIRED":"PERMANENT_FAILURE",code,now);
         jdbc.update("UPDATE execution_steps SET status='FAILED',completed_at=?,output_json=?,error_code=? WHERE organization_id=? AND execution_id=? AND node_id=?",time(now),output,code,e.organization(),e.id(),step.node());
         store.event(e,"STEP_FAILED",step.node(),now);fail(e,code,now);
     }
@@ -221,7 +239,7 @@ public class ExecutionRuntime {
     private void worker(Execution e){if(actorAuthority!=null)actorAuthority.worker(e);else if(e.automation()==null)authority.trusted(e.actor(),e.organization(),"execution.run");else throw new DomainFailure(403,"AUTOMATION_SCOPE_DENIED");}
     private void durable(Execution e){if(e.automation()==null)authority.lockDurableContext(e.actor(),e.organization());else authority.lockDurableOrganization(e.organization());}
     private ApprovalRuntime.Gate checkedGate(Execution e,List<ExecutionPlan.Node> plan,tools.jackson.databind.JsonNode graph,Set<UUID> actors,boolean resume,Claim claim){
-        var action=data.action(graph,plan,e.position());boolean capability=Set.of("capabilityAction","notification").contains(action.type());
+        var action=data.action(graph,plan,e.position());boolean capability=Set.of("capabilityAction","notification","configuredHttp").contains(action.type());
         try{
             if(capability){
                 if(capabilities==null)return new ApprovalRuntime.Gate(ApprovalRuntime.Result.FAIL,null,"UNSUPPORTED_RUNTIME_NODE",false);
@@ -248,7 +266,7 @@ public class ExecutionRuntime {
     }
     private boolean handleGate(Execution e,Claim c,ExecutionPlan.Node node,ApprovalRuntime.Gate gate,Instant now){
         if(gate.result()==ApprovalRuntime.Result.ALLOW)return false;
-        if(gate.result()==ApprovalRuntime.Result.FAIL){if(Set.of("capabilityAction","notification").contains(node.type())||Set.of("INVALID_CAPABILITY_INPUT","INVALID_CAPABILITY_BINDING","STALE_CONNECTION","INTEGRATION_DISABLED","STALE_TICKET_PLAN","NOT_FOUND").contains(gate.error()))failCapability(e,store.steps(e.organization(),e.id()).get(e.position()),null,gate.error(),now);else fail(e,gate.error(),now);return true;}
+        if(gate.result()==ApprovalRuntime.Result.FAIL){if(Set.of("capabilityAction","notification","configuredHttp").contains(node.type())||Set.of("INVALID_CAPABILITY_INPUT","INVALID_CAPABILITY_BINDING","STALE_CONNECTION","INTEGRATION_DISABLED","STALE_TICKET_PLAN","NOT_FOUND").contains(gate.error()))failCapability(e,store.steps(e.organization(),e.id()).get(e.position()),null,gate.error(),now);else fail(e,gate.error(),now);return true;}
         var step=store.steps(e.organization(),e.id()).get(e.position());
         if(gate.result()==ApprovalRuntime.Result.RECHECK_ACTORS){
             if(step.state().equals("RUNNING")){attempt(e,step,"INTERRUPTED","ACTOR_SET_CHANGED",now);jdbc.update("UPDATE execution_steps SET status='WAITING_FOR_RETRY',error_code='ACTOR_SET_CHANGED' WHERE organization_id=? AND execution_id=? AND node_id=?",e.organization(),e.id(),step.node());store.state(e,ExecutionState.WAITING_FOR_RETRY,"ACTOR_SET_CHANGED",now);}

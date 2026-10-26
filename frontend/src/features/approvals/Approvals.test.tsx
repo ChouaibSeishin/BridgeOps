@@ -83,6 +83,28 @@ beforeEach(() => {
   vi.spyOn(approvalApi, "policy").mockResolvedValue(policy);
 });
 afterEach(() => vi.restoreAllMocks());
+it("renders the server's exact canonical numeric intent without browser rounding", async () => {
+  const canonical =
+    '{"fields":{"amount":9223372036854775807},"pathParameters":{}}';
+  vi.mocked(approvalApi.get).mockResolvedValue(
+    request({
+      capability: "rest",
+      operation: "update",
+      intentSchemaVersion: 2,
+      classification: "WRITE",
+      arguments: {
+        fields: { amount: Number("9223372036854775807") },
+        pathParameters: {},
+      },
+      canonicalArguments: canonical,
+    }),
+  );
+  show();
+  const proposed = await screen.findByLabelText("Exact proposed arguments");
+  expect(proposed.textContent).toBe(canonical);
+  expect(proposed).toHaveTextContent("9223372036854775807");
+  expect(proposed.textContent).not.toContain("9223372036854776000");
+});
 function show(path = "/organizations/org/approvals/approval", actor = user) {
   const client = new QueryClient({
     defaultOptions: {

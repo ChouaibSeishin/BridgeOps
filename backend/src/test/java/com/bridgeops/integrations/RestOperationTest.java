@@ -9,6 +9,9 @@ import static org.assertj.core.api.Assertions.*;
 
 class RestOperationTest {
     final JsonMapper json=JsonMapper.builder().build();
+    @Test void projectedTextCannotContainNulOrUnpairedSurrogates(){
+        var operation=RestOperation.parse(json.readTree(definition));for(String invalid:List.of(String.valueOf((char)0),String.valueOf((char)0xd800),String.valueOf((char)0xdfff)))assertThatThrownBy(()->operation.projectResponse(json.createObjectNode().put("id",invalid))).isInstanceOfSatisfying(DomainFailure.class,e->assertThat(e.code()).isEqualTo("INVALID_PROVIDER_RESPONSE"));assertThat(operation.projectResponse(json.createObjectNode().put("id","Team \ud83d\ude00")).path("id").asString()).isEqualTo("Team \ud83d\ude00");
+    }
     final String definition="""
         {"id":"create","method":"POST","path":"/v1/items/{id}","pathParameters":["id"],"requestFields":{"message":"STRING","count":"INTEGER","enabled":"BOOLEAN"},"responseFields":{"id":"STRING"},"classification":"WRITE","timeoutSeconds":5,"maximumResponseBytes":4096,"remoteIdempotencyKey":true}
         """;

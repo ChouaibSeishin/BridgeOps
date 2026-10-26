@@ -20,6 +20,7 @@ export interface Approval {
   capability: string;
   operation: string;
   arguments: Record<string, unknown>;
+  canonicalArguments?: string | null;
   intentSchemaVersion?: number;
   classification?: "READ" | "WRITE";
   connection?: {

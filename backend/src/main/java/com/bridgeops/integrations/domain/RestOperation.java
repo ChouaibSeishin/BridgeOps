@@ -51,10 +51,15 @@ public record RestOperation(String id,String method,String path,Set<String> path
     }
     private static Map<String,String> fields(JsonNode node){if(!node.isObject()||node.size()>32)throw invalid();var fields=new TreeMap<String,String>();for(String key:node.propertyNames()){if(!node.path(key).isString())throw invalid();fields.put(key,node.path(key).asString());}return fields;}
     private static void check(JsonNode value,String type,int length){
-        boolean valid=switch(type){case "STRING"->value.isString()&&value.asString().length()<=length&&value.asString().codePoints().noneMatch(c->c==0);case "INTEGER"->value.isIntegralNumber()&&value.bigIntegerValue().bitLength()<=63;case "BOOLEAN"->value.isBoolean();default->false;};if(!valid)throw invalid();
+        boolean valid=switch(type){case "STRING"->value.isString()&&validText(value.asString(),length);case "INTEGER"->value.isIntegralNumber()&&value.bigIntegerValue().bitLength()<=63;case "BOOLEAN"->value.isBoolean();default->false;};if(!valid)throw invalid();
     }
     private static int integer(JsonNode node){if(!node.isIntegralNumber()||node.bigIntegerValue().bitLength()>31)throw invalid();return node.asInt();}
     private static boolean field(String field){return field!=null&&field.matches("[a-zA-Z][a-zA-Z0-9_]{0,31}")&&!Set.of("constructor","prototype","__proto__","authorization","password","credential","secret","apikey","api_key","access_token","refresh_token","accessToken".toLowerCase(Locale.ROOT),"refreshToken".toLowerCase(Locale.ROOT)).contains(field.toLowerCase(Locale.ROOT));}
     private static void exact(JsonNode node,Set<String> keys){if(node==null||!node.isObject()||!node.propertyNames().equals(keys))throw invalid();}
     private static DomainFailure invalid(){return new DomainFailure(422,"INVALID_REST_OPERATION");}
+    private static boolean validText(String value,int maximum){
+        if(value.length()>maximum)return false;
+        for(int i=0;i<value.length();i++){char c=value.charAt(i);if(c==0)return false;if(Character.isHighSurrogate(c)){if(++i>=value.length()||!Character.isLowSurrogate(value.charAt(i)))return false;}else if(Character.isLowSurrogate(c))return false;}
+        return true;
+    }
 }

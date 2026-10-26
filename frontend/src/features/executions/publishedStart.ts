@@ -31,6 +31,7 @@ export function publishedStart(definition: unknown) {
     "manualTrigger",
     "syntheticAction",
     "capabilityAction",
+    "configuredHttp",
     "notification",
     "condition",
     "transform",
@@ -64,6 +65,7 @@ export function publishedStart(definition: unknown) {
     )
     .map((node) => ({
       id: node.id,
+      external: node.type === "configuredHttp",
       label: labels.get(node.id) ?? node.type,
       operation:
         node.type === "notification"
@@ -77,16 +79,15 @@ export function publishedStart(definition: unknown) {
           : null,
       revision: node.config.revision,
       inputs: node.inputs ?? {},
-      protected:
-        node.type === "configuredHttp" ||
-        ["support.assignBatch", "support.addNote"].includes(
-          String(node.config.operation),
-        ),
+      protected: ["support.assignBatch", "support.addNote"].includes(
+        String(node.config.operation),
+      ),
     }));
   return {
     fields: fields.sort(([a], [b]) => a.localeCompare(b)),
     effects,
     unsupported,
+    external: definition.nodes.some((node) => node.type === "configuredHttp"),
     manual: trigger.type === "manualTrigger",
   };
 }

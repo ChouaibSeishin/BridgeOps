@@ -60,8 +60,8 @@ export function ApprovalInbox({ user }: { user: User }) {
           <div className="eyebrow">HUMAN GOVERNANCE</div>
           <h1>Approval inbox</h1>
           <p>
-            Review exact proposed internal operations. One different eligible
-            person decides.
+            Review exact proposed operations. One different eligible person
+            decides.
           </p>
         </div>
         <Link to={`/organizations/${id}/approval-policy`}>Approval policy</Link>
@@ -297,7 +297,7 @@ function ApprovalReview({
           </p>
         )}
         <pre className="definition-json" aria-label="Exact proposed arguments">
-          {JSON.stringify(r.arguments, null, 2)}
+          {r.canonicalArguments ?? JSON.stringify(r.arguments, null, 2)}
         </pre>
         <p>
           Your decision applies only to these stored arguments. You cannot edit
