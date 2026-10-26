@@ -43,6 +43,10 @@ public final class GraphValues {
         }
         if (!binding.has("from") || !binding.has("path")) throw failure("INVALID_MAPPING");
         var value = outputs.get(binding.path("from").asString());
+        if(binding.path("path").asString().equals("$")){
+            if(value==null||!value.isObject())throw failure("MISSING_STEP_OUTPUT");
+            return value.deepCopy();
+        }
         for (String segment : binding.path("path").asString().split("\\.")) {
             if (value == null || !value.isObject() || !value.has(segment)) throw failure("MISSING_STEP_OUTPUT");
             value = value.get(segment);

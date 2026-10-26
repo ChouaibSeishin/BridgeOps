@@ -42,6 +42,7 @@ public class GraphV2DefinitionTest {
         var a = graph(); var b = graph();
         for (String field : List.of("nodes", "edges")) { var values = new ArrayList<JsonNode>(); b.path(field).forEach(values::add); Collections.reverse(values); var replacement = (ArrayNode) b.withArray(field); replacement.removeAll(); values.forEach(replacement::add); }
         var canonical = graphs.canonical(a); assertThat(canonical).isEqualTo(graphs.canonical(b));
+        assertThat(canonical.hash()).isEqualTo("42a04704c96b0d3dfb888eafe56339e0b30e30fd9d519ddacc759817325c42ec");
         assertThat(canonical.schemaVersion()).isEqualTo(2); assertThat(canonical.canonicalizationVersion()).isEqualTo(2);
         ((ObjectNode) b.path("edges").get(2)).put("branch", "true"); ((ObjectNode) b.path("edges").get(3)).put("branch", "false");
         assertThat(graphs.canonical(b).hash()).isNotEqualTo(canonical.hash());
@@ -92,6 +93,21 @@ public class GraphV2DefinitionTest {
         assertThat(GraphValues.prepare(copy, Map.of("start", input)).path("summary").asString()).isEqualTo("Count: 2");
         assertThatThrownBy(() -> GraphValues.prepare(copy, Map.of())).isInstanceOf(DomainFailure.class);
         assertThatThrownBy(() -> GraphValues.prepare(copy, Map.of("start", graphs.parse("{\"count\":[]}")))).isInstanceOf(DomainFailure.class);
+    }
+    @Test void wholeObjectMappingsCopyOnlyDeclaredDominatingTriggerOrTransformOutputs() {
+        var root=graph();var copy=node(root,"copy");((ObjectNode)copy.path("inputs")).set("payload",graphs.parse("{\"from\":\"start\",\"path\":\"$\"}"));assertThat(graphs.validate(root).valid()).isTrue();
+        var input=graphs.parse("{\"count\":2}");var prepared=GraphValues.prepare(copy,Map.of("start",input));assertThat(prepared.path("payload")).isEqualTo(input).isNotSameAs(input);((ObjectNode)prepared.path("payload")).put("count",3);assertThat(input.path("count").asInt()).isEqualTo(2);
+        var target=node(root,"positive");target.put("type","configuredHttp");target.set("config",graphs.parse("{\"integrationId\":\"11111111-1111-4111-8111-111111111111\",\"revision\":0,\"operation\":\"record\"}"));target.set("inputs",graphs.parse("{\"pathParameters\":{\"literal\":{}},\"fields\":{\"from\":\"copy\",\"path\":\"$\"}}"));assertThat(graphs.validate(root).valid()).isTrue();
+        var fields=GraphValues.prepare(target,Map.of("copy",prepared));assertThat(fields.path("fields")).isEqualTo(prepared).isNotSameAs(prepared);assertThat(fields.path("pathParameters").isObject()).isTrue();
+        node(root,"start").put("type","webhookTrigger");assertThat(graphs.validate(root).valid()).isTrue();
+        assertThatThrownBy(()->GraphValues.prepare(target,Map.of())).isInstanceOf(DomainFailure.class);
+        assertThatThrownBy(()->GraphValues.prepare(target,Map.of("copy",graphs.parse("[]")))).isInstanceOf(DomainFailure.class);
+    }
+    @Test void wholeObjectSelectorsNeverEnableJsonPathTextCoercionOrNonDominatingSources() {
+        for(String path:List.of("$.count","$.*","$[0]","$..count")){var root=graph();((ObjectNode)node(root,"copy").path("inputs").path("count")).put("path",path);code(root,"INVALID_MAPPING");}
+        var root=graph();node(root,"copy").set("inputs",graphs.parse("{\"count\":{\"parts\":[{\"from\":\"start\",\"path\":\"$\"}]}}"));code(root,"TEXT_PART_TYPE");assertThatThrownBy(()->GraphValues.prepare(node(root,"copy"),Map.of("start",graphs.parse("{\"count\":2}")))).isInstanceOf(DomainFailure.class);
+        for(String source:List.of("choose","positive","empty","finish")){var bad=graph();((ObjectNode)node(bad,"copy").path("inputs")).set("count",graphs.parse("{\"from\":\""+source+"\",\"path\":\"$\"}"));code(bad,"SOURCE_NOT_DOMINATING");code(bad,"UNREGISTERED_OUTPUT");}
+        var self=graph();((ObjectNode)node(self,"copy").path("inputs")).set("count",graphs.parse("{\"from\":\"copy\",\"path\":\"$\"}"));code(self,"SOURCE_NOT_DOMINATING");
     }
     @Test void conditionsNeverCoerceTypesAndSupportBoundedEmptyChecks() {
         var config = node(graph(), "choose").path("config");

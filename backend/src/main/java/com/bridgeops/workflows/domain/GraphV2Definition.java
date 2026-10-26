@@ -167,11 +167,12 @@ public final class GraphV2Definition {
         if (fields.equals(Set.of("literal"))) {
             if (!literal(value.get("literal"))) error(errors, id, path, "LITERAL_LIMIT");
         } else if (fields.equals(Set.of("from", "path"))) {
-            if (!value.path("from").isString() || !value.path("from").asString().matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || !value.path("path").isString() || !value.path("path").asString().matches("[A-Za-z][A-Za-z0-9_]{0,63}(?:\\.[A-Za-z][A-Za-z0-9_]{0,63})?")) error(errors, id, path, "INVALID_MAPPING");
+            if (!value.path("from").isString() || !value.path("from").asString().matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || !value.path("path").isString() || !value.path("path").asString().matches("(?:\\$|[A-Za-z][A-Za-z0-9_]{0,63}(?:\\.[A-Za-z][A-Za-z0-9_]{0,63})?)")) error(errors, id, path, "INVALID_MAPPING");
         } else if (partsAllowed && fields.equals(Set.of("parts")) && value.path("parts").isArray() && !value.path("parts").isEmpty() && value.path("parts").size() <= 16) {
             for (var part : value.path("parts")) {
                 binding(part, id, path + ".parts", errors, false);
                 if (part.has("literal") && !primitive(part.get("literal"))) error(errors, id, path, "TEXT_PART_TYPE");
+                if (part.has("from") && part.path("path").asString().equals("$")) error(errors, id, path, "TEXT_PART_TYPE");
             }
         } else error(errors, id, path, "INVALID_MAPPING");
     }
@@ -190,6 +191,7 @@ public final class GraphV2Definition {
     }
     private static boolean output(JsonNode source, String path) {
         String type = source.path("type").asString("");
+        if(path.equals("$"))return Set.of("manualTrigger","webhookTrigger","transform").contains(type);
         return switch (type) {
             case "manualTrigger", "webhookTrigger" -> source.path("config").path("inputFields").has(path);
             case "syntheticAction" -> Set.of("message", "recorded").contains(path);
