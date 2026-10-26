@@ -84,9 +84,9 @@ public class WorkflowService {
         authority.read(user,family,organization,"workflow.read");return version(store.version(organization,id,versionId));
     }
     private Summary summary(WorkflowStore.Row row) { return new Summary(row.id(), row.name(), row.description(), row.status(), row.revision(), row.currentVersion(), row.updatedAt()); }
-    private Detail detail(WorkflowStore.Row row) { return new Detail(summary(row), graphs.parse(row.definition()), row.currentVersion() == null ? null : version(store.version(row.organizationId(), row.id(), row.currentVersion()))); }
+    private Detail detail(WorkflowStore.Row row) { return new Detail(summary(row), graphs.parse(row.definition()), row.currentVersion() == null ? null : version(store.version(row.organizationId(), row.id(), row.currentVersion())), row.definition()); }
     private VersionSummary version(WorkflowStore.Version row) { return new VersionSummary(row.id(), row.workflowId(), row.number(), row.sourceRevision(), row.schemaVersion(), row.canonicalizationVersion(), row.name(), row.description(), row.hash(), row.actor(), row.publishedAt()); }
-    private Snapshot snapshot(WorkflowStore.Version row) { return new Snapshot(version(row), graphs.parse(row.definition())); }
+    private Snapshot snapshot(WorkflowStore.Version row) { return new Snapshot(version(row), graphs.parse(row.definition()), row.definition()); }
     private void metadata(String name, String description) {
         if (name == null || name.isBlank() || name.length() > 120 || name.codePoints().anyMatch(Character::isISOControl) || description == null || description.length() > 2000)
             throw new DomainFailure(400, "INVALID_REQUEST");

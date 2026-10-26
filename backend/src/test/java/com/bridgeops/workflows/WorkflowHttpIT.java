@@ -79,6 +79,19 @@ class WorkflowHttpIT {
         assertThat(read(send(owner, get(exact)).andExpect(status().isOk()).andReturn())).isEqualTo(first);
         send(owner, get(base() + "?size=1")).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].revision").value(3)).andExpect(jsonPath("$.items[0].definition").doesNotExist());
     }
+    @Test void exactDefinitionTextSurvivesLargeSignedIntegersAndHistoricalInspection() throws Exception {
+        String source=GraphV2DefinitionTest.GRAPH.replace("\"compare\":0","\"compare\":9223372036854775807");
+        var created=read(send(owner,post(base()).content(body(Map.of("name","Exact integers","description","","definition",json.readTree(source))))).andExpect(status().isCreated()).andReturn());
+        String path=path(created),stored=created.path("definitionJson").asString();
+        assertThat(stored).contains("9223372036854775807");
+        assertThat(json.readTree(stored)).isEqualTo(json.readTree(source));
+        var published=send(owner,post(path+"/publish").content(revision(0))).andExpect(status().isCreated()).andReturn();
+        var snapshot=read(published);String canonical=snapshot.path("definitionJson").asString();
+        assertThat(canonical).contains("9223372036854775807");
+        assertThat(com.bridgeops.executions.domain.ExecutionPlan.hash(canonical)).isEqualTo(snapshot.path("version").path("definitionHash").asString());
+        var reloaded=read(send(owner,get(published.getResponse().getHeader("Location"))).andExpect(status().isOk()).andReturn());assertThat(reloaded.path("definitionJson").asString()).isEqualTo(canonical);
+        assertThat(read(send(owner,get(path)).andExpect(status().isOk()).andReturn()).path("definitionJson").asString()).isEqualTo(stored);
+    }
     @Test void invalidSavedDefinitionReturnsSafeStructured422WithoutPublishing() throws Exception {
         String path = path(create()); String graph = GraphDefinitionTest.GRAPH.replace("\"message\":\"Prepare review\"", "\"secretInput\":\"synthetic-canary-content\"");
         send(owner, patch(path).content(save(0, graph))).andExpect(status().isOk());

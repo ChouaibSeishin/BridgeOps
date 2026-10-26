@@ -24,6 +24,7 @@ import {
   type CanvasGraph,
 } from "./canvasModel";
 import "./canvas.css";
+import { requiresExactNumbers } from "./precision";
 
 type DiagramNode = Node<
   { label: string; kind: string; invalid: boolean },
@@ -484,6 +485,12 @@ function JsonProperties({
             try {
               const c: unknown = JSON.parse(configText),
                 i: unknown = JSON.parse(inputText);
+              if (requiresExactNumbers(c) || requiresExactNumbers(i)) {
+                setError(
+                  "Integers must stay within the browser's exact range (-9007199254740991 to 9007199254740991). Use the API for larger signed 64-bit values; this edit was not applied.",
+                );
+                return;
+              }
               if (
                 !c ||
                 typeof c !== "object" ||

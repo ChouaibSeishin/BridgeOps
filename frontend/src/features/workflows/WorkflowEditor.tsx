@@ -10,6 +10,7 @@ import { Problem, Pager, ValidationResults } from "./Feedback";
 import { GraphEditor, ReadOnlyDefinition } from "./GraphEditor";
 
 import { ExecutionStart } from "../executions/ExecutionStart";
+import { requiresExactNumbers } from "./precision";
 
 function validationDetails(value: unknown): value is Validation {
   if (!value || typeof value !== "object") return false;
@@ -101,6 +102,7 @@ function DraftWorkspace({
   const revision = saved.workflow.revision;
   const archived = saved.workflow.status === "ARCHIVED";
   const edit = permissions.includes("workflow.edit");
+  const exactOnly = requiresExactNumbers(saved.definition);
   const publish = permissions.includes("workflow.publish");
   const dirty =
     pendingProperties ||
@@ -246,6 +248,7 @@ function DraftWorkspace({
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            if (exactOnly) return;
             void perform("Saving…", async () => {
               adopt(
                 await workflowApi.save(
@@ -270,7 +273,7 @@ function DraftWorkspace({
               onChange={(event) => setName(event.target.value)}
               required
               maxLength={120}
-              disabled={!edit || archived || frozen}
+              disabled={!edit || archived || frozen || exactOnly}
             />
           </label>
           <label>
@@ -280,26 +283,34 @@ function DraftWorkspace({
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
               maxLength={2000}
-              disabled={!edit || archived || frozen}
+              disabled={!edit || archived || frozen || exactOnly}
             />
           </label>
           {edit && !archived && (
             <button
               className="button primary"
-              disabled={!dirty || frozen || pendingProperties}
+              disabled={!dirty || frozen || pendingProperties || exactOnly}
             >
               Save draft
             </button>
           )}
         </form>
       </section>
-      <GraphEditor
-        definition={definition}
-        change={setDefinition}
-        disabled={!edit || archived || frozen}
-        errors={validation?.errors ?? []}
-        pendingChange={setPendingProperties}
-      />
+      {exactOnly ? (
+        <ReadOnlyDefinition
+          draft
+          definition={saved.definition}
+          definitionJson={saved.definitionJson}
+        />
+      ) : (
+        <GraphEditor
+          definition={definition}
+          change={setDefinition}
+          disabled={!edit || archived || frozen}
+          errors={validation?.errors ?? []}
+          pendingChange={setPendingProperties}
+        />
+      )}
       <div className="action-row workflow-actions">
         <button
           className="button"
@@ -540,7 +551,10 @@ export function PublishedVersion({ user }: { user: User }) {
           SHA-256 {version.definitionHash}
         </code>
       </section>
-      <ReadOnlyDefinition definition={snapshot.data.definition} />
+      <ReadOnlyDefinition
+        definition={snapshot.data.definition}
+        definitionJson={snapshot.data.definitionJson}
+      />
     </>
   );
 }

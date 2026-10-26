@@ -66,6 +66,32 @@ function graph(): CanvasGraph {
   };
 }
 describe("workflow canvas", () => {
+  it("keeps an unsafe integer edit unapplied so JSON parsing cannot silently change its value", () => {
+    const change = vi.fn(),
+      pending = vi.fn();
+    render(
+      <WorkflowCanvas
+        graph={graph()}
+        change={change}
+        pendingChange={pending}
+      />,
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Inspect node" }), {
+      target: { value: "stable_action_identifier" },
+    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Input mapping JSON" }),
+      { target: { value: '{"value":{"literal":9223372036854775807}}' } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply node properties" }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "this edit was not applied",
+    );
+    expect(change).not.toHaveBeenCalled();
+    expect(pending).toHaveBeenLastCalledWith(true);
+  });
   it("renders React Flow and friendly duplicate labels with collapsed stable identity", () => {
     const { container } = render(<WorkflowCanvas graph={graph()} />);
     expect(container.querySelector(".react-flow")).toBeInTheDocument();

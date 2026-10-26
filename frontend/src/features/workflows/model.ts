@@ -169,11 +169,13 @@ export interface VersionSummary {
   publishedAt: string;
 }
 export interface WorkflowDetail {
+  definitionJson?: string;
   workflow: WorkflowSummary;
   definition: unknown;
   currentPublishedVersion: VersionSummary | null;
 }
 export interface Snapshot {
+  definitionJson?: string;
   version: VersionSummary;
   definition: unknown;
 }

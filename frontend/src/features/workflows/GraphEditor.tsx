@@ -10,6 +10,7 @@ import {
 } from "./model";
 import type { Graph, ValidationError } from "./model";
 import { convertV1, isCanvasGraph } from "./canvasModel";
+import { requiresExactNumbers } from "./precision";
 import type { WorkflowCanvas as CanvasView } from "./WorkflowCanvas";
 const LazyCanvas = lazy(() =>
   import("./WorkflowCanvas").then((module) => ({
@@ -369,25 +370,42 @@ export function GraphEditor({
   );
 }
 
-export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
+export function ReadOnlyDefinition({
+  definition,
+  definitionJson,
+  draft = false,
+}: {
+  definition: unknown;
+  definitionJson?: string;
+  draft?: boolean;
+}) {
   const [canvasVisible, setCanvasVisible] = useState(false);
+  const exactOnly = requiresExactNumbers(definition);
   const labels = isGraph(definition)
     ? nodeLabels(definition)
     : new Map<string, string>();
   return (
     <section className="data-panel">
-      <h2>Immutable definition</h2>
+      <h2>{draft ? "Saved draft definition" : "Immutable definition"}</h2>
       <p>
-        This snapshot is read-only. Editing its separate draft cannot change
-        these bytes.
+        {draft
+          ? "This saved draft is read-only in the browser to preserve its exact numbers. Use the authenticated API for edits outside the browser's supported integer range."
+          : "This snapshot is read-only. Editing its separate draft cannot change these bytes."}
       </p>
-      {isCanvasGraph(definition) && (
+      {exactOnly && (
+        <p role="alert">
+          This definition contains integers outside the browser's exact editing
+          range. Inspect the original server JSON below; rounded diagram values
+          are hidden.
+        </p>
+      )}
+      {!exactOnly && isCanvasGraph(definition) && (
         <details onToggle={(e) => setCanvasVisible(e.currentTarget.open)}>
           <summary>Visual published graph</summary>
           {canvasVisible && <WorkflowCanvas graph={definition} />}
         </details>
       )}
-      {isGraph(definition) && (
+      {!exactOnly && isGraph(definition) && (
         <>
           <h3>Connections</h3>
           <ul>
@@ -427,9 +445,14 @@ export function ReadOnlyDefinition({ definition }: { definition: unknown }) {
         <pre
           className="definition-json"
           tabIndex={0}
-          aria-label="Published definition JSON"
+          aria-label={
+            draft ? "Saved draft definition JSON" : "Published definition JSON"
+          }
         >
-          {JSON.stringify(definition, null, 2)}
+          {definitionJson ??
+            (exactOnly
+              ? "Exact source is unavailable. Reload from the current server before inspecting this definition."
+              : JSON.stringify(definition, null, 2))}
         </pre>
       </details>
     </section>

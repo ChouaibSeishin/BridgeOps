@@ -90,6 +90,33 @@ function show(route = "/organizations/org/workflows/workflow") {
 async function ready() {
   await screen.findByRole("heading", { name: "Ticket triage" });
 }
+it("blocks browser saves of API-created large integers and displays exact original draft bytes", async () => {
+  const saved = detail(),
+    definitionJson = JSON.stringify({
+      ...graph,
+      schemaVersion: 2,
+      unrecognized: { value: 0 },
+    }).replace('"value":0', '"value":9223372036854775807');
+  saved.definition = JSON.parse(definitionJson);
+  saved.definitionJson = definitionJson;
+  vi.mocked(workflowApi.get).mockResolvedValue(saved);
+  const save = vi.spyOn(workflowApi, "save");
+  show();
+  await ready();
+  expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+  expect(screen.getByLabelText("Workflow name")).toBeDisabled();
+  expect(
+    screen.getByRole("heading", { name: "Saved draft definition" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByLabelText("Saved draft definition JSON").textContent,
+  ).toContain("9223372036854775807");
+  expect(
+    screen.queryByRole("combobox", { name: "Inspect node" }),
+  ).not.toBeInTheDocument();
+  fireEvent.submit(screen.getByLabelText("Workflow name").closest("form")!);
+  expect(save).not.toHaveBeenCalled();
+});
 it("blocks saving and publication while canvas properties have unapplied invalid edits", async () => {
   vi.stubGlobal(
     "ResizeObserver",
