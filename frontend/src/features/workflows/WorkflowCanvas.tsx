@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -25,6 +25,9 @@ import {
 } from "./canvasModel";
 import "./canvas.css";
 import { requiresExactNumbers } from "./precision";
+import { TypedNodeProperties } from "./TypedNodeProperties";
+import { object } from "./mappingModel";
+import type { MappingScope } from "./MappingField";
 
 type DiagramNode = Node<
   { label: string; kind: string; invalid: boolean },
@@ -77,12 +80,14 @@ export function WorkflowCanvas({
   disabled = false,
   errors = [],
   pendingChange,
+  scope,
 }: {
   graph: CanvasGraph;
   change?: (graph: CanvasGraph) => void;
   disabled?: boolean;
   errors?: ValidationError[];
   pendingChange?: (pending: boolean) => void;
+  scope?: MappingScope;
 }) {
   const [selected, setSelected] = useState<string>();
   const [positions, setPositions] = useState<Record<string, XYPosition>>({});
@@ -304,6 +309,9 @@ export function WorkflowCanvas({
               <JsonProperties
                 key={`${current.id}/${JSON.stringify(current.config)}/${JSON.stringify(current.inputs)}`}
                 config={current.config}
+                node={current}
+                graph={graph}
+                scope={scope}
                 inputs={current.inputs}
                 v2={graph.schemaVersion === 2}
                 pendingChange={reportPending}
@@ -415,6 +423,9 @@ function JsonProperties({
   v2,
   apply,
   pendingChange,
+  node,
+  graph,
+  scope,
 }: {
   config: Record<string, unknown>;
   inputs?: Record<string, unknown>;
@@ -424,15 +435,54 @@ function JsonProperties({
     inputs: Record<string, unknown>,
   ) => void;
   pendingChange: (pending: boolean) => void;
+  node: import("./canvasModel").CanvasNode;
+  graph: CanvasGraph;
+  scope?: MappingScope;
 }) {
   const originalConfig = JSON.stringify(config, null, 2),
     originalInputs = JSON.stringify(inputs ?? {}, null, 2);
   const [configText, setConfigText] = useState(originalConfig),
     [inputText, setInputText] = useState(originalInputs),
     [error, setError] = useState("");
-  const dirty = configText !== originalConfig || inputText !== originalInputs;
+  const [touched, setTouched] = useState(false),
+    [reset, setReset] = useState(0);
+  const typedForm = useRef<HTMLFormElement>(null);
+  const dirty =
+    touched || configText !== originalConfig || inputText !== originalInputs;
+  let parsedConfig: Record<string, unknown> | undefined,
+    parsedInputs: Record<string, unknown> | undefined;
+  try {
+    parsedConfig = object(JSON.parse(configText));
+    parsedInputs = object(JSON.parse(inputText));
+  } catch {
+    /* Keep malformed advanced edits intact. */
+  }
+  const touch = () => {
+    setTouched(true);
+    pendingChange(true);
+  };
   return (
     <div className="canvas-properties">
+      {parsedConfig && parsedInputs ? (
+        <TypedNodeProperties
+          key={reset}
+          node={node}
+          graph={graph}
+          config={parsedConfig}
+          inputs={parsedInputs}
+          scope={scope}
+          pending={touch}
+          formRef={typedForm}
+          change={(config, inputs) => {
+            touch();
+            setConfigText(JSON.stringify(config, null, 2));
+            setInputText(JSON.stringify(inputs, null, 2));
+          }}
+        />
+      ) : (
+        <p>Correct the advanced JSON or discard it to use typed controls.</p>
+      )}
+      <h4>Advanced JSON</h4>
       <p>
         Configuration uses registered fields only. Input mappings use literal,
         from/path or bounded parts. Apply properties, then save and validate the
@@ -500,6 +550,16 @@ function JsonProperties({
                 Array.isArray(i)
               )
                 throw new Error();
+              if (typedForm.current && !typedForm.current.checkValidity()) {
+                setError(
+                  "Correct the typed fields before applying properties. No properties were applied.",
+                );
+                return;
+              }
+              setTouched(false);
+              setReset((before) => before + 1);
+              setConfigText(JSON.stringify(c, null, 2));
+              setInputText(JSON.stringify(i, null, 2));
               apply(c as Record<string, unknown>, i as Record<string, unknown>);
               setError("");
             } catch {
@@ -519,6 +579,8 @@ function JsonProperties({
             setConfigText(originalConfig);
             setInputText(originalInputs);
             setError("");
+            setTouched(false);
+            setReset((before) => before + 1);
             pendingChange(false);
           }}
         >

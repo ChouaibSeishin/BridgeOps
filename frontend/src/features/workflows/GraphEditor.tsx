@@ -11,6 +11,7 @@ import {
 import type { Graph, ValidationError } from "./model";
 import { convertV1, isCanvasGraph } from "./canvasModel";
 import { requiresExactNumbers } from "./precision";
+import type { MappingScope } from "./MappingField";
 import type { WorkflowCanvas as CanvasView } from "./WorkflowCanvas";
 const LazyCanvas = lazy(() =>
   import("./WorkflowCanvas").then((module) => ({
@@ -31,12 +32,14 @@ export function GraphEditor({
   disabled,
   errors,
   pendingChange,
+  scope,
 }: {
   definition: unknown;
   change: (graph: Graph) => void;
   disabled: boolean;
   errors: ValidationError[];
   pendingChange?: (pending: boolean) => void;
+  scope?: MappingScope;
 }) {
   const [type, setType] = useState("syntheticAction");
   const [canvasVisible, setCanvasVisible] = useState(false);
@@ -55,6 +58,7 @@ export function GraphEditor({
           disabled={disabled}
           errors={errors}
           pendingChange={propertiesPending}
+          scope={scope}
         />
       </section>
     );

@@ -1,6 +1,7 @@
 import { session } from "../../lib/session";
 import type { Page } from "../workflows/model";
 export interface OperationDescriptor {
+  pathParameters?: string[];
   id: string;
   classification: string;
   requiresApproval: boolean;

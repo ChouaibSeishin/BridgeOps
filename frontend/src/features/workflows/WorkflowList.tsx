@@ -128,8 +128,9 @@ function OrganizationWorkflows({
         </div>
       </div>
       <p className="phase-note">
-        Publication does not start an execution. Explicit runs support internal
-        records only; no external integration or approval decision is performed.
+        Publication does not start an execution. Explicit runs dispatch
+        registered internal or configured REST operations; protected actions
+        wait for a different eligible human. AI and MCP are not implemented yet.
       </p>
       <section className="data-panel">
         <div className="section-heading">

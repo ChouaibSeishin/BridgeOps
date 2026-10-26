@@ -64,6 +64,24 @@
   font-family: ui-monospace, monospace;
   width: 100%;
 }
+.typed-node-properties,
+.mapping-field,
+.typed-field-row {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.mapping-field,
+.typed-field-row {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+.typed-node-properties input,
+.typed-node-properties select,
+.typed-node-properties textarea {
+  max-width: 100%;
+}
 @media (max-width: 640px) {
   .canvas-diagram {
     height: 380px;

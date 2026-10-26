@@ -35,6 +35,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class IntegrationHttpIT {
+    @Test void editorMetadataExposesDeclaredParameterNamesWithoutProviderRoutesOrSecrets()throws Exception{
+        var json=JsonMapper.builder().build();var config=json.readTree(restConfiguration());((tools.jackson.databind.node.ObjectNode)config).putNull("healthOperation");var operation=(tools.jackson.databind.node.ObjectNode)config.path("operations").get(0);operation.put("path","/tickets/{ticketId}");operation.putArray("pathParameters").add("ticketId");
+        var body=json.createObjectNode().put("name","Parameterized provider").put("description","").put("type","REST").put("credential","disposable-metadata-credential");body.set("configuration",config);
+        var created=send(owner,post(base()+"/integrations").content(json.writeValueAsString(body))).andExpect(status().isCreated()).andReturn();String id=json.readTree(created.getResponse().getContentAsString()).path("connection").path("id").asString();
+        var result=send(member("VIEWER"),get(base()+"/integrations/"+id+"/operations")).andExpect(status().isOk()).andExpect(jsonPath("$[0].pathParameters[0]").value("ticketId")).andExpect(jsonPath("$[0].responseFields.message").value("STRING")).andReturn();
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("api.example.com","/tickets/","disposable-metadata-credential","credentialReference");verify(transport,never()).call(anyString(),any(),any(),any(),any());
+    }
     static final String ORIGIN="https://bridgeops.invalid";static final TestAuthMaterial keys=new TestAuthMaterial();
     static final java.nio.file.Path secretDirectory=secretDirectory();
     static java.nio.file.Path secretDirectory(){try{var dir=java.nio.file.Files.createTempDirectory("bridgeops-connection-keys-");byte[] key=new byte[32];new java.security.SecureRandom().nextBytes(key);var file=dir.resolve("local-v1.key");java.nio.file.Files.write(file,key);if(java.nio.file.Files.getFileStore(file).supportsFileAttributeView("posix"))java.nio.file.Files.setPosixFilePermissions(file,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));Arrays.fill(key,(byte)0);return dir;}catch(Exception failure){throw new ExceptionInInitializerError(failure);}}

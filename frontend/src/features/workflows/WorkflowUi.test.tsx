@@ -460,3 +460,67 @@ it("inspects an exact immutable snapshot with frozen metadata and no edit or run
     "/organizations/org/workflows/workflow",
   );
 });
+
+it("keeps exactly one execution start panel after republishing without a page reload", async () => {
+  vi.mocked(session.request).mockResolvedValue({
+    membershipId: "member",
+    permissions: [
+      "workflow.read",
+      "workflow.edit",
+      "workflow.publish",
+      "execution.read",
+      "execution.run",
+    ],
+  });
+  const initial = detail();
+  initial.workflow.revision = 1;
+  initial.workflow.currentPublishedVersionId = version.id;
+  initial.currentPublishedVersion = version;
+  const second = {
+    ...version,
+    id: "second-version",
+    versionNumber: 2,
+    sourceRevision: 1,
+    definitionHash: "b".repeat(64),
+  };
+  const updated = {
+    ...initial,
+    workflow: {
+      ...initial.workflow,
+      revision: 2,
+      currentPublishedVersionId: second.id,
+    },
+    currentPublishedVersion: second,
+  };
+  vi.mocked(workflowApi.get)
+    .mockResolvedValueOnce(initial)
+    .mockResolvedValue(updated);
+  vi.spyOn(workflowApi, "publish").mockResolvedValue({
+    version: second,
+    definition: structuredClone(graph),
+  });
+  show();
+  await ready();
+  expect(
+    screen.getAllByRole("button", {
+      name: "Run published version",
+    }),
+  ).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Publish draft" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm publication" }));
+  await screen.findByRole("link", {
+    name: "Current published version 2",
+  });
+  expect(
+    screen.getAllByRole("button", {
+      name: "Run published version",
+    }),
+  ).toHaveLength(1);
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", {
+        name: "Run published version",
+      }),
+    ).toBeEnabled(),
+  );
+});

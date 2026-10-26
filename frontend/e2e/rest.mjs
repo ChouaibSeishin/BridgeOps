@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { resolve } from "node:path";
+import { authorRest } from "./rest-authoring.mjs";
 const {
   BRIDGEOPS_TEST_ORIGIN: origin,
   BRIDGEOPS_TEST_ORG: org,
@@ -60,6 +61,7 @@ try {
   const ownerToken = await login(owner, "owner@example.invalid");
   await login(reviewer, "approver@example.invalid");
   await owner.goto(`/organizations/${org}/workflows/${workflow}`);
+  await authorRest(owner, org, workflow, report);
   report("explicit external confirmation and intent-change acknowledgement");
   await owner
     .getByRole("button", { name: "Run published version", exact: true })
@@ -78,6 +80,9 @@ try {
       "I acknowledge that these configured operations may contact an external provider and create effects.",
       { exact: true },
     );
+  await owner
+    .getByRole("textbox", { name: "message (STRING)", exact: true })
+    .fill("Approved browser payload");
   await expect(confirm).toBeDisabled();
   await ack.check();
   await expect(confirm).toBeEnabled();
@@ -169,6 +174,20 @@ try {
     "PASS: real browser external acknowledgement, exact independent approval, one TLS provider request, projected receipt/result, durable timeline, refresh and no persistent credentials; disposable fixtures only.",
   );
 } catch (error) {
+  await owner.screenshot({
+    path: resolve("backend/target/browser-checks/rest-failure.png"),
+    fullPage: true,
+  });
+  console.log(
+    "FAIL_DIAGNOSTIC: runButtons=" +
+      (await owner
+        .getByRole("button", { name: "Run published version", exact: true })
+        .count()) +
+      " dirtyMarkers=" +
+      (await owner.getByText("Unsaved changes", { exact: true }).count()) +
+      " dialogs=" +
+      (await owner.getByRole("dialog").count()),
+  );
   console.error(
     "FAIL: " +
       step +
@@ -177,7 +196,9 @@ try {
         ? "TIMEOUT"
         : "ASSERTION_OR_TRANSPORT"),
   );
-  const location = String(error?.stack).match(/rest\.mjs:\d+:\d+/)?.[0];
+  const location = String(error?.stack).match(
+    /(?:rest|rest-authoring)\.mjs:\d+:\d+/,
+  )?.[0];
   if (location) console.error("AT: " + location);
   process.exitCode = 1;
 } finally {

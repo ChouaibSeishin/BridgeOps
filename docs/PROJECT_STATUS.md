@@ -2,7 +2,13 @@
 
 Updated 2026-10-26 UTC. **Phase 4 is verified; Phase 5 controlled integrations and business automation is in progress.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain later phases.
 
-## Current Phase 5 work
+## Latest Phase 5 checkpoint
+
+The Phase 5 runtime, signed automation and typed canvas critical path is implemented. Final authored browser checks pass with actual internal triage effects and an approved TLS provider request. All 148 frontend tests/typecheck/lint/build pass; backend verification includes 135 units, 14 integration HTTP cases and both authored browser journeys. The strict report gate passes 55 reports totaling 517 tests from recorded incremental runs, zero failures/errors/skips. A clean complete regression and preserved-data production/container upgrade remain required before a Phase 5 release. The real local installation is still V11. See the [authoring guide](development/PHASE_5_AUTHORING.md) and [complete verification record](development/PHASE_5_INTEGRATIONS.md).
+
+The exact published object-mapping checkpoint is 8d6a164cf89d593b084df837d55fd119a9467661 with successful hosted CI40342763365. The preceding REST and exact-number checkpoints also have successful exact hosted CI. Typed-editor publication is next; no final Phase 5 release is claimed.
+
+## Phase 5 incremental delivery history
 
 The actor-aware runtime increment now carries real automation identities through the fenced worker, internal business capabilities, exact human approvals, cancellation and audit. Current grants and endpoint/principal revocation are enforced independently of configuring humans' sessions; both configuring humans remain excluded from approval. Local verification passed 126 unit/MVC and 166 PostgreSQL/HTTP tests with zero failures/errors/skips, plus 116 frontend tests/typecheck/lint/build and zero-vulnerability production audit. All three retained real Chromium journeys also passed before publication. The V22 persistence checkpoint has [successful exact hosted CI](https://github.com/ChouaibSeishin/BridgeOps/actions/runs/39959515895). The next local increment adds V23 signed durable acceptance and automation management; its new real Chromium journey now passes from UI setup through signed triage, independent approval, effects, replay, rotation and revocation. Backend results and known corrected failures are recorded in the Phase 5 guide; final verification passed 130 units, 47 automation/webhook cases and the signed Chromium journey, with zero failures/errors/skips. The V23 checkpoint is published at f87ba08628d4379086b20156776201abab360a73 with successful exact hosted CI40087548714. V24 controlled REST workflow dispatch is published and its exact hosted CI40334889255 passed; typed canvas properties and full release verification remain incomplete; production remains V11.
 

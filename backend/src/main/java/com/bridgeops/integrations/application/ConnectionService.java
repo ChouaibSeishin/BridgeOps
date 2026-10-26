@@ -17,7 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class ConnectionService {
-    public record Operation(String id,String classification,boolean requiresApproval,Map<String,String> requestFields,Map<String,String> responseFields) {}
+    public record Operation(String id,String classification,boolean requiresApproval,Map<String,String> requestFields,Map<String,String> responseFields,List<String> pathParameters) {}
     public record Definition(String type,String name,String description,int implementationVersion,List<Operation> operations) {}
     public record Health(String status,String code,Instant checkedAt,Long revision) {}
     public record Summary(UUID id,String name,String description,String type,int implementationVersion,long revision,boolean enabled,Instant updatedAt,Health health) {}
@@ -35,7 +35,7 @@ public class ConnectionService {
     @Transactional(readOnly=true,timeout=5) public Page list(UUID actor,UUID family,UUID org,int page,int size){authority.read(actor,family,org,"integration.read");bounds(page,size);long total=store.count(org);return new Page(store.list(org,page,size).stream().map(this::summary).toList(),page,size,total,(total+size-1)/size);}
     @Transactional(readOnly=true,timeout=5) public Summary get(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"integration.read");return summary(store.get(org,id,false));}
     @Transactional(readOnly=true,timeout=5) public Managed configuration(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"integration.manage");return managed(store.get(org,id,false));}
-    @Transactional(readOnly=true,timeout=5) public List<Operation> operations(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"integration.read");var row=store.get(org,id,false);if(!row.type().equals("REST"))return definitions(actor,family,org).stream().filter(d->d.type().equals(row.type())).findFirst().orElseThrow().operations();return operations(json.readTree(row.configuration())).stream().map(o->new Operation(o.id(),o.classification(),o.classification().equals("WRITE"),o.requestFields(),o.responseFields())).toList();}
+    @Transactional(readOnly=true,timeout=5) public List<Operation> operations(UUID actor,UUID family,UUID org,UUID id){authority.read(actor,family,org,"integration.read");var row=store.get(org,id,false);if(!row.type().equals("REST"))return definitions(actor,family,org).stream().filter(d->d.type().equals(row.type())).findFirst().orElseThrow().operations();return operations(json.readTree(row.configuration())).stream().map(o->new Operation(o.id(),o.classification(),o.classification().equals("WRITE"),o.requestFields(),o.responseFields(),o.pathParameters().stream().sorted().toList())).toList();}
     @Transactional(timeout=10) public Managed create(UUID actor,UUID family,UUID org,String name,String description,String type,JsonNode configuration,String credential){
         authority.write(actor,family,org,"integration.manage");metadata(name,description);String config=configuration(type,configuration);UUID reference=credential(actor,family,org,type,credential);
         UUID id=store.create(org,actor,name.trim(),description,type,config,reference,clock.instant());var row=store.get(org,id,false);version(row);audit.write(org,actor,IntegrationAudit.Action.INTEGRATION_CREATED,id,0,clock.instant());return managed(row);
@@ -52,7 +52,7 @@ public class ConnectionService {
         return new Plan(org,id,row.revision(),row.type(),config.path("baseDestination").asString(),operation,row.credential());
     }
     @Transactional(timeout=5) Summary recordCheck(UUID actor,UUID family,UUID org,UUID id,long expected,String status,String code){authority.write(actor,family,org,"integration.manage");var row=store.get(org,id,false);store.health(row,expected,status,code,clock.instant());audit.write(org,actor,IntegrationAudit.Action.INTEGRATION_CHECKED,id,expected,clock.instant());return summary(store.get(org,id,false));}
-    private List<Operation> internalOperations(String capability){return InternalOperation.definitions(capability).stream().map(d->new Operation(d.id(),d.classification(),d.requiresApproval(),d.inputs(),d.outputs())).toList();}
+    private List<Operation> internalOperations(String capability){return InternalOperation.definitions(capability).stream().map(d->new Operation(d.id(),d.classification(),d.requiresApproval(),d.inputs(),d.outputs(),List.of())).toList();}
     private UUID credential(UUID actor,UUID family,UUID org,String type,String credential){
         if(credential==null)return null;if(!type.equals("REST")||credential.length()<8||credential.length()>4096||!credential.matches("[A-Za-z0-9._~+/-]+=*"))throw new DomainFailure(422,"INVALID_CREDENTIAL_FORMAT");byte[] bytes=credential.getBytes(StandardCharsets.UTF_8);try{return secrets.put(actor,family,org,"REST_CREDENTIAL",bytes);}finally{Arrays.fill(bytes,(byte)0);}
     }

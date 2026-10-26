@@ -203,7 +203,7 @@ function DraftWorkspace({
       </p>
       {!archived && (
         <ExecutionStart
-          key={saved.currentPublishedVersion?.id ?? "unpublished"}
+          key={`execution/${saved.currentPublishedVersion?.id ?? "unpublished"}`}
           organization={organization}
           workflow={id}
           version={saved.currentPublishedVersion?.id ?? null}
@@ -304,6 +304,7 @@ function DraftWorkspace({
         />
       ) : (
         <GraphEditor
+          scope={{ organization, user: user.id }}
           definition={definition}
           change={setDefinition}
           disabled={!edit || archived || frozen}
@@ -426,7 +427,7 @@ function DraftWorkspace({
       )}
       <ValidationResults result={validation} />
       <VersionHistory
-        key={saved.currentPublishedVersion?.id ?? "unpublished"}
+        key={`history/${saved.currentPublishedVersion?.id ?? "unpublished"}`}
         user={user.id}
         organization={organization}
         id={id}
