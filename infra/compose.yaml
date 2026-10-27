@@ -18,6 +18,9 @@ services:
       retries: 15
     restart: unless-stopped
   backend:
+    # Linux owner-only key mounts require the operator's non-root UID:GID.
+    # Docker Desktop retains the default non-root image identity.
+    user: ${BRIDGEOPS_RUNTIME_USER:-bridgeops}
     build:
       context: ..
       dockerfile: infra/docker/backend.Dockerfile

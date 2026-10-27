@@ -11,6 +11,12 @@ The verified Phase 4 checkpoint's [implementation CI passed](https://github.com/
 Prerequisites: Docker Engine/Desktop with Compose 2.24+ and PowerShell 7. Host Java/Node are unnecessary for the container startup. Run from repository root:
 
 ```powershell
+if (-not $IsWindows) {
+    $taskRuntimeUid = (& id -u).Trim()
+    $taskRuntimeGid = (& id -g).Trim()
+    if ($taskRuntimeUid -eq '0') { throw 'Start BridgeOps as a non-root operator.' }
+    $env:BRIDGEOPS_RUNTIME_USER = "${taskRuntimeUid}:${taskRuntimeGid}"
+}
 ./scripts/setup-local.ps1
 ./scripts/setup-auth.ps1
 ./scripts/setup-integration-secrets.ps1
@@ -20,7 +26,9 @@ docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait
 
 Open [BridgeOps](http://localhost:8088). Setup creates unique ignored .env database credentials and ignored signing material; it refuses to overwrite existing files. For an existing workspace, retain .env, keys and volumes; run setup-auth only if authentication material has never been configured. Setup/startup creates no account or tenant. Never commit credentials or keys. Port 8088 is localhost-only; BRIDGEOPS_PORT can be set in .env. The browser uses relative URLs through the same-origin proxy.
 
-For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade to V11.
+For an existing installation with its first account already provisioned, run only Compose config/build/start with the existing environment and volume. Do not repeat bootstrap, reset the consumed marker or recreate credentials to upgrade.
+
+On Linux, repeat the non-root UID:GID environment setting above in each new shell before starting Compose; it lets the application read the operator-owned 0700/0600 integration key mount without changing permissions or `.env`. In Bash, use `export BRIDGEOPS_RUNTIME_USER="$(id -u):$(id -g)"` from a non-root account. Docker Desktop uses the image's default non-root identity. The container entrypoint refuses UID 0. [Deployment identity decision](docs/architecture/adr/0017-non-root-key-mount-identity.md).
 
 Phase 5 is in progress. Its new connection/secret features use a separate ignored key: run `./scripts/setup-integration-secrets.ps1` once if `secrets/integrations/local-v1.key` does not exist. It refuses to replace an existing key and leaves `.env`, SMTP and signing/CSRF material unchanged. Preserve this key with database backups; encrypted credentials cannot be recovered without it. Set only the exact approved public REST hosts in `REST_ALLOWED_HOSTS` when configuring an external provider. Empty means no REST destination is permitted. See [Phase 5 progress and configuration](docs/development/PHASE_5_INTEGRATIONS.md); graph-v2 business execution/webhooks are not claimed complete by connection setup.
 

@@ -59,7 +59,21 @@ jobs:
           ./scripts/setup-auth.ps1
           ./scripts/setup-integration-secrets.ps1
       - name: Build and start containers
-        run: docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
+        run: |
+          test "$(id -u)" -ne 0
+          printf 'BRIDGEOPS_RUNTIME_USER=%s:%s\n' "$(id -u)" "$(id -g)" >> "$GITHUB_ENV"
+          BRIDGEOPS_RUNTIME_USER="$(id -u):$(id -g)" docker compose --env-file .env -f infra/compose.yaml up --build -d --wait --wait-timeout 180
+      - name: Non-root private key mount and root refusal
+        shell: bash
+        run: |
+          docker compose --env-file .env -f infra/compose.yaml exec -T backend sh -c 'test "$(id -u)" -ne 0 && test -r /run/bridgeops-integrations/local-v1.key && test ! -w /run/bridgeops-integrations/local-v1.key && test "$(wc -c < /run/bridgeops-integrations/local-v1.key)" -eq 32'
+          backend="$(docker compose --env-file .env -f infra/compose.yaml ps -q backend)"
+          image="$(docker inspect --format '{{.Image}}' "$backend")"
+          set +e
+          docker run --rm --network none --user 0 "$image" > "$RUNNER_TEMP/bridgeops-root-refusal.log" 2>&1
+          root_status=$?
+          set -e
+          test "$root_status" -eq 78
       - name: Same-origin API smoke
         run: |
           curl --fail http://localhost:8088/api/v1/system/info

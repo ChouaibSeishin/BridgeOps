@@ -8,6 +8,7 @@ FROM eclipse-temurin@sha256:f04fb34e053148344e83317976114ec3f37e4b830ec8bdab5a2f
 RUN groupadd --system bridgeops && useradd --system --gid bridgeops --home-dir /app bridgeops
 WORKDIR /app
 COPY --from=build --chown=bridgeops:bridgeops /workspace/target/bridgeops-backend-0.1.0-SNAPSHOT.jar app.jar
+COPY --chmod=0555 infra/docker/backend-entrypoint.sh /usr/local/bin/bridgeops
 USER bridgeops
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+ENTRYPOINT ["/usr/local/bin/bridgeops"]

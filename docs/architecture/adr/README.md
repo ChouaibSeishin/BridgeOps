@@ -18,3 +18,4 @@ Records 0001–0012 retain the reviewed architecture; 0013–0014 record accepte
 - [Released compatible stack](0013-released-stack.md)
 - [Scoped automation and separation of human decisions](0015-scoped-automation.md)
 - [Bounded whole-object mappings](0016-bounded-object-mappings.md)
+- [Non-root identity for private key mounts](0017-non-root-key-mount-identity.md)
