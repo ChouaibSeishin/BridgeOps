@@ -1,6 +1,6 @@
 # Phase 5 — Typed workflow authoring
 
-Status: implemented and locally verified; clean full-suite and preserved-data release verification is in progress. This guide describes the Phase 5 development build, not the still-preserved local V11 installation. [Implementation and verification record](PHASE_5_INTEGRATIONS.md).
+Status: implemented and verified, with clean full-suite, real-browser, preserved-data V11 → V24 local Compose and successful exact hosted implementation CI. [Implementation and verification record](PHASE_5_INTEGRATIONS.md).
 
 ## Build a workflow
 

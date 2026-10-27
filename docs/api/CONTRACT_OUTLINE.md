@@ -1,6 +1,6 @@
 # API contract outline
 
-Status: mixed implemented and target contracts. **Info/health, Phase 1 authentication/recovery and organization/member/invitation/browser-context routes, Phase 2 workflow definition routes, Phase 3 published execution/start/read/cancel/retry and Phase 4 approval/policy routes are implemented.** [Workflow DTOs](../development/PHASE_2_WORKFLOWS.md) and [execution DTOs and semantics](../development/PHASE_3_EXECUTION.md). Other target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
+Status: mixed implemented and target contracts. **Info/health, Phase 1 identity/tenancy, Phase 2 definitions, Phase 3 executions, Phase 4 approvals and Phase 5 integration/business/automation/webhook routes are implemented.** [Workflow DTOs](../development/PHASE_2_WORKFLOWS.md), [execution DTOs](../development/PHASE_3_EXECUTION.md) and [Phase 5 contracts](../development/PHASE_5_INTEGRATIONS.md) specify exact semantics. AI/MCP target families remain planned. Runtime OpenAPI describes implemented routes only. `/api/v1` is the business base; actuator and MCP have separate transport paths. Increment descriptions below preserve historical scope, not current denial of subsequently implemented routes.
 
 ## Shared conventions
 
@@ -103,3 +103,19 @@ All routes below use `/api/v1/organizations/{organizationId}` and live tenant/ap
 | PUT `/approval-policy` | policy.manage | expectedRevision, exact boolean requireRecordApproval and integer lifetimeSeconds 60–86400; 200 persisted new version |
 
 Distinct requester/decision actor is mandatory. Repeated/stale/final decision conflicts return 409; self/permission denial 403, foreign resources 404, malformed scalar/body 400, invalid policy 422 and unavailable dependency 503. Bodies are bounded to 256 KiB and unknown fields reject. Decisions and policy changes commit required audit atomically. Signals are durable worker input, not a public resume endpoint. [Exact DTOs, error codes, state and retry semantics](../development/PHASE_4_APPROVALS.md).
+
+## Implemented Phase 5 routes
+
+Tenant routes use the same organization prefix and live application authorization. Mutations retain strict JSON, exact Origin/CSRF and required transactional audit. Descriptors expose registered field names/types and classification; management responses never return credential plaintext. [Exact bounds, DTOs, signing bytes and failure/recovery semantics](../development/PHASE_5_INTEGRATIONS.md).
+
+| Route family | Capability boundary | Behavior |
+| --- | --- | --- |
+| GET `/integration-definitions`, `/integrations`, `/integrations/{id}`, `/integrations/{id}/operations` | integration.read | Registered catalog, bounded tenant connections and operation descriptors |
+| GET `/integrations/{id}/configuration`; POST `/integrations`; PUT `/integrations/{id}`; POST `/integrations/{id}/test` | integration.manage | Revision-checked configuration and explicit connection checks; REST checks require effects acknowledgement |
+| GET `/support/tickets`, `/teams`, `/notifications` and their detail/attempt routes | capability.read | Persisted business records, bounded collections and actual internal delivery state |
+| POST `/demo-data`; GET/POST `/demo-workflows` | Existing capability/integration/workflow intersections | Confirmed opt-in examples; never automatic data reset, execution or automation activation |
+| GET/POST `/automations`; GET `/automations/{id}`; POST `/automations/{id}/revoke` | Read: integration.read; configuration: integration.manage + execution.run, plus capability.write for write grants | Explicit immutable-version operation scope and terminal revocation |
+| GET/POST `/webhook-endpoints`; GET detail; POST `/{id}/rotate`, `/{id}/revoke` | Live scoped configuration authority | Exact principal/version, immutable endpoint revisions, explicit confirmation and one-time no-store signing-secret reveal |
+| GET `/webhook-endpoints/{id}/deliveries` | integration.read + execution.read | Bounded safe delivery/execution metadata, without signatures or payloads |
+
+The public `POST /api/v1/webhooks/{publicEndpointId}` authenticates exact body bytes using HMAC, timestamp and delivery ID. It has no ambient-cookie run authority. A committed receipt/execution/work/audit transaction returns the stable execution acknowledgement; matching delivery retries deduplicate, changed content conflicts, revoked/rotated/expired signatures fail closed and bounded admission can return 429. External operations reuse the existing published execution/detail/attempt/timeline and exact approval APIs. No raw HTTP dispatch, arbitrary expression, AI or MCP adapter is exposed.

@@ -7,6 +7,8 @@ const excluded = new Set(['.git', 'node_modules', 'target', 'dist', '.tools', '.
 function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     if (excluded.has(entry.name)) return [];
+    // Operator-owned key material is ignored local state, never documentation.
+    if (dir === root && entry.name === 'secrets') return [];
     const location = path.join(dir, entry.name);
     return entry.isDirectory() ? walk(location) : [location];
   });

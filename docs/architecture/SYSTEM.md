@@ -1,6 +1,6 @@
 # Proposed system architecture
 
-Status: architecture retained after review. Phase 1 implements foundation, identity and organization onboarding/browser boundaries. Phase 2 implements workflow definitions, HTTP lifecycle and browser authoring; later modules in the target diagrams remain planned. One Spring Boot deployment, one React frontend and PostgreSQL are retained. Phase 3 adds bounded PostgreSQL-backed execution workers in the same deployment. Phase 4 adds human approvals through owned public ports and durable signals. Separate workers and a broker require evidence and an ADR update. [Phase 2 contract](../development/PHASE_2_WORKFLOWS.md).
+Status: architecture retained through Phase 5. One Spring Boot deployment, one React frontend and PostgreSQL provide identity/tenancy, immutable definitions, durable execution, exact human approvals, controlled integrations and signed webhook automation. Phase 5 integrations owns the internal notification capability as well as support/team data, encrypted references and registered HTTPS adapters; a separate notifications module is target design. AI and MCP arrows/modules remain planned for Phase 6. Separate workers and a broker require evidence and an ADR update. Increment descriptions below preserve their historical scope. [Phase 5 contract](../development/PHASE_5_INTEGRATIONS.md).
 
 ## Context and containers
 
@@ -79,7 +79,7 @@ flowchart TB
   Ap --> ApprovalDB[(Approval tables)]
 ```
 
-Authorization and auditing apply to all boundaries, including arrows omitted for readability. Tables share a physical database but retain module ownership. Architecture tests will enforce package dependencies once domain code exists.
+Authorization and auditing apply to all boundaries, including arrows omitted for readability. Tables share a physical database but retain module ownership. Existing architecture tests enforce the implemented package boundaries; the diagram includes future AI/MCP components.
 
 ## Interview rationale
 
@@ -87,7 +87,7 @@ A modular monolith preserves local transaction guarantees while making boundarie
 
 A distributed transaction tries to coordinate changes in separate systems. PostgreSQL cannot roll back an external API call. BridgeOps persists intent, uses idempotency and reconciles ambiguous outcomes rather than promising global atomicity. Security-sensitive changes write audit records in the same local transaction; notification delivery is asynchronous and recoverable.
 
-The Phase 5 REST increment implements that boundary with execution-owned ExternalDispatch and integration-owned registered-operation planning, dispatch markers and transport. Public application contracts independently rederive persisted actor/tenant/approval/fence context; no integration repository is imported by executions. Network I/O and credential resolution run with transaction propagation NEVER; required dispatch audit commits before I/O and result/receipt/audit commit under the current fence afterward. Explicit USER/AUTOMATION context and signed durable webhook acceptance are implemented in preceding Phase 5 increments; historical scope notes below describe their original checkpoints. Typed authoring and complete preserved-data release verification remain in progress.
+The Phase 5 REST increment implements that boundary with execution-owned ExternalDispatch and integration-owned registered-operation planning, dispatch markers and transport. Public application contracts independently rederive persisted actor/tenant/approval/fence context; no integration repository is imported by executions. Network I/O and credential resolution run with transaction propagation NEVER; required dispatch audit commits before I/O and result/receipt/audit commit under the current fence afterward. Explicit USER/AUTOMATION context, signed durable webhook acceptance and typed React Flow authoring are implemented. The clean 517-test regression, six Chromium journeys and preserved-data V11 → V24 local Compose upgrade passed. [Release evidence and limitations](../development/PHASE_5_INTEGRATIONS.md).
 
 Implemented Phase 1D clarification: shared.mail owns the narrow OutboundEmail port and authenticated TLS adapter. Identity and organizations depend on that module-neutral contract; identity does not depend on organization persistence or invitation infrastructure. Member display labels are resolved through identity's public query DTO boundary only after tenant authorization. Planned notifications and workflow execution modules above remain later work.
 
