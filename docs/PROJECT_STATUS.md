@@ -2,6 +2,10 @@
 
 Updated 2026-10-27 UTC. **Phase 5 controlled integrations and business automation is implemented and verified locally and in exact hosted implementation CI.** Publication stores an immutable definition; explicit execution dispatches only implemented registered capabilities. AI and MCP remain Phase 6.
 
+## Current work — Phase 5.5 UX/UI foundation
+
+Started 2026-10-29 from clean/fetched master `4ff2e7a3d257d9addafaedc3ca43f23aafe1aa6a`, whose exact CI40474013684 passed. The user selected a light enterprise workspace with a dark graphite React Flow canvas. Fresh baseline frontend verification passed all 148 tests, typecheck, lint and build. Six existing disposable browser journeys are being rerun; no result is assumed. The [UI audit and implementation sequence](development/PHASE_5_5_UX.md) covers contextual navigation, responsive shell, reusable controls/states, editor composition and all current operational pages. Backend behavior, APIs, permissions, graph hashes, databases, environment/keys/SMTP and named volumes are preserved. This milestone is in progress; Phase 6 has not started.
+
 ## Phase 5 release verification
 
 The complete critical path is implemented: encrypted secret references and registered REST operations; persisted support/team/internal-notification capabilities; graph-v2 routing, mappings, transforms and delays; exact approval-protected effects; scoped automation actors and signed durable webhooks; typed React Flow authoring and execution monitoring. All six real Chromium journeys passed, including visibly authored triage and an independently approved TLS provider operation. The clean full regression passed **517 tests: 135 unit/MVC and 382 PostgreSQL/HTTP/browser**, zero failures/errors/skips across 55 required XML reports. All **148 frontend tests**, strict typecheck, lint and production build passed. Dependency audit found zero production vulnerabilities and the repository-history secret scan found no leaks. See the [authoring guide](development/PHASE_5_AUTHORING.md) and [complete verification record](development/PHASE_5_INTEGRATIONS.md).

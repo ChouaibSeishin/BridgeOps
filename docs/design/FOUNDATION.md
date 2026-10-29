@@ -1,6 +1,6 @@
 # Design foundation
 
-Status: tokens and layout direction retained after review. Phase 1A implements an inspectable shell; rendered results and verification limits are recorded in PROJECT_STATUS.md. [Token source](../../frontend/src/styles/tokens.css) remains framework-independent and is imported alongside Tailwind.
+Status: Phase 5.5 evolves the delivered UI into a light operations workspace with an intentionally dark graphite workflow canvas. Implementation/verification is in progress under the [UI audit and sequence](../development/PHASE_5_5_UX.md). Historical milestone notes below retain their scope. The existing [token source](../../frontend/src/styles/tokens.css), system fonts, Tailwind and current React Flow behavior remain the foundation.
 
 Use a restrained operations workspace: warm neutral light surfaces, graphite dark surfaces, indigo actions, clear table hierarchy, monospaced identifiers and readable status text. Use system sans-serif initially to avoid font licensing/network dependencies. Typography targets: 14px body, 12px metadata, 24px page title; 1.5 body line height. Use a 4px spacing scale, 6–12px radii and modest shadows. Tokens govern colors, spacing, typography, borders, focus and states.
 
@@ -8,7 +8,7 @@ Desktop shell: 240px navigation rail, compact top bar, content width up to 1440p
 
 Show page title, precise supporting text and one primary action. Prefer compact metric strips, tables and timelines over a grid of unrelated cards. Use outlined surfaces for configuration and inspection, not every content item. Status always includes text/icon, not color alone. Definition versions and operation IDs use monospace.
 
-Workflow canvas: left categorized palette; central graph with visible trigger/action/condition/approval distinctions; right configuration inspector. Keep zoom/fit controls, keyboard alternatives to dragging, unsaved-change text, version badge and node-specific validation list. Errors link to the affected node. Publish shows the exact draft revision. Test-run uses the label **Run test — real effects**, lists configured integrations and requires a confirmation dialog explaining possible real requests and changes. The request carries effectsAcknowledged=true. A true dry-run is a separate deferred feature.
+Workflow canvas: left categorized palette; central graphite graph with readable nodes/grid/edges and visible trigger/action/condition/approval distinctions; right light configuration inspector. Keep zoom/fit controls, keyboard alternatives to dragging, unsaved-change text, version badge and node-specific validation list. Errors navigate to the affected node. Publish shows the exact draft revision. Run published version remains a separate explicit action using the existing supported input and external-effects acknowledgement. The former draft TEST wording was target design; Phase 5.5 introduces neither TEST snapshots nor dry-run execution.
 
 Execution view prioritizes state and timestamps, then graph/timeline, attempts and sanitized item results. Approval view shows exact changes, requester, expiry, policy and consequences before decision. AI view labels MOCK or provider identity and differentiates proposal, approval request and completed action.
 
