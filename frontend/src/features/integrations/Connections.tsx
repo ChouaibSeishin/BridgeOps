@@ -5,6 +5,12 @@ import { failureMessage, type User } from "../../lib/session";
 import { useWorkflowAccess } from "../workflows/useWorkflowAccess";
 import { Pager, Problem } from "../workflows/Feedback";
 import {
+  ConfirmationDialog,
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+} from "../../components/ui";
+import {
   connectionApi,
   type ManagedConnection,
   type ConnectionInput,
@@ -69,16 +75,26 @@ function ConnectionList({
   });
   return (
     <>
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">REGISTERED CAPABILITIES</p>
-          <h1>Integrations</h1>
-          <p>
-            Organization-owned connections and their actual persisted status.
-          </p>
-        </div>
-        <Link to={`/organizations/${org}`}>Organization</Link>
-      </section>
+      <PageHeader
+        title="Integrations"
+        eyebrow="REGISTERED CAPABILITIES"
+        description="Organization-owned connections and their actual persisted status."
+        actions={
+          <>
+            <Link className="button" to={`/organizations/${org}`}>
+              Organization
+            </Link>
+            {manage && (
+              <button
+                className="button primary"
+                onClick={() => setCreate((value) => !value)}
+              >
+                {create ? "Close connection setup" : "Configure a connection"}
+              </button>
+            )}
+          </>
+        }
+      />
       <section className="data-panel">
         <h2>Integration catalog</h2>
         {definitions.isPending ? (
@@ -89,13 +105,15 @@ function ConnectionList({
             retry={() => void definitions.refetch()}
           />
         ) : (
-          definitions.data.map((definition) => (
-            <article key={definition.type}>
-              <h3>{definition.name}</h3>
-              <p>{definition.description}</p>
-              <p>Implementation version {definition.implementationVersion}</p>
-            </article>
-          ))
+          <div className="catalog-grid">
+            {definitions.data.map((definition) => (
+              <article key={definition.type}>
+                <h3>{definition.name}</h3>
+                <p>{definition.description}</p>
+                <p>Implementation version {definition.implementationVersion}</p>
+              </article>
+            ))}
+          </div>
         )}
       </section>
       <section className="data-panel">
@@ -112,7 +130,10 @@ function ConnectionList({
         ) : (
           <>
             {list.data.items.length === 0 ? (
-              <p>No connections are configured.</p>
+              <EmptyState title="No connections are configured.">
+                Connections become available only after an authorized person
+                configures them.
+              </EmptyState>
             ) : (
               list.data.items.map((connection) => (
                 <article key={connection.id}>
@@ -126,11 +147,14 @@ function ConnectionList({
                   <p>{connection.description}</p>
                   <p>
                     {connection.type} ·{" "}
-                    {connection.enabled ? "ENABLED" : "DISABLED"} · revision{" "}
-                    {connection.revision}
+                    <StatusBadge
+                      value={connection.enabled ? "ENABLED" : "DISABLED"}
+                    />{" "}
+                    · revision {connection.revision}
                   </p>
                   <p>
-                    Connection check: {connection.health.status}
+                    Connection check:{" "}
+                    <StatusBadge value={connection.health.status} />
                     {connection.health.checkedAt
                       ? ` · ${new Date(connection.health.checkedAt).toLocaleString()}`
                       : ""}
@@ -140,14 +164,6 @@ function ConnectionList({
             )}
             <Pager page={page} pages={list.data.totalPages} change={setPage} />
           </>
-        )}
-        {manage && (
-          <button
-            className="button primary"
-            onClick={() => setCreate((v) => !v)}
-          >
-            {create ? "Close connection setup" : "Configure a connection"}
-          </button>
         )}
       </section>
       {create && manage && (
@@ -249,24 +265,26 @@ function ConnectionData({
     );
   return (
     <>
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">CONFIGURED INTEGRATION</p>
-          <h1>{summary.data.name}</h1>
-          <p>{summary.data.description}</p>
-        </div>
-        <Link to={`/organizations/${org}/integrations`}>All integrations</Link>
-      </section>
+      <PageHeader
+        title={summary.data.name}
+        eyebrow="CONFIGURED INTEGRATION"
+        description={summary.data.description}
+        actions={
+          <Link className="button" to={`/organizations/${org}/integrations`}>
+            All integrations
+          </Link>
+        }
+      />
       <section className="data-panel">
         <h2>Connection state</h2>
         <p>
           {summary.data.type} · implementation v
           {summary.data.implementationVersion} · revision{" "}
           {summary.data.revision} ·{" "}
-          {summary.data.enabled ? "ENABLED" : "DISABLED"}
+          <StatusBadge value={summary.data.enabled ? "ENABLED" : "DISABLED"} />
         </p>
         <p>
-          Health: {summary.data.health.status}
+          Health: <StatusBadge value={summary.data.health.status} />
           {summary.data.health.code ? ` · ${summary.data.health.code}` : ""}
         </p>
         {summary.data.health.checkedAt && (
@@ -301,14 +319,17 @@ function ConnectionData({
         <button className="button" onClick={() => void summary.refetch()}>
           Refresh connection state
         </button>
-        {error && <p role="alert">{error}</p>}
+        {error && checkRevision === null && <p role="alert">{error}</p>}
         {notice && <p role="status">{notice}</p>}
         {checkRevision !== null && (
-          <section
+          <ConfirmationDialog
             role="alertdialog"
-            aria-label="Confirm saved connection check"
+            label="Confirm saved connection check"
+            onCancel={() => setCheckRevision(null)}
+            busy={busy}
           >
             <h3>Check this saved revision?</h3>
+            {error && <p role="alert">{error}</p>}
             <p>Connection revision {checkRevision}.</p>
             {summary.data.type === "REST" ? (
               <>
@@ -345,7 +366,7 @@ function ConnectionData({
             >
               Cancel connection check
             </button>
-          </section>
+          </ConfirmationDialog>
         )}
       </section>
       <section className="data-panel">
@@ -649,33 +670,36 @@ function ConnectionForm({
               Optional; it must identify a GET operation with no required path
               parameters.
             </p>
-            <label>
-              New bearer credential
-              <input
-                type="password"
-                autoComplete="off"
-                maxLength={4096}
-                value={credential}
-                disabled={busy || remove}
-                onChange={(e) => setCredential(e.target.value)}
-              />
-            </label>
-            <p>
-              {configured
-                ? "A credential is stored. Leave this empty to retain it; saved credentials are never returned."
-                : "No credential is stored. Leave empty for an unauthenticated registered operation."}
-            </p>
-            {initial && (
+            <fieldset className="connection-credential">
+              <legend>Credential entry</legend>
               <label>
+                New bearer credential
                 <input
-                  type="checkbox"
-                  checked={remove}
-                  disabled={busy || Boolean(credential)}
-                  onChange={(e) => setRemove(e.target.checked)}
+                  type="password"
+                  autoComplete="off"
+                  maxLength={4096}
+                  value={credential}
+                  disabled={busy || remove}
+                  onChange={(e) => setCredential(e.target.value)}
                 />
-                Remove the stored credential reference
               </label>
-            )}
+              <p>
+                {configured
+                  ? "A credential is stored. Leave this empty to retain it; saved credentials are never returned."
+                  : "No credential is stored. Leave empty for an unauthenticated registered operation."}
+              </p>
+              {initial && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={remove}
+                    disabled={busy || Boolean(credential)}
+                    onChange={(e) => setRemove(e.target.checked)}
+                  />
+                  Remove the stored credential reference
+                </label>
+              )}
+            </fieldset>
           </>
         )}
         <button className="button primary" disabled={busy}>

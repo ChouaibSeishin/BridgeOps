@@ -136,6 +136,7 @@ it("blocks saving and publication while canvas properties have unapplied invalid
       { timeout: 10000 },
     );
     fireEvent.change(inspect, { target: { value: "action" } });
+    fireEvent.click(screen.getByText("Advanced JSON"));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Node configuration JSON" }),
       { target: { value: "invalid configuration" } },
@@ -265,10 +266,9 @@ it("maps server validation to the offending node and field", async () => {
   expect(
     within(node).getByText("Provide a bounded message."),
   ).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "action" })).toHaveAttribute(
-    "href",
-    "#node-action",
-  );
+  expect(
+    screen.getByRole("link", { name: "Synthetic action 1" }),
+  ).toHaveAttribute("href", "#node-action");
 });
 it("preserves local edits after 409 and requires explicit discard before reload", async () => {
   const save = vi

@@ -1,5 +1,6 @@
 import { failureMessage } from "../../lib/session";
 import type { Validation } from "./model";
+import { isCanvasGraph, canvasLabels } from "./canvasModel";
 
 export function Problem({
   error,
@@ -49,8 +50,17 @@ export function Pager({
     </nav>
   );
 }
-export function ValidationResults({ result }: { result?: Validation }) {
+export function ValidationResults({
+  result,
+  definition,
+}: {
+  result?: Validation;
+  definition?: unknown;
+}) {
   if (!result) return null;
+  const labels = isCanvasGraph(definition)
+    ? canvasLabels(definition)
+    : new Map<string, string>();
   return (
     <section
       className="validation-results"
@@ -72,7 +82,9 @@ export function ValidationResults({ result }: { result?: Validation }) {
           {result.errors.map((error, index) => (
             <li key={index}>
               {error.nodeId ? (
-                <a href={`#node-${error.nodeId}`}>{error.nodeId}</a>
+                <a href={`#node-${error.nodeId}`}>
+                  {labels.get(error.nodeId) ?? "Workflow node"}
+                </a>
               ) : (
                 <strong>Definition</strong>
               )}
@@ -80,6 +92,12 @@ export function ValidationResults({ result }: { result?: Validation }) {
               <small className="mono">
                 {error.path} · {error.code}
               </small>
+              {error.nodeId && (
+                <details>
+                  <summary>Validation technical details</summary>
+                  <code>{error.nodeId}</code>
+                </details>
+              )}
             </li>
           ))}
         </ul>

@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { workflowJourney } from "./workflows.mjs";
 import { executionJourney } from "./executions.mjs";
-import { workspaceVisualChecks } from "./ux.mjs";
+import { workspaceVisualChecks, operationalVisualChecks } from "./ux.mjs";
 const origin = process.env.BRIDGEOPS_TEST_ORIGIN;
 const control = process.env.BRIDGEOPS_TEST_CONTROL;
 const ownerPassword = "browser-disposable-password";
@@ -307,7 +307,33 @@ try {
   await respectAuthenticationBudget();
   step = "desktop mobile and dark render captures";
   console.log("STEP: " + step);
+  await page
+    .locator(".workspace-sidebar")
+    .getByRole("link", { name: "Account & sessions", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Account & sessions", exact: true }),
+  ).toBeVisible();
+  await operationalVisualChecks(page, "account");
+  await page
+    .locator(".workspace-sidebar")
+    .getByRole("link", { name: "Runtime", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Runtime", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Ready", { exact: true })).toBeVisible();
+  await operationalVisualChecks(page, "runtime");
+  await page
+    .locator(".workspace-sidebar")
+    .getByRole("link", { name: "Organizations", exact: true })
+    .click();
+  await page.getByRole("link", { name: /Dispatch Operations/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Dispatch Operations", exact: true }),
+  ).toBeVisible();
   await workspaceVisualChecks(page);
+  await operationalVisualChecks(page, "organization");
   await page.evaluate(() => window.scrollTo(0, 0));
   await mkdir(resolve("backend/target/browser-checks"), { recursive: true });
   await page.screenshot({

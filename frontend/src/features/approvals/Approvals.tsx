@@ -5,6 +5,12 @@ import type { User } from "../../lib/session";
 import { useWorkflowAccess } from "../workflows/useWorkflowAccess";
 import { Problem, Pager } from "../workflows/Feedback";
 import {
+  ConfirmationDialog,
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+} from "../../components/ui";
+import {
   approvalApi,
   approvalFailure,
   terminalExecution,
@@ -55,19 +61,18 @@ export function ApprovalInbox({ user }: { user: User }) {
   if (!allowed) return <p role="alert">Approval reading is not permitted.</p>;
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">HUMAN GOVERNANCE</div>
-          <h1>Approval inbox</h1>
-          <p>
-            Review exact proposed operations. One different eligible person
-            decides.
-          </p>
-        </div>
-        <Link to={`/organizations/${id}/approval-policy`}>Approval policy</Link>
-      </div>
+      <PageHeader
+        title="Approval inbox"
+        eyebrow="HUMAN GOVERNANCE"
+        description="Review exact proposed operations. One different eligible person decides."
+        actions={
+          <Link className="button" to={`/organizations/${id}/approval-policy`}>
+            Approval policy
+          </Link>
+        }
+      />
       <section className="data-panel">
-        <div className="action-row">
+        <div className="filter-row">
           <label>
             Approval status
             <select
@@ -97,11 +102,13 @@ export function ApprovalInbox({ user }: { user: User }) {
         {inbox.data && !inbox.isError && (
           <>
             {inbox.data.items.length === 0 ? (
-              <p>No approval requests match this view.</p>
+              <EmptyState title="No approval requests match this view.">
+                Change the state filter or refresh to check for new requests.
+              </EmptyState>
             ) : (
               <ol className="version-history">
                 {inbox.data.items.map((r) => (
-                  <li key={r.id}>
+                  <li key={r.id} className="approval-record">
                     <Link to={`/organizations/${id}/approvals/${r.id}`}>
                       {r.prompt}
                     </Link>
@@ -109,9 +116,11 @@ export function ApprovalInbox({ user }: { user: User }) {
                       {r.workflowName} · published version {r.versionNumber}
                     </p>
                     <p>
-                      <strong>{r.status}</strong>
+                      <StatusBadge value={r.status} />
                       {r.invalidated && " · Authorization invalidated"} ·
-                      Internal record
+                      {r.capability === "synthetic"
+                        ? "Internal record"
+                        : "Registered operation"}
                     </p>
                     <p>
                       {typeof r.arguments.message === "string"
@@ -225,26 +234,33 @@ function ApprovalReview({
   }
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">EXACT PROPOSED INTENT</div>
-          <h1>Approval detail</h1>
-          <p>{r.prompt}</p>
-        </div>
-        <Link to={`/organizations/${organization}/approvals`}>
-          All approvals
-        </Link>
-      </div>
+      <PageHeader
+        title="Approval detail"
+        eyebrow="EXACT PROPOSED INTENT"
+        description={r.prompt}
+        actions={
+          <Link
+            className="button"
+            to={`/organizations/${organization}/approvals`}
+          >
+            All approvals
+          </Link>
+        }
+      />
       <section className="data-panel">
-        <div className="action-row">
+        <div className="record-heading">
           <h2>Request state</h2>
-          <strong role="status">{r.status}</strong>
+          <StatusBadge value={r.status} live />
           <button className="button" onClick={() => void refresh()}>
             Refresh approval
           </button>
         </div>
         <p>
-          Execution state: <strong>{label(r.executionStatus)}</strong> ·{" "}
+          Execution state:{" "}
+          <StatusBadge value={r.executionStatus}>
+            {label(r.executionStatus)}
+          </StatusBadge>{" "}
+          ·{" "}
           <Link
             to={`/organizations/${organization}/executions/${r.executionId}`}
           >
@@ -273,7 +289,7 @@ function ApprovalReview({
         )}
         {r.errorCode && <p role="alert">Reason: {label(r.errorCode)}</p>}
       </section>
-      <section className="data-panel">
+      <section className="data-panel intent-review">
         <h2>
           {r.capability === "synthetic"
             ? "Exact internal operation"
@@ -347,7 +363,7 @@ function ApprovalReview({
           </p>
         </details>
         {notice && <p role="status">{notice}</p>}
-        {error && (
+        {error && (!confirm || !r.actionable) && (
           <p role="alert" className="form-error">
             {error}
           </p>
@@ -372,44 +388,59 @@ function ApprovalReview({
                 </button>
               </div>
             ) : (
-              <form onSubmit={(e) => void submit(e)}>
-                <fieldset disabled={busy}>
-                  <legend>
-                    {confirm === "APPROVE"
-                      ? "Confirm exact approval"
-                      : "Confirm rejection"}
-                  </legend>
-                  <p>
-                    {confirm === "APPROVE"
-                      ? `Authorize this exact ${r.capability === "synthetic" ? "internal record" : "registered operation"}. The worker must still revalidate policy, authority, preconditions and deadline before executing it.`
-                      : "Reject this intent. Earlier completed operations remain recorded."}
-                  </p>
-                  <label>
-                    Optional decision reason
-                    <textarea
-                      value={reason}
-                      maxLength={200}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                  </label>
-                  <div className="action-row">
-                    <button className="button primary" type="submit">
-                      {busy
-                        ? "Saving decision…"
-                        : confirm === "APPROVE"
-                          ? "Confirm approval"
-                          : "Confirm rejection"}
-                    </button>
-                    <button
-                      className="button"
-                      type="button"
-                      onClick={() => setConfirm(null)}
-                    >
-                      Back to review
-                    </button>
-                  </div>
-                </fieldset>
-              </form>
+              <ConfirmationDialog
+                label={
+                  confirm === "APPROVE"
+                    ? "Confirm exact approval"
+                    : "Confirm rejection"
+                }
+                onCancel={() => setConfirm(null)}
+                busy={busy}
+              >
+                <form onSubmit={(e) => void submit(e)}>
+                  <fieldset disabled={busy}>
+                    <legend>
+                      {confirm === "APPROVE"
+                        ? "Confirm exact approval"
+                        : "Confirm rejection"}
+                    </legend>
+                    <p>
+                      {confirm === "APPROVE"
+                        ? `Authorize this exact ${r.capability === "synthetic" ? "internal record" : "registered operation"}. The worker must still revalidate policy, authority, preconditions and deadline before executing it.`
+                        : "Reject this intent. Earlier completed operations remain recorded."}
+                    </p>
+                    {error && (
+                      <p role="alert" className="form-error">
+                        {error}
+                      </p>
+                    )}
+                    <label>
+                      Optional decision reason
+                      <textarea
+                        value={reason}
+                        maxLength={200}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                    </label>
+                    <div className="action-row">
+                      <button className="button primary" type="submit">
+                        {busy
+                          ? "Saving decision…"
+                          : confirm === "APPROVE"
+                            ? "Confirm approval"
+                            : "Confirm rejection"}
+                      </button>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => setConfirm(null)}
+                      >
+                        Back to review
+                      </button>
+                    </div>
+                  </fieldset>
+                </form>
+              </ConfirmationDialog>
             )}
           </>
         ) : (

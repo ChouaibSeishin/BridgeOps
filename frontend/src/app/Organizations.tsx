@@ -353,56 +353,60 @@ export function OrganizationDetail({ user }: { user: User }) {
         <div>
           <div className="eyebrow">ORGANIZATION</div>
           <h1>{detail.data.name}</h1>
-          <p>
-            {detail.data.slug} · <span className="mono">{detail.data.id}</span>
-          </p>
+          <p>{detail.data.slug}</p>
         </div>
         <button className="button" onClick={reload}>
           Reload access & data
         </button>
       </div>
+      <details className="organization-identifiers">
+        <summary>Technical organization details</summary>
+        <code>{detail.data.id}</code>
+      </details>
       {notice && <p role="status">{notice}</p>}
-      {permissions.includes("integration.read") && (
-        <p>
-          <Link className="button" to={`/organizations/${id}/integrations`}>
-            Open integrations
-          </Link>{" "}
-          <Link className="button" to={`/organizations/${id}/automations`}>
-            Automations & webhooks
-          </Link>
-        </p>
-      )}
-      {permissions.includes("capability.read") && (
-        <p>
-          <Link className="button" to={`/organizations/${id}/business`}>
-            Open support operations
-          </Link>
-        </p>
-      )}
-      {permissions.includes("approval.read") && (
-        <p>
-          <Link className="button" to={`/organizations/${id}/approvals`}>
-            Open approvals
-          </Link>
-        </p>
-      )}
-      {permissions.includes("execution.read") && (
-        <p>
-          <Link className="button" to={`/organizations/${id}/executions`}>
-            Open executions
-          </Link>
-        </p>
-      )}
-      {permissions.includes("workflow.read") && (
-        <p>
-          <Link
-            className="button primary"
-            to={`/organizations/${id}/workflows`}
-          >
-            Open workflows
-          </Link>
-        </p>
-      )}
+      <nav className="organization-actions" aria-label="Organization tools">
+        {permissions.includes("integration.read") && (
+          <p>
+            <Link className="button" to={`/organizations/${id}/integrations`}>
+              Open integrations
+            </Link>{" "}
+            <Link className="button" to={`/organizations/${id}/automations`}>
+              Automations & webhooks
+            </Link>
+          </p>
+        )}
+        {permissions.includes("capability.read") && (
+          <p>
+            <Link className="button" to={`/organizations/${id}/business`}>
+              Open support operations
+            </Link>
+          </p>
+        )}
+        {permissions.includes("approval.read") && (
+          <p>
+            <Link className="button" to={`/organizations/${id}/approvals`}>
+              Open approvals
+            </Link>
+          </p>
+        )}
+        {permissions.includes("execution.read") && (
+          <p>
+            <Link className="button" to={`/organizations/${id}/executions`}>
+              Open executions
+            </Link>
+          </p>
+        )}
+        {permissions.includes("workflow.read") && (
+          <p>
+            <Link
+              className="button primary"
+              to={`/organizations/${id}/workflows`}
+            >
+              Open workflows
+            </Link>
+          </p>
+        )}
+      </nav>
       {error && (
         <p role="alert" className="form-error">
           {error}

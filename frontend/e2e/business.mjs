@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { resolve } from "node:path";
+import { operationalVisualChecks } from "./ux.mjs";
 const {
   BRIDGEOPS_TEST_ORIGIN: origin,
   BRIDGEOPS_TEST_ORG: org,
@@ -247,9 +248,13 @@ try {
   await expect(
     owner.getByText("Assigned 2 tickets", { exact: true }),
   ).toBeVisible();
+  const deliveredNotice = owner
+    .locator("article.notification-record")
+    .filter({ hasText: "Assigned 2 tickets" });
   await expect(
-    owner.getByText(/DELIVERED_INTERNAL.*LIVE_EXECUTION/),
+    deliveredNotice.getByText("DELIVERED INTERNAL", { exact: true }),
   ).toBeVisible();
+  await expect(deliveredNotice).toContainText("LIVE_EXECUTION");
   const notifications = await http(
     owner,
     ownerToken,
@@ -270,6 +275,7 @@ try {
       )
     ).body,
   ).toHaveLength(1);
+  await operationalVisualChecks(owner, "support");
   await owner.screenshot({
     path: resolve("backend/target/browser-checks/business-triage-desktop.png"),
     fullPage: true,

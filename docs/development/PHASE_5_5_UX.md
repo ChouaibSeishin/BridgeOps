@@ -45,3 +45,53 @@ Baseline frontend: 21 files / 148 tests passed, zero failures/skips; typecheck, 
 Fresh unchanged-asset browser baseline passed all 135 unit/MVC tests and all six required real Chromium journeys with zero failures/errors/skips. Captures were retained privately before the redesigned build. The first shared foundation build passed all 155 frontend tests (23 files), typecheck, lint and production build. Seven added cases cover live permission-based navigation, scoped organization context, no empty-tenant fetch on global routes, named drawer/focus return, honest status/empty states and cancellation while busy. An initial new title query matched both breadcrumb and sidebar; scoping it to the navigation landmark corrected the test assumption without removing the long-name check.
 
 The first real redesigned canvas/triage journey passed, including rendered node/secondary-text contrast of at least 4.5:1 and all retained actual business/approval/receipt/history assertions. The expanded onboarding journey caught a mobile drawer keyboard-boundary failure. An explicit first/last focus-target loop supplements the native modal; strict TypeScript additionally required checking the actual first/last elements rather than only array length. The corrected focused tests/typecheck/lint/build passed, followed by all 135 units and the complete real onboarding/workflow/execution/recovery journey, zero failures/errors/skips. The new checks passed desktop widths 1440/1280, tablet 768 and mobile 390, including Tab/Shift+Tab containment, Escape, focus return, body contrast and global overflow. Desktop, mobile workspace/drawer and dark-canvas screenshots were inspected. No focus assertion or retained timeout was relaxed. Editor composition and operational page refinements remain subsequent increments; this is not the full phase release gate.
+
+## Integrated presentation
+
+The shared shell uses actual organization access and name queries, the existing URLs and session client, contextual breadcrumbs and permission-filtered Operations/Governance links. Global Organizations, Workflows, Runtime and Account remain available. There is no invented dashboard, analytics, audit-query or AI destination. Navigation becomes a focus-managed native dialog below the desktop breakpoint. Existing dark theme and reduced-motion behavior remain; theme is still session-local DOM state, with no new persistent browser storage.
+
+`tokens.css` owns semantic surfaces, text, borders, selected/focus states, status colors and independent graphite canvas colors. `app.css` exposes the semantic palette through the existing Tailwind processor; `workspace.css` and `operations.css` apply shared layout and record patterns. PageHeader, StatusBadge, EmptyState, ConfirmationDialog and TableRegion provide reusable presentation. Status labels retain the actual persisted state, accompanied by icons. Dense tables have named keyboard-scrollable regions.
+
+### Authoring and lifecycle
+
+The React Flow workbench places a categorized palette beside the graph and inspector on desktop. Tablet places the inspector below; phone stacks the native grouped palette picker, canvas and inspector. Keyboard selectors for adding, inspecting and connecting nodes remain. Typed property forms and mapping controls retain every registered field, permission, revision and compatibility check. Advanced JSON is available in a collapsed section; unapplied or unsafe edits still block lifecycle mutations. Field errors are programmatically associated with the configuration form. Friendly saved-validation links select the affected node.
+
+Compact and horizontal layouts, drag positions, zoom and selection are presentation state only. Resize fitting keeps the graph visible when its container changes size; Focus selected node centers the node and brings the graph into the page viewport. None of these values enter workflow JSON, published hashes or database records. Graph-v1 editing, graph-v2 conversion, historical exact JSON/large-integer handling and immutable published inspection retain their existing semantics.
+
+Save, validate, publish, duplicate, archive and run remain separate actions. Publish, archive, reload/discard, graph conversion, start, cancel, linked retry, approval decisions, connection checks, example-data addition and automation rotation/revocation use the shared native confirmation pattern where they already require confirmation. No additional server mutation or external request is introduced by navigation, layout, validation links or screenshots.
+
+### Operational routes
+
+- Workflow and execution histories use compact real-data tables with state, revision/time and accessible secondary fingerprints. Publication metadata retains publisher, source revision, schema/canonicalization and exact hash.
+- Execution detail prioritizes persisted state, timestamps, absolute deadline, duration and current step. Step outputs, logical operation IDs, attempts, retry schedules, approval references, partial outcomes and timeline remain available. Polling, stale warnings, cancellation and backend-confirmed retry eligibility are unchanged.
+- Approval inbox/detail distinguish request state from execution state. Exact canonical proposed arguments remain directly visible before decisions; requester, policy, expiry and immutable source remain. Decision confirmation still explains independent worker revalidation and completed effects.
+- Integrations show honest enabled/health/revision states and registered operations. Credential entry is visually separated; stored credentials are never returned or prefilled. Configured-destination and external-effects confirmation remains permission-bound.
+- Support tickets use a contained table with filters, team assignment, revision and provenance. Responsibilities and persisted internal delivery history remain. No notes API or email delivery is invented; internal delivery still means persisted BridgeOps availability.
+- Automation principals and webhook endpoints show persisted scope/status/revision, pinned versions and delivery links. Rotation/revocation confirmations retain expected revisions. One-time signing-key reveal/copy/dismiss stays transient and outside query/persistent caches.
+- Organization tools use a compact permission-filtered row; organization IDs are secondary. Members, roles, invitations, account/session controls, onboarding, recovery and Runtime adopt the shared readable form, table, notice and responsive surface rules.
+
+## Verification commands and evidence
+
+Use the pinned Node runtime and repository Maven wrapper. Browser/integration fixtures are disposable PostgreSQL/Testcontainers instances, not the installed local account or volume.
+
+```text
+npm --prefix frontend run typecheck
+npm --prefix frontend run lint
+npm --prefix frontend test -- --maxWorkers=2
+npm --prefix frontend run build
+backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
+node scripts/verify-test-reports.mjs
+node scripts/verify-docs.mjs
+npm --prefix frontend audit --omit=dev --audit-level=high
+gitleaks git --redact --no-banner
+```
+
+The composed editor/operational build passed all 160 frontend tests in 24 files, strict typecheck, lint and production build. Existing assertions were retained; formatting-specific queries now inspect the separate state badges and their containing records. Added coverage verifies categorized controls, presentation-only layout, pending-edit protection, collapsed advanced JSON, associated errors and friendly validation navigation. The production dependency audit reported zero vulnerabilities; history scanning reported no leaks.
+
+Visual checks in `frontend/e2e/ux.mjs` run within existing real journeys. They capture 1440/1280/768/390px layouts, keyboard-scrollable tables, drawer focus containment/return, graph visibility after resizing and selected-node focusing, real status text contrast, control focus contrast/hit targets and global overflow. Captures are written under `backend/target/browser-checks/ux-*.png`; the existing journey captures remain. No mocked metrics, production credentials or one-time webhook secrets are used for visual evidence.
+
+Visual review found a phone graph outside its resized viewport. The new real node-intersection assertion detected the gap in the earlier geometry-only checks. A subsequent selected-node assertion exposed page scrolling as a separate issue; focus now also brings the graph into view. These checks remain enabled. Final full-suite, container, preservation and exact hosted release results will be recorded after completion.
+
+## Remaining scope boundaries
+
+This is a UX foundation, not formal WCAG certification. Dedicated screen-reader and broader assistive-technology audits remain release-polish work. Current API/permission boundaries govern every displayed action. AI/MCP, new connectors, new schema/input semantics, arbitrary requests and database changes are outside this milestone. The current theme behavior is preserved rather than adding preference storage.

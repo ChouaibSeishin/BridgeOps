@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { resolve } from "node:path";
+import { operationalVisualChecks } from "./ux.mjs";
 
 /** Actual runtime/API/browser only; protected failure control exists solely in the disposable gateway. */
 export async function executionJourney({
@@ -130,6 +131,18 @@ export async function executionJourney({
       exact: true,
     }),
   ).toBeVisible();
+  await operationalVisualChecks(page, "execution-history");
+  await page
+    .getByLabel("Execution status", { exact: true })
+    .selectOption("FAILED");
+  await expect(
+    page.getByRole("heading", {
+      name: "No executions match this view.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await operationalVisualChecks(page, "execution-empty");
+  await page.getByLabel("Execution status", { exact: true }).selectOption("");
   await page
     .getByRole("link", { name: "Inspect execution · SUCCEEDED", exact: true })
     .click();
@@ -137,8 +150,13 @@ export async function executionJourney({
   await expect(
     page.getByText('"recorded": true', { exact: false }),
   ).toHaveCount(2);
-  await expect(page.getByText("Loading attempts…", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Loading timeline…", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Loading attempts…", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Loading timeline…", { exact: true }),
+  ).toHaveCount(0);
+  await operationalVisualChecks(page, "execution");
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: resolve("backend/target/browser-checks/execution-desktop.png"),

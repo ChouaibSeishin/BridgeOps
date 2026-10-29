@@ -43,6 +43,8 @@ export function StatusBadge({
     "DELIVERED_INTERNAL",
     "APPLIED",
     "VALID",
+    "PUBLISHED",
+    "RESOLVED",
   ].includes(normalized);
   const danger = [
     "FAILED",
@@ -50,6 +52,7 @@ export function StatusBadge({
     "INVALIDATED",
     "UNAVAILABLE",
     "RECONCILIATION_REQUIRED",
+    "URGENT",
   ].includes(normalized);
   const waiting =
     normalized.startsWith("WAITING") ||
@@ -60,7 +63,7 @@ export function StatusBadge({
       ? "danger"
       : waiting
         ? "warning"
-        : normalized === "RUNNING"
+        : ["RUNNING", "IN_PROGRESS", "OPEN"].includes(normalized)
           ? "info"
           : "neutral";
   const Icon = success
@@ -69,7 +72,7 @@ export function StatusBadge({
       ? TriangleAlert
       : waiting
         ? Clock
-        : normalized === "RUNNING"
+        : ["RUNNING", "IN_PROGRESS", "OPEN"].includes(normalized)
           ? Activity
           : Minus;
   return (
@@ -114,6 +117,7 @@ export function ConfirmationDialog({
   onCancel,
   busy = false,
   className = "",
+  role = "dialog",
 }: {
   children: ReactNode;
   labelledBy?: string;
@@ -121,6 +125,7 @@ export function ConfirmationDialog({
   onCancel: () => void;
   busy?: boolean;
   className?: string;
+  role?: "dialog" | "alertdialog";
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -141,6 +146,7 @@ export function ConfirmationDialog({
   return (
     <dialog
       ref={dialog}
+      role={role}
       tabIndex={-1}
       aria-modal="true"
       aria-labelledby={labelledBy}

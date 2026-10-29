@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { resolve } from "node:path";
-import { canvasContrastChecks } from "./ux.mjs";
+import { canvasContrastChecks, canvasWorkbenchChecks } from "./ux.mjs";
 
 /** Every definition change here uses visible canvas controls; no graph JSON/API write shortcut. */
 export async function authorTriage(page, org, report) {
@@ -8,7 +8,9 @@ export async function authorTriage(page, org, report) {
   await page.goto(`/organizations/${org}/workflows`);
   await page
     .getByRole("textbox", { name: "Workflow name", exact: true })
-    .fill("Canvas-authored ticket triage");
+    .fill(
+      "Canvas-authored ticket triage — priority routing and independently approved support operations across teams",
+    );
   await page
     .getByRole("button", { name: "Create workflow", exact: true })
     .click();
@@ -181,12 +183,52 @@ export async function authorTriage(page, org, report) {
     .getByRole("textbox", { name: "Input result literal value", exact: true })
     .fill("No assignment needed");
   await apply();
+  report("canvas: invalid saved connection has friendly actionable validation");
+  await page
+    .getByRole("combobox", { name: "Canvas next node", exact: true })
+    .selectOption("");
+  const invalidSave = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PATCH" &&
+      response.url().endsWith(`/workflows/${workflow}`),
+  );
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  expect((await invalidSave).status()).toBe(200);
+  const invalidValidation = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/validate"),
+  );
+  await page
+    .getByRole("button", { name: "Validate saved draft", exact: true })
+    .click();
+  const validation = await (await invalidValidation).json();
+  expect(validation.valid).toBe(false);
+  expect(validation.errors.some((error) => error.nodeId === ids.noWork)).toBe(
+    true,
+  );
+  await select(ids.read);
+  await page
+    .getByRole("region", { name: "Saved definition validation" })
+    .getByRole("link", { name: "Transform 1" })
+    .click();
+  await expect(inspect).toHaveValue(ids.noWork);
+  await page
+    .getByRole("combobox", { name: "Canvas next node", exact: true })
+    .selectOption(ids.finish);
   report("canvas: save, validate and immutably publish the authored workflow");
   await select(ids.read);
   await page
     .getByRole("button", { name: "Reset layout and fit", exact: true })
     .click();
   await canvasContrastChecks(page);
+  await expect(
+    page
+      .getByRole("combobox", { name: "Registered operation", exact: true })
+      .getByRole("option", { name: "list · READ", exact: true }),
+  ).toBeAttached();
+  await canvasWorkbenchChecks(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: resolve("backend/target/browser-checks/canvas-editor-desktop.png"),
     fullPage: true,

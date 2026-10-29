@@ -9,6 +9,8 @@ import { emptyGraph } from "./model";
 import type { Page } from "./model";
 import { useWorkflowAccess } from "./useWorkflowAccess";
 import { Pager, Problem } from "./Feedback";
+import { StatusBadge } from "../../components/ui";
+import { TableRegion } from "../../components/TableRegion";
 
 export function WorkflowHome({ user }: { user: User }) {
   const [page, setPage] = useState(0);
@@ -153,34 +155,59 @@ function OrganizationWorkflows({
                 </p>
               </div>
             ) : (
-              <div className="workflow-list">
-                {list.data.items.map((workflow) => (
-                  <article className="workflow-list-row" key={workflow.id}>
-                    <div>
-                      <Link
-                        to={`/organizations/${organization}/workflows/${workflow.id}`}
-                      >
-                        <strong>{workflow.name}</strong>
-                      </Link>
-                      <p>{workflow.description || "No description"}</p>
-                      <small>
-                        Updated{" "}
-                        <time dateTime={workflow.updatedAt}>
-                          {new Date(workflow.updatedAt).toLocaleString()}
-                        </time>{" "}
-                        · revision {workflow.revision}
-                      </small>
-                    </div>
-                    <span className="status-badge">
-                      {workflow.status === "ARCHIVED"
-                        ? "Archived"
-                        : workflow.currentPublishedVersionId
-                          ? "Published · editable draft"
-                          : "Draft"}
-                    </span>
-                  </article>
-                ))}
-              </div>
+              <TableRegion label="Workflow records">
+                <table className="records-table">
+                  <caption className="sr-only">
+                    Workflow drafts and published versions
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Workflow</th>
+                      <th scope="col">Lifecycle</th>
+                      <th scope="col">Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.data.items.map((workflow) => (
+                      <tr key={workflow.id}>
+                        <td>
+                          <Link
+                            to={`/organizations/${organization}/workflows/${workflow.id}`}
+                          >
+                            <strong>{workflow.name}</strong>
+                          </Link>
+                          <p>{workflow.description || "No description"}</p>
+                        </td>
+                        <td>
+                          <StatusBadge
+                            value={
+                              workflow.status === "ARCHIVED"
+                                ? "ARCHIVED"
+                                : workflow.currentPublishedVersionId
+                                  ? "PUBLISHED"
+                                  : "DRAFT"
+                            }
+                          >
+                            {workflow.status === "ARCHIVED"
+                              ? "Archived"
+                              : workflow.currentPublishedVersionId
+                                ? "Published · editable draft"
+                                : "Draft"}
+                          </StatusBadge>
+                        </td>
+                        <td>
+                          <time dateTime={workflow.updatedAt}>
+                            {new Date(workflow.updatedAt).toLocaleString()}
+                          </time>
+                          <p className="record-secondary">
+                            Revision {workflow.revision}
+                          </p>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableRegion>
             )}
             <Pager page={page} pages={list.data.totalPages} change={setPage} />
           </>

@@ -17,6 +17,7 @@ export interface TypedPropertiesProps {
   pending: () => void;
   formRef: Ref<HTMLFormElement>;
   scope?: MappingScope;
+  descriptionId?: string;
 }
 export function TypedNodeProperties(props: TypedPropertiesProps) {
   const { node, graph, config, inputs, change, pending, formRef, scope } =
@@ -43,6 +44,7 @@ export function TypedNodeProperties(props: TypedPropertiesProps) {
   return (
     <form
       ref={formRef}
+      aria-describedby={props.descriptionId}
       className="typed-node-properties"
       onSubmit={(e) => e.preventDefault()}
     >

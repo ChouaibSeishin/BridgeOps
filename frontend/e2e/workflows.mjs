@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { operationalVisualChecks } from "./ux.mjs";
 
 /** Real definition lifecycle. Credentials remain in this test process/closure, never output. */
 export async function workflowJourney({
@@ -98,6 +99,7 @@ export async function workflowJourney({
     await expect(
       page.getByRole("heading", { name: "No workflows yet", exact: true }),
     ).toBeVisible();
+    await operationalVisualChecks(page, "workflow-empty");
     await page
       .getByLabel("Workflow name", { exact: true })
       .fill("Ticket Dispatch");
@@ -215,6 +217,7 @@ export async function workflowJourney({
       .getByText("Technical node details", { exact: true })
       .click();
     await expect(technical.locator("code")).toHaveText(firstAction.id);
+    await canvas.getByText("Advanced JSON", { exact: true }).click();
     await canvas
       .getByRole("textbox", { name: "Node configuration JSON", exact: true })
       .fill("invalid local properties");
@@ -521,6 +524,13 @@ export async function workflowJourney({
         ),
       ),
     ).toBe(false);
+    await page
+      .getByRole("link", { name: "All workflows", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Workflow definitions", exact: true }),
+    ).toBeVisible();
+    await operationalVisualChecks(page, "workflows");
     await page.goto(organizationUrl);
     await expect(
       page.getByRole("heading", { name: "Dispatch Operations", exact: true }),

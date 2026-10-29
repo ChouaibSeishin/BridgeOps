@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ConfirmationDialog } from "../../components/ui";
 import { Link, useNavigate } from "react-router-dom";
 import { executionApi, executionFailure } from "./api";
 import { workflowApi } from "../workflows/api";
@@ -129,11 +130,10 @@ export function ExecutionStart({
         </p>
       )}
       {confirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="execution-confirm-title"
-          className="confirmation-panel"
+        <ConfirmationDialog
+          labelledBy="execution-confirm-title"
+          onCancel={() => setConfirm(false)}
+          busy={busy}
         >
           <h3 id="execution-confirm-title">
             {preview?.external
@@ -328,7 +328,7 @@ export function ExecutionStart({
               Keep editing
             </button>
           </div>
-        </div>
+        </ConfirmationDialog>
       )}
     </section>
   );

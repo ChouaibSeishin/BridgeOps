@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { resolve } from "node:path";
+import { operationalVisualChecks } from "./ux.mjs";
 const origin = process.env.BRIDGEOPS_TEST_ORIGIN,
   org = process.env.BRIDGEOPS_TEST_ORG,
   foreign = process.env.BRIDGEOPS_TEST_FOREIGN_ORG,
@@ -283,6 +284,7 @@ try {
   await expect(
     reviewer.getByText("Exact protected record", { exact: true }),
   ).toBeVisible();
+  await operationalVisualChecks(reviewer, "approval");
   await reviewer.screenshot({
     path: resolve("backend/target/browser-checks/approval-inbox-desktop.png"),
     fullPage: true,

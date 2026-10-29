@@ -446,6 +446,7 @@ it("keeps saved bindings intact and omits private error details when connection 
   expect(
     screen.queryByText(/private-provider-fixture/),
   ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("Advanced JSON"));
   expect(
     screen.getByRole("textbox", { name: "Node configuration JSON" }),
   ).toHaveValue(

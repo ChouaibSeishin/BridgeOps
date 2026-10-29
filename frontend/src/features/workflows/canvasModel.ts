@@ -290,7 +290,15 @@ export function connectCanvas(
 }
 export function initialPositions(
   graph: CanvasGraph,
+  mode: "horizontal" | "compact" = "horizontal",
 ): Map<string, { x: number; y: number }> {
+  if (mode === "compact")
+    return new Map(
+      displayOrder(graph).map((node, index) => [
+        node.id,
+        { x: (index % 2) * 280, y: Math.floor(index / 2) * 160 },
+      ]),
+    );
   const positions = new Map<string, { x: number; y: number }>(),
     depth = new Map<string, number>(),
     columns = new Map<number, number>();

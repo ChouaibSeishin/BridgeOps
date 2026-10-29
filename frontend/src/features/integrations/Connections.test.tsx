@@ -130,7 +130,8 @@ it("shows actual catalog and persisted connection health", async () => {
     await screen.findByRole("heading", { name: "Configured HTTPS" }),
   ).toBeVisible();
   expect(await screen.findByText("Persisted connection")).toBeVisible();
-  expect(screen.getByText("Connection check: NOT_CHECKED")).toBeVisible();
+  expect(screen.getByText("Connection check:")).toBeVisible();
+  expect(screen.getByText("NOT CHECKED")).toBeVisible();
 });
 it("does not load private configuration or controls for viewers", async () => {
   vi.mocked(session.request).mockResolvedValue({

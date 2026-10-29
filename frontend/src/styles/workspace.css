@@ -1,11 +1,4 @@
 /* Phase 5.5 shared presentation. Existing feature classes retain their behavior. */
-@theme inline {
-  --color-workspace: var(--color-bg);
-  --color-panel: var(--color-surface);
-  --color-ink: var(--color-text);
-  --color-muted: var(--color-text-muted);
-  --color-primary: var(--color-accent);
-}
 html {
   scroll-padding-top: 5rem;
 }
@@ -835,5 +828,38 @@ code {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+}
+.workflow-metadata form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(16rem, 2fr) auto;
+  align-items: end;
+  gap: 1rem;
+  max-width: none;
+  margin: 0;
+}
+.workflow-metadata textarea {
+  height: 66px;
+  min-height: 44px;
+}
+.workflow-metadata form > .button {
+  min-width: 110px;
+  align-self: end;
+}
+@media (max-width: 960px) {
+  .workflow-metadata form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .workflow-metadata form > .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+@media (max-width: 640px) {
+  .workflow-metadata form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workflow-metadata form > .button {
+    justify-self: stretch;
   }
 }

@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
@@ -92,7 +98,11 @@ it("shows persisted ticket revision, team mapping and honest notification status
   expect(await screen.findByText("Persisted billing issue")).toBeVisible();
   expect(screen.getByText(/Revision 3/)).toBeVisible();
   expect(screen.getByText(/Assigned team: Billing support/)).toBeVisible();
-  expect(screen.getByText(/DELIVERED_INTERNAL · LIVE_EXECUTION/)).toBeVisible();
+  const notification = screen
+    .getByText("Persisted internal update")
+    .closest("article")!;
+  expect(within(notification).getByText("DELIVERED INTERNAL")).toBeVisible();
+  expect(notification).toHaveTextContent("LIVE_EXECUTION");
   expect(
     screen.getByText(/No email, SMS or third-party delivery is implied/),
   ).toBeVisible();

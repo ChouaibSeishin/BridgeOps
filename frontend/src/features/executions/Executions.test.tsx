@@ -248,7 +248,9 @@ it("renders persisted result, attempts, timeline and immutable version link with
   show();
   await screen.findByText("RECORD COMMITTED · Synthetic action 1");
   expect(screen.getByText(/"recorded": true/)).toBeInTheDocument();
-  expect(screen.getByText(/attempt 1 · SUCCEEDED/)).toBeInTheDocument();
+  expect(screen.getByText(/attempt 1 ·/)).toHaveTextContent(
+    /attempt 1 · SUCCEEDED/,
+  );
   expect(
     screen.getByRole("link", { name: "Inspect pinned workflow version" }),
   ).toHaveAttribute(

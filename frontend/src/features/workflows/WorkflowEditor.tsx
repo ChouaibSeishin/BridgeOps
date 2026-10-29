@@ -11,6 +11,7 @@ import { GraphEditor, ReadOnlyDefinition } from "./GraphEditor";
 
 import { ExecutionStart } from "../executions/ExecutionStart";
 import { requiresExactNumbers } from "./precision";
+import { ConfirmationDialog, StatusBadge } from "../../components/ui";
 
 function validationDetails(value: unknown): value is Validation {
   if (!value || typeof value !== "object") return false;
@@ -179,9 +180,9 @@ function DraftWorkspace({
         </Link>
       </div>
       <div className="workflow-revision">
-        <span className="status-badge">
+        <StatusBadge value={archived ? "ARCHIVED" : "DRAFT"}>
           {archived ? "Archived" : "Editable draft"}
-        </span>
+        </StatusBadge>
         <strong>Saved revision {revision}</strong>
         <span role="status">
           {dirty ? "Unsaved changes" : "All changes saved"}
@@ -243,7 +244,7 @@ function DraftWorkspace({
           editors may duplicate its saved draft.
         </p>
       )}
-      <section className="data-panel">
+      <section className="data-panel workflow-metadata">
         <h2>Draft metadata</h2>
         <form
           onSubmit={(event) => {
@@ -383,10 +384,10 @@ function DraftWorkspace({
         </p>
       )}
       {confirmation && (
-        <section
-          className="confirmation"
-          role="dialog"
-          aria-labelledby="workflow-confirm-title"
+        <ConfirmationDialog
+          labelledBy="workflow-confirm-title"
+          onCancel={() => setConfirmation(null)}
+          busy={Boolean(busy)}
         >
           <h2 id="workflow-confirm-title">
             {confirmation === "publish"
@@ -423,9 +424,9 @@ function DraftWorkspace({
               Cancel
             </button>
           </div>
-        </section>
+        </ConfirmationDialog>
       )}
-      <ValidationResults result={validation} />
+      <ValidationResults result={validation} definition={saved.definition} />
       <VersionHistory
         key={`history/${saved.currentPublishedVersion?.id ?? "unpublished"}`}
         user={user.id}
@@ -489,11 +490,16 @@ function VersionHistory({
                     <time dateTime={version.publishedAt}>
                       {new Date(version.publishedAt).toLocaleString()}
                     </time>{" "}
-                    by <span className="mono">{version.publishedBy}</span>
                   </small>
-                  <code className="definition-hash">
-                    SHA-256 {version.definitionHash}
-                  </code>
+                  <details>
+                    <summary>Technical publication details</summary>
+                    <p>
+                      Published by <code>{version.publishedBy}</code>
+                    </p>
+                    <code className="definition-hash">
+                      SHA-256 {version.definitionHash}
+                    </code>
+                  </details>
                 </li>
               ))}
             </ol>
@@ -546,11 +552,16 @@ export function PublishedVersion({ user }: { user: User }) {
           <time dateTime={version.publishedAt}>
             {new Date(version.publishedAt).toLocaleString()}
           </time>{" "}
-          by <span className="mono">{version.publishedBy}</span>
         </p>
-        <code className="definition-hash">
-          SHA-256 {version.definitionHash}
-        </code>
+        <details>
+          <summary>Technical publication details</summary>
+          <p>
+            Published by <code>{version.publishedBy}</code>
+          </p>
+          <code className="definition-hash">
+            SHA-256 {version.definitionHash}
+          </code>
+        </details>
       </section>
       <ReadOnlyDefinition
         definition={snapshot.data.definition}

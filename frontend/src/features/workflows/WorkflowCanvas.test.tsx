@@ -5,6 +5,7 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkflowCanvas } from "./WorkflowCanvas";
@@ -66,6 +67,88 @@ function graph(): CanvasGraph {
   };
 }
 describe("workflow canvas", () => {
+  it("changes visual layout without changing the workflow definition", () => {
+    const change = vi.fn();
+    render(<WorkflowCanvas graph={graph()} change={change} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Canvas layout" }), {
+      target: { value: "horizontal" },
+    });
+    expect(change).not.toHaveBeenCalled();
+    expect(screen.getByRole("combobox", { name: "Inspect node" })).toHaveValue(
+      "",
+    );
+  });
+  it("provides a categorized palette, graph and inspector while keeping added-node state out of saved coordinates", () => {
+    const change = vi.fn();
+    render(<WorkflowCanvas graph={graph()} change={change} />);
+    const palette = screen.getByRole("complementary", { name: "Node palette" });
+    expect(
+      within(palette).getByRole("region", { name: "Actions" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "Node inspector" }),
+    ).toHaveTextContent("Choose a node");
+    fireEvent.click(
+      within(palette).getByRole("button", { name: "Add Approval gate node" }),
+    );
+    const next = change.mock.calls[0]![0] as CanvasGraph;
+    expect(next.nodes).toHaveLength(5);
+    expect(next.nodes.at(-1)?.type).toBe("approval");
+    expect(next.edges).toEqual(graph().edges);
+    expect(JSON.stringify(next)).not.toMatch(/position|viewport|selected/);
+  });
+  it("keeps advanced JSON secondary and associates rejected values with a safe field error", () => {
+    render(<WorkflowCanvas graph={graph()} change={vi.fn()} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Inspect node" }), {
+      target: { value: "stable_action_identifier" },
+    });
+    const details = screen.getByText("Advanced JSON").closest("details")!;
+    expect(details.open).toBe(false);
+    fireEvent.click(within(details).getByText("Advanced JSON"));
+    const input = screen.getByRole("textbox", { name: "Input mapping JSON" });
+    fireEvent.change(input, { target: { value: "invalid-private-canary" } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply node properties" }),
+    );
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute(
+      "aria-describedby",
+      screen.getByRole("alert").id,
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(
+      "invalid-private-canary",
+    );
+  });
+  it("navigates a friendly saved-validation issue to the selected node and focuses its inspector", async () => {
+    render(
+      <WorkflowCanvas
+        graph={graph()}
+        change={vi.fn()}
+        errors={[
+          {
+            nodeId: "stable_action_identifier",
+            code: "REQUIRED",
+            path: "nodes[1].config.message",
+            message: "Enter a record message.",
+          },
+        ]}
+      />,
+    );
+    fireEvent.click(
+      screen.getByText("Saved validation needs attention · 1 issues"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Synthetic action 1 — First" }),
+    );
+    expect(screen.getByRole("combobox", { name: "Inspect node" })).toHaveValue(
+      "stable_action_identifier",
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Synthetic action 1 — First" }),
+      ).toHaveFocus(),
+    );
+  });
   it("keeps an unsafe integer edit unapplied so JSON parsing cannot silently change its value", () => {
     const change = vi.fn(),
       pending = vi.fn();
@@ -79,6 +162,7 @@ describe("workflow canvas", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Inspect node" }), {
       target: { value: "stable_action_identifier" },
     });
+    fireEvent.click(screen.getByText("Advanced JSON"));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Input mapping JSON" }),
       { target: { value: '{"value":{"literal":9223372036854775807}}' } },
@@ -133,6 +217,7 @@ describe("workflow canvas", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Inspect node" }), {
       target: { value: "stable_action_identifier" },
     });
+    fireEvent.click(screen.getByText("Advanced JSON"));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Node configuration JSON" }),
       {
@@ -171,6 +256,7 @@ describe("workflow canvas", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Inspect node" }), {
       target: { value: "stable_action_identifier" },
     });
+    fireEvent.click(screen.getByText("Advanced JSON"));
     fireEvent.change(
       screen.getByRole("textbox", { name: "Input mapping JSON" }),
       { target: { value: "invalid-private-canary" } },

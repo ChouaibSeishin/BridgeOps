@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { resolve } from "node:path";
 import { authorRest } from "./rest-authoring.mjs";
+import { operationalVisualChecks } from "./ux.mjs";
 const {
   BRIDGEOPS_TEST_ORIGIN: origin,
   BRIDGEOPS_TEST_ORG: org,
@@ -162,10 +163,19 @@ try {
   expect(await owner.content()).not.toContain(
     "disposable-browser-provider-credential",
   );
+  await operationalVisualChecks(owner, "external-execution");
   await owner.screenshot({
     path: resolve("backend/target/browser-checks/rest-workflow-desktop.png"),
     fullPage: true,
   });
+  await owner
+    .locator(".workspace-sidebar")
+    .getByRole("link", { name: "Integrations", exact: true })
+    .click();
+  await expect(
+    owner.getByRole("heading", { name: "Integration catalog", exact: true }),
+  ).toBeVisible();
+  await operationalVisualChecks(owner, "integrations");
   for (const page of [owner, reviewer])
     expect(
       await page.evaluate(() => localStorage.length + sessionStorage.length),

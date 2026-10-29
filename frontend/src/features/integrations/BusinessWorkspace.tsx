@@ -6,6 +6,12 @@ import { useWorkflowAccess } from "../workflows/useWorkflowAccess";
 import { Pager, Problem } from "../workflows/Feedback";
 import { businessApi } from "./businessApi";
 import { DemoWorkflows } from "./DemoWorkflows";
+import {
+  ConfirmationDialog,
+  EmptyState,
+  StatusBadge,
+} from "../../components/ui";
+import { TableRegion } from "../../components/TableRegion";
 
 export function BusinessWorkspace({ user }: { user: User }) {
   const { id = "" } = useParams();
@@ -154,7 +160,7 @@ function BusinessData({
         </button>
       </div>
       {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && !confirm && <p role="alert">{error}</p>}
       {canSeed && (
         <section className="data-panel">
           <h2>Example data setup</h2>
@@ -164,11 +170,17 @@ function BusinessData({
             recorded separately as LIVE_EXECUTION.
           </p>
           {confirm ? (
-            <div>
+            <ConfirmationDialog
+              label="Add example data?"
+              busy={busy}
+              onCancel={() => setConfirm(false)}
+            >
+              <h3>Add example data?</h3>
               <p>
                 Add the example tickets, teams, responsibility mappings and one
                 internal demo notification?
               </p>
+              {error && <p role="alert">{error}</p>}
               <button
                 className="button primary"
                 disabled={busy}
@@ -183,7 +195,7 @@ function BusinessData({
               >
                 Keep existing data only
               </button>
-            </div>
+            </ConfirmationDialog>
           ) : (
             <button className="button" onClick={() => setConfirm(true)}>
               Add example data
@@ -200,7 +212,7 @@ function BusinessData({
       )}
       <section className="data-panel">
         <h2>Support tickets</h2>
-        <div className="action-row">
+        <div className="filter-row">
           <label>
             Status
             <select
@@ -254,26 +266,52 @@ function BusinessData({
         ) : (
           <>
             {tickets.data.items.length === 0 ? (
-              <p>No tickets match these filters.</p>
+              <EmptyState title="No tickets match these filters." />
             ) : (
-              tickets.data.items.map((ticket) => (
-                <article className="execution-step" key={ticket.id}>
-                  <h3>{ticket.title}</h3>
-                  <p>
-                    {ticket.status} · {ticket.priority} · {ticket.category}
-                  </p>
-                  <p>
-                    Assigned team: {teamName(ticket.assignedTeamId)} · Revision{" "}
-                    {ticket.revision}
-                  </p>
-                  <p>Provenance: {ticket.provenance}</p>
-                  <details>
-                    <summary>Technical ticket details</summary>
-                    <code>{ticket.id}</code>
-                    <p>Updated {new Date(ticket.updatedAt).toLocaleString()}</p>
-                  </details>
-                </article>
-              ))
+              <TableRegion label="Support ticket records">
+                <table className="records-table records-table--tickets">
+                  <caption className="sr-only">
+                    Support tickets and current assignments
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Ticket</th>
+                      <th scope="col">Status / priority</th>
+                      <th scope="col">Assigned team</th>
+                      <th scope="col">Provenance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tickets.data.items.map((ticket) => (
+                      <tr key={ticket.id}>
+                        <td>
+                          <h3>{ticket.title}</h3>
+                          <p className="record-secondary">{ticket.category}</p>
+                          <details>
+                            <summary>Technical ticket details</summary>
+                            <code>{ticket.id}</code>
+                            <p>
+                              Updated{" "}
+                              {new Date(ticket.updatedAt).toLocaleString()}
+                            </p>
+                          </details>
+                        </td>
+                        <td>
+                          <StatusBadge value={ticket.status} />
+                          <p>{ticket.priority}</p>
+                        </td>
+                        <td>
+                          Assigned team: {teamName(ticket.assignedTeamId)}
+                          <p className="record-secondary">
+                            Revision {ticket.revision}
+                          </p>
+                        </td>
+                        <td>{ticket.provenance}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableRegion>
             )}
             <Pager
               page={page}
@@ -311,7 +349,7 @@ function BusinessData({
         ) : mapping.data.length === 0 ? (
           <p>No responsibility mappings are configured.</p>
         ) : (
-          <ul>
+          <ul className="responsibility-list">
             {mapping.data.map((item) => (
               <li key={item.category}>
                 {item.category} → {teamName(item.teamId)}
@@ -339,10 +377,11 @@ function BusinessData({
               <p>No internal notifications yet.</p>
             ) : (
               notifications.data.items.map((notification) => (
-                <article key={notification.id}>
+                <article className="notification-record" key={notification.id}>
                   <h3>{notification.message}</h3>
                   <p>
-                    {notification.status} · {notification.provenance}
+                    <StatusBadge value={notification.status} /> ·{" "}
+                    {notification.provenance}
                   </p>
                   <p>{new Date(notification.createdAt).toLocaleString()}</p>
                   <button

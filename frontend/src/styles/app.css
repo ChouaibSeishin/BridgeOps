@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
+@theme inline {
+  --color-workspace: var(--color-bg);
+  --color-panel: var(--color-surface);
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-primary: var(--color-accent);
+}
+
 * {
   box-sizing: border-box;
 }

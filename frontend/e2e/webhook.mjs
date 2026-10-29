@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { createHmac } from "node:crypto";
 import { resolve } from "node:path";
+import { operationalVisualChecks } from "./ux.mjs";
 const {
   BRIDGEOPS_TEST_ORIGIN: origin,
   BRIDGEOPS_TEST_ORG: org,
@@ -391,6 +392,7 @@ try {
   await expect(
     owner.getByRole("link", { name: "no-work", exact: true }),
   ).toBeVisible();
+  await operationalVisualChecks(owner, "automations");
   await owner.screenshot({
     path: resolve("backend/target/browser-checks/webhook-triage-desktop.png"),
     fullPage: true,

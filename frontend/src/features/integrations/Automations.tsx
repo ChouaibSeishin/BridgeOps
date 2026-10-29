@@ -10,6 +10,7 @@ import {
   type SigningReveal,
   type WebhookEndpoint,
 } from "./automationApi";
+import { ConfirmationDialog, StatusBadge } from "../../components/ui";
 
 export function Automations({ user }: { user: User }) {
   const { id = "" } = useParams();
@@ -110,7 +111,7 @@ function AutomationWorkspace({
         </div>
         <Link to={`/organizations/${org}`}>Organization overview</Link>
       </section>
-      {error && (
+      {error && !action && (
         <p role="alert">
           {error} Refresh persisted configuration before retrying a creation
           whose response was lost.
@@ -142,10 +143,10 @@ function AutomationWorkspace({
           <>
             {!principals.data.items.length && <p>No automation principals.</p>}
             {principals.data.items.map((p) => (
-              <article className="data-panel" key={p.id}>
+              <article className="automation-record" key={p.id}>
                 <h3>{p.name}</h3>
                 <p>
-                  {p.status} · revision {p.revision}
+                  <StatusBadge value={p.status} /> · revision {p.revision}
                 </p>
                 <p>
                   <Link to={`/organizations/${org}/workflows/${p.workflowId}`}>
@@ -278,10 +279,10 @@ function AutomationWorkspace({
           <>
             {!endpoints.data.items.length && <p>No webhook endpoints.</p>}
             {endpoints.data.items.map((e) => (
-              <article className="data-panel" key={e.id}>
+              <article className="automation-record" key={e.id}>
                 <h3>{e.name}</h3>
                 <p>
-                  {e.status} · revision {e.revision}
+                  <StatusBadge value={e.status} /> · revision {e.revision}
                 </p>
                 <label>
                   Callback path
@@ -357,10 +358,10 @@ function AutomationWorkspace({
         )}
       </section>
       {action && (
-        <section
-          className="data-panel"
-          role="region"
-          aria-label="Confirm automation change"
+        <ConfirmationDialog
+          label="Confirm automation change"
+          busy={busy}
+          onCancel={() => setAction(null)}
         >
           <h2>
             {action.kind === "rotate"
@@ -370,6 +371,11 @@ function AutomationWorkspace({
           <p>
             {action.name} · expected revision {action.revision}
           </p>
+          {error && (
+            <p role="alert">
+              {error} Refresh persisted configuration before retrying.
+            </p>
+          )}
           <p>
             {action.kind === "rotate"
               ? "The previous key will stop accepting deliveries. Previously accepted work retains its original approval exclusions. Copy the new key when it appears."
@@ -413,7 +419,7 @@ function AutomationWorkspace({
           >
             Keep current configuration
           </button>
-        </section>
+        </ConfirmationDialog>
       )}
       {selected && (
         <DeliveryHistory
@@ -445,7 +451,10 @@ function SecretReveal({
     }
   }
   return (
-    <section className="data-panel" aria-label="One-time signing key">
+    <section
+      className="data-panel secret-reveal"
+      aria-label="One-time signing key"
+    >
       <h2>Copy the signing key once</h2>
       <p>
         This key will not appear in later reads. Store it securely with the

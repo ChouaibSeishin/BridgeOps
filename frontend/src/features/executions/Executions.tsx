@@ -13,6 +13,12 @@ import { nodeSchema } from "../workflows/model";
 import { canvasTypes } from "../workflows/canvasModel";
 import { executionApi, executionFailure, active } from "./api";
 import type { Execution, Step } from "./api";
+import {
+  ConfirmationDialog,
+  StatusBadge,
+  EmptyState,
+} from "../../components/ui";
+import { TableRegion } from "../../components/TableRegion";
 
 const when = (value: string | null) =>
   value ? new Date(value).toLocaleString() : "Not yet";
@@ -51,7 +57,7 @@ export function ExecutionList({ user }: { user: User }) {
         </Link>
       </div>
       <section className="data-panel">
-        <div className="action-row">
+        <div className="filter-row">
           <label>
             Execution status
             <select
@@ -89,23 +95,48 @@ export function ExecutionList({ user }: { user: User }) {
         {list.data && (
           <>
             {list.data.items.length === 0 ? (
-              <p>No executions match this view.</p>
+              <EmptyState title="No executions match this view." />
             ) : (
-              <ol className="version-history">
-                {list.data.items.map((e) => (
-                  <li key={e.id}>
-                    <Link to={`/organizations/${id}/executions/${e.id}`}>
-                      Inspect execution · {stateLabel(e.status)}
-                    </Link>
-                    <p>
-                      Created {when(e.createdAt)} · {e.source} · {e.mode}
-                    </p>
-                    <code className="definition-hash">
-                      SHA-256 {e.definitionHash}
-                    </code>
-                  </li>
-                ))}
-              </ol>
+              <TableRegion label="Execution records">
+                <table className="records-table">
+                  <caption className="sr-only">
+                    Persisted workflow executions
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Execution</th>
+                      <th scope="col">State</th>
+                      <th scope="col">Created</th>
+                      <th scope="col">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.data.items.map((e) => (
+                      <tr key={e.id}>
+                        <td>
+                          <Link to={`/organizations/${id}/executions/${e.id}`}>
+                            Inspect execution · {stateLabel(e.status)}
+                          </Link>
+                          <details>
+                            <summary>Version fingerprint</summary>
+                            <code className="definition-hash">
+                              SHA-256 {e.definitionHash}
+                            </code>
+                          </details>
+                        </td>
+                        <td>
+                          <StatusBadge value={e.status} />
+                        </td>
+                        <td>{when(e.createdAt)}</td>
+                        <td>
+                          {e.source}
+                          <p className="record-secondary">{e.mode}</p>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableRegion>
             )}
             <Pager page={page} pages={list.data.totalPages} change={setPage} />
           </>
@@ -291,27 +322,46 @@ function ExecutionWorkspace({
     : null;
   return (
     <>
-      <section className="data-panel">
-        <div className="action-row">
+      <section className="data-panel execution-summary" data-state={e.status}>
+        <div className="record-heading">
           <h2>Execution state</h2>
-          <strong role="status">{stateLabel(e.status)}</strong>
+          <StatusBadge value={e.status} live />
           <button className="button" onClick={() => void reload()}>
             Refresh execution
           </button>
         </div>
-        <p>
-          Created {when(e.createdAt)} · started {when(e.startedAt)} · completed{" "}
-          {when(e.completedAt)}
-        </p>
-        <p>
-          Absolute deadline: {when(e.deadlineAt)} · not before:{" "}
-          {when(e.notBefore)}
-        </p>
-        <p>
-          Duration since start:{" "}
-          {elapsed === null ? "Not started" : `${elapsed}s`} · source {e.source}{" "}
-          · {e.mode}
-        </p>
+        <dl className="summary-grid">
+          <div>
+            <dt>Created</dt>
+            <dd>{when(e.createdAt)}</dd>
+          </div>
+          <div>
+            <dt>Started</dt>
+            <dd>{when(e.startedAt)}</dd>
+          </div>
+          <div>
+            <dt>Completed</dt>
+            <dd>{when(e.completedAt)}</dd>
+          </div>
+          <div>
+            <dt>Absolute deadline</dt>
+            <dd>{when(e.deadlineAt)}</dd>
+          </div>
+          <div>
+            <dt>Not before</dt>
+            <dd>{when(e.notBefore)}</dd>
+          </div>
+          <div>
+            <dt>Duration since start</dt>
+            <dd>{elapsed === null ? "Not started" : `${elapsed}s`}</dd>
+          </div>
+          <div>
+            <dt>Source / mode</dt>
+            <dd>
+              {e.source} · {e.mode}
+            </dd>
+          </div>
+        </dl>
         <p>
           Current step:{" "}
           {steps.data?.[e.currentPosition]
@@ -352,7 +402,6 @@ function ExecutionWorkspace({
         >
           Inspect pinned workflow version
         </Link>
-        <code className="definition-hash">SHA-256 {e.definitionHash}</code>
         <p>
           <Link
             to={`/organizations/${organization}/approvals?executionId=${e.id}`}
@@ -375,6 +424,7 @@ function ExecutionWorkspace({
         )}
         <details>
           <summary>Technical execution details</summary>
+          <code className="definition-hash">SHA-256 {e.definitionHash}</code>
           {e.origin && (
             <p>
               Accepted webhook endpoint <code>{e.origin.endpoint}</code> ·
@@ -418,11 +468,10 @@ function ExecutionWorkspace({
           )}
         </div>
         {confirm && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="execution-mutation-title"
-            className="confirmation-panel"
+          <ConfirmationDialog
+            labelledBy="execution-mutation-title"
+            onCancel={() => setConfirm(null)}
+            busy={busy}
           >
             <h3 id="execution-mutation-title">
               {confirm === "cancel"
@@ -463,7 +512,7 @@ function ExecutionWorkspace({
                 Keep current execution
               </button>
             </div>
-          </div>
+          </ConfirmationDialog>
         )}
       </section>
       <section className="data-panel">
@@ -493,11 +542,11 @@ function ExecutionWorkspace({
         )}
         {attempts.data && (
           <>
-            <ol className="version-history">
+            <ol className="execution-timeline">
               {attempts.data.items.map((a) => (
                 <li key={a.id}>
                   {names.get(a.nodeId) ?? "Step"} · attempt {a.attemptNumber} ·{" "}
-                  {stateLabel(a.outcome)}
+                  <StatusBadge value={a.outcome} />
                   <p>
                     {when(a.startedAt)} → {when(a.completedAt)}{" "}
                     {a.errorCode && ` · ${stateLabel(a.errorCode)}`}
@@ -521,7 +570,7 @@ function ExecutionWorkspace({
         )}
         {events.data && (
           <>
-            <ol className="version-history">
+            <ol className="execution-timeline">
               {events.data.items.map((event) => (
                 <li key={event.sequence}>
                   {stateLabel(event.code)}
@@ -543,10 +592,12 @@ function ExecutionWorkspace({
 }
 function StepView({ step, name }: { step: Step; name: string }) {
   return (
-    <li>
-      <h3>
-        {name} · {stateLabel(step.status)}
-      </h3>
+    <li className="execution-step">
+      <div className="step-heading">
+        <h3>
+          {name} · <StatusBadge value={step.status} />
+        </h3>
+      </div>
       <p>
         {step.attemptCount} attempts · {when(step.startedAt)} →{" "}
         {when(step.completedAt)}

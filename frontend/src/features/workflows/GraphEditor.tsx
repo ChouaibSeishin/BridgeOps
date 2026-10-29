@@ -13,6 +13,7 @@ import { convertV1, isCanvasGraph } from "./canvasModel";
 import { requiresExactNumbers } from "./precision";
 import type { MappingScope } from "./MappingField";
 import type { WorkflowCanvas as CanvasView } from "./WorkflowCanvas";
+import { ConfirmationDialog } from "../../components/ui";
 const LazyCanvas = lazy(() =>
   import("./WorkflowCanvas").then((module) => ({
     default: module.WorkflowCanvas,
@@ -139,10 +140,9 @@ export function GraphEditor({
         </button>
       </div>
       {convert && (
-        <section
-          className="confirmation"
-          role="dialog"
-          aria-label="Convert draft schema"
+        <ConfirmationDialog
+          label="Convert draft schema"
+          onCancel={() => setConvert(false)}
         >
           <p>
             Convert only this editable draft to schema v2 with explicit input
@@ -168,7 +168,7 @@ export function GraphEditor({
           >
             Keep schema v1
           </button>
-        </section>
+        </ConfirmationDialog>
       )}
       {canvasVisible && (
         <WorkflowCanvas
