@@ -133,7 +133,7 @@ export async function executionJourney({
   ).toBeVisible();
   await operationalVisualChecks(page, "execution-history");
   await page
-    .getByLabel("Execution status", { exact: true })
+    .getByRole("combobox", { name: "Execution status", exact: true })
     .selectOption("FAILED");
   await expect(
     page.getByRole("heading", {
@@ -142,7 +142,9 @@ export async function executionJourney({
     }),
   ).toBeVisible();
   await operationalVisualChecks(page, "execution-empty");
-  await page.getByLabel("Execution status", { exact: true }).selectOption("");
+  await page
+    .getByRole("combobox", { name: "Execution status", exact: true })
+    .selectOption("");
   await page
     .getByRole("link", { name: "Inspect execution · SUCCEEDED", exact: true })
     .click();

@@ -1,6 +1,6 @@
 # Design foundation
 
-Status: Phase 5.5 evolves the delivered UI into a light operations workspace with an intentionally dark graphite workflow canvas. Implementation/verification is in progress under the [UI audit and sequence](../development/PHASE_5_5_UX.md). Historical milestone notes below retain their scope. The existing [token source](../../frontend/src/styles/tokens.css), system fonts, Tailwind and current React Flow behavior remain the foundation.
+Status: Phase 5.5 delivers a light operations workspace with an intentionally dark graphite workflow canvas. Implementation, responsive/keyboard checks and local release evidence are recorded in the [UX verification guide](../development/PHASE_5_5_UX.md). Historical milestone notes below retain their scope. The existing [token source](../../frontend/src/styles/tokens.css), system fonts, Tailwind and current React Flow behavior remain the foundation. Formal accessibility certification remains future work.
 
 Use a restrained operations workspace: warm neutral light surfaces, graphite dark surfaces, indigo actions, clear table hierarchy, monospaced identifiers and readable status text. Use system sans-serif initially to avoid font licensing/network dependencies. Typography targets: 14px body, 12px metadata, 24px page title; 1.5 body line height. Use a 4px spacing scale, 6–12px radii and modest shadows. Tokens govern colors, spacing, typography, borders, focus and states.
 

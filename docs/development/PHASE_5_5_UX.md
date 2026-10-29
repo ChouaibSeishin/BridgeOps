@@ -1,6 +1,6 @@
 # Phase 5.5 — UX/UI foundation and usability
 
-Status: in progress, 2026-10-29 UTC. This is a frontend milestone before Phase 6, preserving backend behavior, API/security contracts, workflow bytes/hashes and existing local data. No migration, environment/key change or production-data fixture is authorized by visual work.
+Status: implemented and locally verified, 2026-10-29 UTC. This frontend milestone before Phase 6 preserves backend behavior, API/security contracts, workflow bytes/hashes and existing local data. No migration, environment/key change or production-data fixture was introduced. Exact final hosted commit/run verification is reported at publication.
 
 ## Preflight and baseline
 
@@ -79,7 +79,8 @@ npm --prefix frontend run typecheck
 npm --prefix frontend run lint
 npm --prefix frontend test -- --maxWorkers=2
 npm --prefix frontend run build
-backend/mvnw.cmd -f backend/pom.xml -B -ntp verify
+backend/mvnw.cmd -f backend/pom.xml -B -ntp '-Dspring.test.context.cache.maxSize=1' clean verify
+backend/mvnw.cmd -f backend/pom.xml -B -ntp '-Dspring.test.context.cache.maxSize=1' '-Dit.test=BrowserJourneyIT' verify
 node scripts/verify-test-reports.mjs
 node scripts/verify-docs.mjs
 npm --prefix frontend audit --omit=dev --audit-level=high
@@ -90,7 +91,19 @@ The composed editor/operational build passed all 160 frontend tests in 24 files,
 
 Visual checks in `frontend/e2e/ux.mjs` run within existing real journeys. They capture 1440/1280/768/390px layouts, keyboard-scrollable tables, drawer focus containment/return, graph visibility after resizing and selected-node focusing, real status text contrast, control focus contrast/hit targets and global overflow. Captures are written under `backend/target/browser-checks/ux-*.png`; the existing journey captures remain. No mocked metrics, production credentials or one-time webhook secrets are used for visual evidence.
 
-Visual review found a phone graph outside its resized viewport. The new real node-intersection assertion detected the gap in the earlier geometry-only checks. A subsequent selected-node assertion exposed page scrolling as a separate issue; focus now also brings the graph into view. These checks remain enabled. Final full-suite, container, preservation and exact hosted release results will be recorded after completion.
+Visual review found a phone graph outside its resized viewport. The new real node-intersection assertion detected the gap in the earlier geometry-only checks. A subsequent selected-node assertion exposed page scrolling as a separate issue; focus now also brings the graph into view. A definite stacked-layout graph height resolves the phone resize case. These checks remain enabled.
+
+The clean full regression executed all 517 tests. Its only failure was a new empty-execution-view test locating a wrapping select by exact label text; the label includes option text in Playwright. The correction uses the exact accessible combobox role/name and retains the actual server-filtered empty-state assertion. The targeted BrowserJourneyIT verification then passed, including the account/Runtime gallery, all earlier onboarding/workflow/execution/recovery checks and the additional empty-state checks. Final strict reports: **55 reports / 517 tests / zero failures, errors or skips** (135 unit/MVC + 382 PostgreSQL/HTTP/browser). All six real Chromium journeys passed; no existing assertion or timeout was relaxed. The unchanged hosted workflow runs the full suite again for the published commit.
+
+The final browser run produced **84 rendered captures**, including **62 new responsive UX captures**. Evidence covers workspace/drawer, empty and populated workflows/executions, canvas/validation/inspector, approval inbox/detail, internal and REST execution, integrations, support/team/notification records, automation history, organization, account and Runtime. Representative 1440/1280 desktop, 768 tablet and 390 phone renders and dark-theme captures were inspected. Password/token fields are masked in screenshots. Local copies are retained under `.tmp/phase55-final-screenshots`; generated captures remain outside Git and are recreated by the required browser journeys.
+
+### Local container and preservation verification
+
+The production frontend image built successfully and the frontend container alone was replaced using Compose `up -d --no-deps --no-build --wait frontend`. The original backend and PostgreSQL container identities remain unchanged and healthy. The served HTML manifest and both entry assets match the verified production build byte-for-byte. Anonymous same-origin system information and readiness reads returned HTTP 200. No real account login, CSRF request, mutation, invitation, SMTP delivery, bootstrap or example-data setup was used as a visual fixture.
+
+Immediately after the frontend replacement, private read-only comparisons matched all **66 existing database table fingerprints**, environment/signing/CSRF/integration-key material and the original named-volume identity. A later check after the interruption matched all 62 non-authentication tables; only authentication throttles, security events, refresh sessions and session families changed. Safe event metadata records a normal session start at 13:24 UTC, after the deployment checks. That newer authentication state was retained. Protected key/environment hashes and the original volume/backend/PostgreSQL identities were rechecked and still match.
+
+No migration, credential rotation, environment replacement, data reset or volume recreation was performed. Database/browser tests use disposable fixtures. Full disposable container/security smoke remains enforced by the unchanged hosted workflow, rather than applying test mutations to the user's installation. All four deployed entry/lazy-canvas assets match the verified build byte-for-byte.
 
 ## Remaining scope boundaries
 
