@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { resolve } from "node:path";
+import { canvasContrastChecks } from "./ux.mjs";
 
 /** Every definition change here uses visible canvas controls; no graph JSON/API write shortcut. */
 export async function authorTriage(page, org, report) {
@@ -185,6 +186,7 @@ export async function authorTriage(page, org, report) {
   await page
     .getByRole("button", { name: "Reset layout and fit", exact: true })
     .click();
+  await canvasContrastChecks(page);
   await page.screenshot({
     path: resolve("backend/target/browser-checks/canvas-editor-desktop.png"),
     fullPage: true,

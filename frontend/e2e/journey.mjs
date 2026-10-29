@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { workflowJourney } from "./workflows.mjs";
 import { executionJourney } from "./executions.mjs";
+import { workspaceVisualChecks } from "./ux.mjs";
 const origin = process.env.BRIDGEOPS_TEST_ORIGIN;
 const control = process.env.BRIDGEOPS_TEST_CONTROL;
 const ownerPassword = "browser-disposable-password";
@@ -306,6 +307,7 @@ try {
   await respectAuthenticationBudget();
   step = "desktop mobile and dark render captures";
   console.log("STEP: " + step);
+  await workspaceVisualChecks(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await mkdir(resolve("backend/target/browser-checks"), { recursive: true });
   await page.screenshot({
@@ -507,7 +509,7 @@ try {
     "FAIL: source " +
       (
         (failure.stack ?? "").match(
-          /(?:journey|workflows|executions)\.mjs:\d+:\d+/g,
+          /(?:journey|workflows|executions|ux)\.mjs:\d+:\d+/g,
         ) ?? []
       ).join(", "),
   );

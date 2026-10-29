@@ -1,12 +1,16 @@
-/* Phase 0 proposal: semantic tokens, not a rendered or accessibility-verified UI. */
+/* Shared workspace semantics. Canvas colors are intentionally theme-independent. */
 :root {
   color-scheme: light;
-  --color-bg: #f7f8fa;
+  --color-bg: #f7f7f5;
   --color-surface: #ffffff;
-  --color-surface-raised: #f0f2f6;
-  --color-text: #172033;
-  --color-text-muted: #536078;
-  --color-border: #7b879b;
+  --color-surface-raised: #f0f2f5;
+  --color-text: #202737;
+  --color-text-muted: #566276;
+  --color-text-subtle: #657084;
+  --color-border: #8792a3;
+  --color-divider: #e0e4ea;
+  --color-hover: #f2f3f7;
+  --color-selected: #eeedfc;
   --color-accent: #4338ca;
   --color-on-accent: #ffffff;
   --color-accent-hover: #3730a3;
@@ -14,6 +18,11 @@
   --color-success: #166534;
   --color-warning: #854d0e;
   --color-danger: #b91c1c;
+  --color-info: #1d4ed8;
+  --color-success-soft: #edf8f0;
+  --color-warning-soft: #fff7e6;
+  --color-danger-soft: #fff0f0;
+  --color-info-soft: #eef3ff;
   --color-disabled-bg: #e8ebf1;
   --color-disabled-text: #536078;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -39,6 +48,24 @@
   --sidebar-width: 15rem;
   --topbar-height: 3.5rem;
   --content-max: 90rem;
+  --shadow-dialog: 0 20px 70px rgb(23 32 51 / 18%);
+  --color-backdrop: rgb(15 23 42 / 48%);
+  --canvas-bg: #171c26;
+  --canvas-grid: #3c4658;
+  --canvas-node: #242d3d;
+  --canvas-node-hover: #2d384a;
+  --canvas-text: #f1f4f9;
+  --canvas-muted: #bbc6d8;
+  --canvas-border: #687991;
+  --canvas-edge: #a6b5cc;
+  --canvas-focus: #bbb5ff;
+  --canvas-danger: #fda4af;
+  --canvas-trigger: #93c5fd;
+  --canvas-action: #c4b5fd;
+  --canvas-condition: #fde68a;
+  --canvas-approval: #fdba74;
+  --canvas-end: #86efac;
+  --canvas-http: #7dd3fc;
   --motion-fast: 120ms;
   --motion-normal: 180ms;
 }
@@ -51,6 +78,10 @@
   --color-text: #edf1f7;
   --color-text-muted: #abb7cc;
   --color-border: #74839c;
+  --color-divider: #374154;
+  --color-hover: #263044;
+  --color-selected: #302d50;
+  --color-text-subtle: #abb7cc;
   --color-accent: #b3adff;
   --color-on-accent: #1e1854;
   --color-accent-hover: #c8c3ff;
@@ -58,6 +89,11 @@
   --color-success: #86efac;
   --color-warning: #fde68a;
   --color-danger: #fca5a5;
+  --color-info: #a5c6ff;
+  --color-success-soft: #173b2a;
+  --color-warning-soft: #40351f;
+  --color-danger-soft: #42282f;
+  --color-info-soft: #202f4b;
   --color-disabled-bg: #30394a;
   --color-disabled-text: #abb7cc;
   --shadow-panel: 0 4px 16px rgb(0 0 0 / 24%);

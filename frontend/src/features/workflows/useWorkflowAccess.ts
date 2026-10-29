@@ -9,6 +9,7 @@ export function useWorkflowAccess(user: string, organization: string) {
         `/api/v1/organizations/${encodeURIComponent(organization)}/access`,
       ),
     retry: false,
+    enabled: Boolean(organization),
     refetchOnWindowFocus: false,
   });
 }

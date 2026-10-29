@@ -1,27 +1,13 @@
+import { WorkspaceShell } from "./WorkspaceShell";
 import {
   useEffect,
   useState,
   useSyncExternalStore,
   type FormEvent,
 } from "react";
-import {
-  Link,
-  NavLink,
-  Navigate,
-  Route,
-  Routes,
-  useNavigate,
-} from "react-router-dom";
+import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  Box,
-  Moon,
-  Sun,
-  Waypoints,
-  LogOut,
-  ShieldCheck,
-} from "lucide-react";
+import { Waypoints } from "lucide-react";
 import { getInfo, getReadiness } from "../lib/api";
 import { failureMessage, session } from "../lib/session";
 
@@ -127,183 +113,129 @@ export function App() {
       </main>
     );
   return (
-    <div className="workspace">
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-      <aside className="sidebar" aria-label="Workspace navigation">
-        <Link className="brand" to="/">
-          <span className="brand-icon">
-            <Waypoints size={22} />
-          </span>
-          BridgeOps<span className="brand-dot">.</span>
-        </Link>
-        <div className="workspace-label">
-          <ShieldCheck size={22} />
-          <div>
-            <strong>Operations workspace</strong>
-            <span>Secure, governed access</span>
-          </div>
-        </div>
-        <p className="nav-label">WORKSPACE</p>
-        <nav>
-          <NavLink to="/" end>
-            <Box size={17} />
-            Organizations
-          </NavLink>
-          <NavLink to="/runtime">
-            <Activity size={17} />
-            Runtime
-          </NavLink>
-          <NavLink to="/account">Account & sessions</NavLink>
-          <NavLink to="/workflows">Workflows</NavLink>
-        </nav>
-        <div className="sidebar-bottom">
-          <p className="muted small">
-            Organization access is checked by the server on every request.
-          </p>
-        </div>
-      </aside>
-      <div className="workspace-body">
-        <header className="topbar">
-          <span className="breadcrumb">Operations / Workspace</span>
-          <div className="top-actions">
-            <span>{state.user?.displayName}</span>
-            <button
-              className="icon-button"
-              aria-label={
-                dark ? "Switch to light theme" : "Switch to dark theme"
-              }
-              onClick={theme}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button className="button" onClick={() => void logout()}>
-              <LogOut size={15} />
-              Sign out
-            </button>
-          </div>
-        </header>
-        <main id="main" tabIndex={-1}>
-          <Routes>
-            <Route
-              path="/forgot"
-              element={<Recovery onReset={passwordFinished} />}
-            />
-            <Route
-              path="/reset"
-              element={<Recovery reset onReset={passwordFinished} />}
-            />
-            <Route path="/" element={<Organizations user={state.user!} />} />
-            <Route
-              path="/organizations/:id/integrations"
-              element={<Connections user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/automations"
-              element={<Automations user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/integrations/:connectionId"
-              element={<ConnectionDetail user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/business"
-              element={<BusinessWorkspace user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/approvals"
-              element={<ApprovalInbox user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/approvals/:approvalId"
-              element={<ApprovalDetail user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/approval-policy"
-              element={<ApprovalPolicy user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/executions"
-              element={<ExecutionList user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/executions/:executionId"
-              element={<ExecutionDetail user={state.user!} />}
-            />
-            <Route
-              path="/workflows"
-              element={<WorkflowHome user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/workflows"
-              element={<WorkflowList user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/workflows/:workflowId"
-              element={<WorkflowEditor user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id/workflows/:workflowId/versions/:versionId"
-              element={<PublishedVersion user={state.user!} />}
-            />
-            <Route
-              path="/organizations/:id"
-              element={<OrganizationDetail user={state.user!} />}
-            />
-            <Route path="/invitations/accept" element={<InvitationJourney />} />
-            <Route
-              path="/invitations/enroll"
-              element={<InvitationJourney enroll />}
-            />
-            <Route
-              path="/account"
-              element={
-                <>
-                  <div className="page-heading">
-                    <div>
-                      <h1>Account & sessions</h1>
-                      <p>Your current identity and sign-out controls.</p>
-                    </div>
-                  </div>
-                  <PasswordSettings onChanged={passwordFinished} />
-                  <section className="auth-card">
-                    <h2>{state.user?.displayName}</h2>
-                    <p>{state.user?.email}</p>
-                    <p>
-                      Access credentials are kept in memory. Your browser
-                      restores the session using its protected cookie.
-                    </p>
-                    <div className="action-row">
-                      <button className="button" onClick={() => void logout()}>
-                        Sign out this browser
-                      </button>
-                      <button
-                        className="button danger"
-                        onClick={() => void logout(true)}
-                      >
-                        Sign out all sessions
-                      </button>
-                    </div>
-                  </section>
-                </>
-              }
-            />
-            <Route path="/runtime" element={<Runtime />} />
-            <Route path="/sign-in" element={<Navigate to="/" replace />} />
-            <Route
-              path="*"
-              element={
-                <>
-                  <h1>Page not found</h1>
-                  <Link to="/">Return to overview</Link>
-                </>
-              }
-            />
-          </Routes>
-        </main>
-      </div>
-    </div>
+    <WorkspaceShell
+      user={state.user!}
+      dark={dark}
+      theme={theme}
+      logout={() => void logout()}
+    >
+      <Routes>
+        <Route
+          path="/forgot"
+          element={<Recovery onReset={passwordFinished} />}
+        />
+        <Route
+          path="/reset"
+          element={<Recovery reset onReset={passwordFinished} />}
+        />
+        <Route path="/" element={<Organizations user={state.user!} />} />
+        <Route
+          path="/organizations/:id/integrations"
+          element={<Connections user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/automations"
+          element={<Automations user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/integrations/:connectionId"
+          element={<ConnectionDetail user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/business"
+          element={<BusinessWorkspace user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/approvals"
+          element={<ApprovalInbox user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/approvals/:approvalId"
+          element={<ApprovalDetail user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/approval-policy"
+          element={<ApprovalPolicy user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/executions"
+          element={<ExecutionList user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/executions/:executionId"
+          element={<ExecutionDetail user={state.user!} />}
+        />
+        <Route
+          path="/workflows"
+          element={<WorkflowHome user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/workflows"
+          element={<WorkflowList user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/workflows/:workflowId"
+          element={<WorkflowEditor user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id/workflows/:workflowId/versions/:versionId"
+          element={<PublishedVersion user={state.user!} />}
+        />
+        <Route
+          path="/organizations/:id"
+          element={<OrganizationDetail user={state.user!} />}
+        />
+        <Route path="/invitations/accept" element={<InvitationJourney />} />
+        <Route
+          path="/invitations/enroll"
+          element={<InvitationJourney enroll />}
+        />
+        <Route
+          path="/account"
+          element={
+            <>
+              <div className="page-heading">
+                <div>
+                  <h1>Account & sessions</h1>
+                  <p>Your current identity and sign-out controls.</p>
+                </div>
+              </div>
+              <PasswordSettings onChanged={passwordFinished} />
+              <section className="auth-card">
+                <h2>{state.user?.displayName}</h2>
+                <p>{state.user?.email}</p>
+                <p>
+                  Access credentials are kept in memory. Your browser restores
+                  the session using its protected cookie.
+                </p>
+                <div className="action-row">
+                  <button className="button" onClick={() => void logout()}>
+                    Sign out this browser
+                  </button>
+                  <button
+                    className="button danger"
+                    onClick={() => void logout(true)}
+                  >
+                    Sign out all sessions
+                  </button>
+                </div>
+              </section>
+            </>
+          }
+        />
+        <Route path="/runtime" element={<Runtime />} />
+        <Route path="/sign-in" element={<Navigate to="/" replace />} />
+        <Route
+          path="*"
+          element={
+            <>
+              <h1>Page not found</h1>
+              <Link to="/">Return to overview</Link>
+            </>
+          }
+        />
+      </Routes>
+    </WorkspaceShell>
   );
 }
 function SignIn({ notice }: { notice: string }) {

@@ -10,23 +10,27 @@
   overflow: hidden;
 }
 .workflow-canvas .react-flow {
-  --xy-background-color: var(--color-surface-raised);
-  --xy-node-background-color: var(--color-surface);
-  --xy-node-color: var(--color-text);
-  --xy-edge-stroke: var(--color-text-muted);
-  --xy-edge-label-color: var(--color-text);
-  --xy-edge-label-background-color: var(--color-surface);
-  --xy-controls-button-background-color: var(--color-surface);
-  --xy-controls-button-color: var(--color-text);
-  --xy-controls-button-border-color: var(--color-border);
+  --xy-background-color: var(--canvas-bg);
+  --xy-node-background-color: var(--canvas-node);
+  --xy-node-color: var(--canvas-text);
+  --xy-edge-stroke: var(--canvas-edge);
+  --xy-edge-stroke-selected: var(--canvas-focus);
+  --xy-edge-stroke-width: 2;
+  --xy-edge-label-color: var(--canvas-text);
+  --xy-edge-label-background-color: var(--canvas-bg);
+  --xy-controls-button-background-color: var(--canvas-node);
+  --xy-controls-button-background-color-hover: var(--canvas-node-hover);
+  --xy-controls-button-color: var(--canvas-text);
+  --xy-controls-button-border-color: var(--canvas-border);
 }
 .canvas-node {
   width: 220px;
   min-height: 100px;
   padding: 14px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: var(--canvas-node);
+  color: var(--canvas-text);
+  border: 1px solid var(--canvas-border);
+  border-top: 3px solid var(--node-accent, var(--canvas-action));
   border-radius: 10px;
   display: grid;
   gap: 5px;
@@ -36,16 +40,51 @@
   font-size: 0.875rem;
 }
 .canvas-node-kind {
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  color: var(--canvas-muted);
 }
 .react-flow__node.selected .canvas-node {
-  outline: 3px solid var(--color-text);
+  outline: 3px solid var(--canvas-focus);
   outline-offset: 3px;
 }
 .canvas-node-invalid {
   border-width: 3px;
   border-style: dashed;
+  border-color: var(--canvas-danger);
+}
+.canvas-node:hover {
+  background: var(--canvas-node-hover);
+}
+.canvas-node[data-kind$="Trigger"] {
+  --node-accent: var(--canvas-trigger);
+}
+.canvas-node[data-kind="condition"],
+.canvas-node[data-kind="delay"] {
+  --node-accent: var(--canvas-condition);
+}
+.canvas-node[data-kind="approval"] {
+  --node-accent: var(--canvas-approval);
+}
+.canvas-node[data-kind="configuredHttp"] {
+  --node-accent: var(--canvas-http);
+}
+.canvas-node[data-kind="end"],
+.canvas-node[data-kind="notification"] {
+  --node-accent: var(--canvas-end);
+}
+.workflow-canvas .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: var(--canvas-edge);
+  border: 2px solid var(--canvas-node);
+}
+.workflow-canvas .react-flow__node:focus-visible {
+  outline: 3px solid var(--canvas-focus);
+  outline-offset: 4px;
+}
+.workflow-canvas .react-flow__controls-button:focus-visible {
+  outline: 3px solid var(--canvas-focus);
+  outline-offset: -4px;
 }
 .workflow-canvas .react-flow__controls-button {
   width: 44px;

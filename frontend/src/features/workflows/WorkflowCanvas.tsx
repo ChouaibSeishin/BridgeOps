@@ -35,7 +35,10 @@ type DiagramNode = Node<
 >;
 function WorkflowNode({ data }: NodeProps<DiagramNode>) {
   return (
-    <div className={`canvas-node${data.invalid ? " canvas-node-invalid" : ""}`}>
+    <div
+      className={`canvas-node${data.invalid ? " canvas-node-invalid" : ""}`}
+      data-kind={data.kind}
+    >
       {!data.kind.endsWith("Trigger") && (
         <Handle type="target" position={Position.Left} />
       )}
@@ -266,9 +269,9 @@ export function WorkflowCanvas({
           fitView
           minZoom={0.15}
           maxZoom={1.8}
-          colorMode="system"
+          colorMode="dark"
         >
-          <Background />
+          <Background color="var(--canvas-grid)" gap={24} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
